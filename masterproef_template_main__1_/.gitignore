@@ -1,0 +1,29 @@
+# LaTeX build artifacts
+*.aux
+*.acn
+*.acr
+*.alg
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.glo
+*.gls
+*.glg
+*.ist
+*.lof
+*.log
+*.lol
+*.lot
+*.out
+*.run.xml
+*.synctex.gz
+*.toc
+*.xdv
+*.pdf
+
+# Minted cache
+_minted/
+
+# Windows alternate data streams
+*:Zone.Identifier
