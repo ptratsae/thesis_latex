@@ -1,25 +1,263 @@
 \chapter{User-Side Job Recommendation System}
 \label{chap:user_recommendation}
 
+This chapter details the job recommendation system build for users using pytorch, consisting of the preprocessing of the data and the architecture of the two-tower model. This model
+will be used in chapter \ref{chap:congestion_balancing} to implement the user-side congestion reduction strategy. 
+\vspace{1em}
+First, in subsection \ref{sec:user_arch}, the architecture of the two-tower model is explained. Then, in subsection \ref{sec:user_data_pipeline}, the data pipeline and feature engineering techniques are described. Finally, in subsection \ref{sec:user_training}, the training and evaluation of the model are discussed.
+\vspace{1em}
+The need for a two-tower \gls{RS} is due to the fact a neural network can deal with cold start problem. Which is important due to how the dataset is split (see section \ref{sec:custom_split}). 
+
 \section{Architecture: The Two-Tower Model}
 \label{sec:user_arch}
 
-Detail the PyTorch-based neural network architecture.
+The two-tower model is trained and evaluated on the CareerBuilder Job Recommendation dataset (see Chapter \ref{chap:dataset_overview} for a comprehensive dataset overview). The model consists of two separate neural networks. One for processing the user features, the user tower, and one for processing the job features, the job tower. Each tower learns a new vector representation of the user and job features, respectively. The output of both towers is then combined to make a final prediction on the match between user and job. The architecture is designed to capture complex interactions between user and job features given in the dataset. 
 
 \subsection{User Tower}
 \label{sec:user_tower}
 
+The user tower consists of a multi-layer feedforward neural network that transforms the input user features into a dense embedding vector. This embedding captures the underlying preferences and characteristics of the user, which can then be used to compute similarity with job embeddings from the job tower. The cold start problem is solved by the fact that the model can learn to generalize from the features of users and jobs, allowing it to make recommendations even for new users or jobs that were not seen during training.
+
+\subsubsection{Input Layer}
+\begin{listing}[h]
+\begin{minted}{python3}
+        self.user_embeddings = nn.ModuleList([nn.Embedding(card, 16) for card in num_user_cat])
+\end{minted}
+\caption{User embedding layer initialization in the two-tower model}
+\label{lst:user_embeddings}
+\end{listing}
+
+Categorical features are converted to 16-dimensional embeddings using learnable embedding layers. These embeddings are then concatenated with numeric features (e.g., age, years of experience). The total input dimension is calculated as:
+
+\begin{equation}
+\text{user\_input\_dim} = (\text{number of categorical features} \times 16) + \text{number of numeric features}
+\end{equation}
+
+\subsubsection{Neural Network Stack}
+
+The user tower consists of three fully-connected layers with regularization:
+\begin{itemize}
+    \item \textbf{Layer 1}: Linear transformation from user\_input\_dim to 512 neurons, followed by batch normalization, ReLU activation, and 30\% dropout for regularization.
+    \item \textbf{Layer 2}: Linear transformation from 512 to 256 neurons, followed by batch normalization, ReLU activation, and 20\% dropout.
+    \item \textbf{Output Layer}: Linear transformation from 256 to 64 neurons, producing a 64-dimensional user embedding.
+\end{itemize}
+
+The decreasing layer sizes (512 $\rightarrow$ 256 $\rightarrow$ 64) act as a bottleneck, forcing the network to learn compressed and meaningful representations of user profiles.
+
 \subsection{Job Tower}
 \label{sec:job_tower}
+
+The job tower mirrors the architecture of the user tower to process job-related features. This symmetric design ensures both towers learn complementary representations suitable for matching user-job pairs. The only difference is the input dimension, which depends on the number of job features.
+
+\subsubsection{Input Layer}
+
+Similar to the user tower, categorical job attributes (e.g., location, industry, job type) are embedded to 16 dimensions. Numeric features representing the job, including FastText embeddings of job descriptions, are concatenated with these categorical embeddings. The total input dimension mirrors the user tower calculation:
+\begin{equation}
+\text{job\_input\_dim} = (\text{number of categorical features} \times 16) + \text{number of numeric features}
+\end{equation}
+
+\subsubsection{Neural Network Stack}
+
+The job tower employs an identical layer progression as the user tower:
+\begin{itemize}
+    \item \textbf{Layer 1}: Linear(job\_input\_dim $\rightarrow$ 512) with batch normalization, ReLU, and 30\% dropout.
+    \item \textbf{Layer 2}: Linear(512 $\rightarrow$ 256) with batch normalization, ReLU, and 20\% dropout.
+    \item \textbf{Output Layer}: Linear(256 $\rightarrow$ 64) producing a 64-dimensional job embedding.
+\end{itemize}
+
+\subsection{Prediction Layer}
+\label{sec:user_prediction}
+
+The final user-job matching score is computed via the dot product of the learned user and job embeddings:
+\begin{equation}
+\text{score} = \text{user\_vec} \cdot \text{job\_vec} = \sum_{i=1}^{64} \text{user\_vec}_i \times \text{job\_vec}_i
+\end{equation}
+
+This dot product measures the semantic similarity between the learned user and job representations. Higher scores indicate better matches, while lower scores suggest poor alignment between user preferences and job characteristics. This approach allows the model to capture non-linear relationships between user and job features through the multi-layer architecture. The complete two-tower model implementation in PyTorch is provided in Appendix \ref{app:two_tower_model}.
+
 
 \section{Data Pipeline and Feature Engineering}
 \label{sec:user_data_pipeline}
 
-Processing of the data.
+The raw data needs to be preprocessed before it can be used by the two-tower model. The data pipeline consists of four main stages: (\ref{sec:training_data_gen}) training data generation with balanced sampling, (\ref{sec:user_features_processing}) user feature processing, (\ref{sec:job_feature_processing}) job feature processing, and (\ref{sec:text_embedding_generation}) text embedding generation. Each stage is designed to handle large-scale data efficiently while preserving data integrity and semantic information.
+
+\subsection{Training Data Generation}
+\label{sec:training_data_gen}
+
+The training data generation process creates a balanced dataset with explicit positive and negative samples while ensuring temporal consistency across train, validation, and test sets.
+
+\subsubsection{Temporal Window-Based Splitting}
+
+The raw applications data consists of a timeline separated into 7 temporal windows, where each window represents a distinct time period. The split is defined as follows:
+\begin{itemize}
+    \item \textbf{Training Set}: Windows 1--4 (early time periods)
+    \item \textbf{Validation Set}: Windows 5--6 (intermediate time periods)
+    \item \textbf{Test Set}: Window 7 (most recent time period)
+\end{itemize}
+
+This temporal split ensures that the model is trained on historical data and evaluated on future predictions, simulating a realistic deployment scenario where recommendations must generalize to unseen temporal patterns.
+
+\subsubsection{Label Assignment and Data Filtering}
+
+Positive samples are generated directly from the applications data: each user-job pair where an application was submitted receives a label of 1. All applications from users originally designated as \textit{Split=Train} are preserved, ensuring reliable ground truth. Users from the \textit{Split=Test} category (used in the original competition for blind evaluation) are excluded to avoid incomplete labels.
+
+Each application is assigned to a train/validation/test split based on its window:
+\begin{equation}
+\text{Split} = \begin{cases}
+\text{Train} & \text{if } \text{WindowID} \in \{1, 2, 3, 4\} \\
+\text{Validation} & \text{if } \text{WindowID} \in \{5, 6\} \\
+\text{Test} & \text{if } \text{WindowID} = 7
+\end{cases}
+\end{equation}
+
+\subsubsection{City-Based Negative Sampling}
+
+To create a balanced binary classification problem, negative samples (user-job pairs that were \textit{not} applied to) are generated synthetically. The ratio of negative to positive samples is maintained at 1:1 to avoid severe class imbalance.
+
+Negative sampling is performed using a city-based strategy to generate realistic hard negatives. For each user in each window:
+\begin{enumerate}
+    \item All job IDs that the user has already applied to are excluded (to avoid duplicate positives).
+    \item Jobs from the same city as the user are preferentially selected as negative samples, as they represent realistic alternatives the user might consider.
+    \item If insufficient same-city jobs exist, jobs from other cities in the same window are used as fallback negatives.
+\end{enumerate}
+
+This strategy creates a dataset with:
+\begin{itemize}
+    \item \textbf{Same-city negatives}: Hard negatives that are geographically relevant but not applied to by the user
+    \item \textbf{Cross-city negatives}: Harder negatives representing jobs outside the user's typical geographic range
+\end{itemize}
+
+The city-based strategy biases the model toward learning location-aware preferences, which is important for a job recommendation system.
+
+\subsection{User Feature Processing}
+\label{sec:user_features_processing}
+
+User features are extracted and engineered to create a comprehensive representation of each jobseeker's profile.
+
+\subsubsection{Feature Extraction and Merging}
+
+Raw user features (demographics, education, location) are merged with user employment history. The most recent job titles (up to 3 previous positions) are extracted and concatenated with recency labels:
+\begin{equation}
+\text{Recent\_JobTitle} = \text{``Current: JobTitle}_{1}\text{ | Previous: JobTitle}_{2}\text{ | Earlier: JobTitle}_{3}\text{'}
+\end{equation}
+
+This concatenation preserves the temporal sequence of employment, allowing the model to understand career progression and specialization.
+
+\subsubsection{Feature Engineering}
+
+Several domain-specific features are engineered from raw attributes:
+
+\begin{itemize}
+    \item \textbf{Years Since Graduation}: Calculated from the graduation date as $\text{current\_year} - \text{graduation\_year}$. Missing values are imputed with the median, representing years of professional experience.
+    \item \textbf{Location Standardization}: Country and ZipCode columns are dropped; City and State are retained for geographic granularity.
+\end{itemize}
+
+\subsubsection{Embedding and Encoding}
+
+The engineered features are processed based on their data type:
+
+\begin{itemize}
+    \item \textbf{Recent Job History}: The Recent\_JobTitle field (textual) is encoded into a dense 100-dimensional vector using the Qwen3 Embedding Model (0.6B), which captures semantic meaning of job titles and career progression. This embedding is stored as 100 columns prefixed with \texttt{ft\_recent\_job0} through \texttt{ft\_recent\_job99}.
+    \item \textbf{Numeric Features}: Features such as years of experience are standardized using z-score normalization (StandardScaler) to have mean 0 and standard deviation 1, ensuring scale invariance.
+    \item \textbf{Categorical Features}: Features such as education level, location, and other discrete attributes are label-encoded, mapping each unique value to an integer starting from 1 (0 is reserved for missing values).
+\end{itemize}
+
+\subsection{Job Feature Processing}
+\label{sec:job_features_processing}
+
+Job features are processed in a scalable manner using chunked processing to handle large job datasets efficiently.
+
+\subsubsection{Data Organization}
+
+Raw job data is separated into three categories:
+\begin{itemize}
+    \item \textbf{Meta Columns}: JobID, WindowID, StartDate, EndDate (preserved without transformation)
+    \item \textbf{Text Columns}: Title, Description, Requirements (extracted for separate text cleaning and embedding)
+    \item \textbf{Feature Columns}: All numerical and categorical attributes used for the two-tower model
+\end{itemize}
+
+\subsubsection{Chunked Processing Strategy}
+
+Given the potentially large size of job datasets (millions of job postings), processing is performed in chunks of 50,000 records. This two-pass approach ensures:
+
+\begin{enumerate}
+    \item \textbf{First Pass}: Iterate through all chunks to collect unique categorical values and compute scaling statistics (mean, variance) from numerical features across the entire dataset.
+    \item \textbf{Second Pass}: Apply learned encoders and scalers consistently to transform the data, ensuring that categorical mappings and numerical scaling are coherent across all jobs.
+\end{enumerate}
+
+\subsubsection{Feature Transformation}
+
+During the second pass, features are transformed as follows:
+
+\begin{itemize}
+    \item \textbf{Numerical Features}: Standardized using StandardScaler fitted on the full dataset, ensuring consistent scaling across all chunks.
+    \item \textbf{Categorical Features}: Mapped to integers using a consistent encoding dictionary built from all unique values (1-indexed; 0 for missing values).
+    \item \textbf{Location Features}: City and State are retained for the city-based negative sampling and geographic modeling.
+\end{itemize}
+
+\subsection{Text Cleaning and Embedding}
+\label{sec:text_embedding}
+
+Text data from job postings is processed to extract semantic information through cleaning and embedding.
+
+\subsubsection{Text Cleaning}
+
+Job titles and descriptions often contain HTML tags, special characters, and inconsistent formatting. The cleaning process:
+\begin{enumerate}
+    \item Removes HTML tags using BeautifulSoup parser.
+    \item Converts text to lowercase for consistency.
+    \item Strips leading and trailing whitespace.
+\end{enumerate}
+
+This produces clean, normalized text suitable for embedding models.
+
+\subsubsection{Semantic Embedding with Qwen}
+
+The cleaned job titles are encoded into dense vectors using the Qwen3 Embedding Model (0.6B), a specialized embedding model for semantic similarity. The embedding process:
+\begin{enumerate}
+    \item Encodes each job title into a 100-dimensional vector (truncated from the full embedding dimension for efficiency).
+    \item Normalizes embeddings to unit norm to ensure comparable similarity scores across the corpus.
+    \item Generates embeddings stored with columns prefixed as \texttt{qwen\_0} through \texttt{qwen\_99}.
+\end{enumerate}
+
+These Qwen embeddings capture semantic relationships between job titles (e.g., ``Software Engineer'' and ``Developer'' have similar embeddings), enabling the job tower to learn meaningful job-to-job relationships beyond categorical attributes.
+
+\subsubsection{Merging with Job Features}
+
+Qwen embeddings are merged with the processed job features using JobID as the key. Missing embeddings (if any) are filled with 0. The final job feature matrix contains:
+\begin{equation}
+\text{job\_features} = [\text{meta\_cols}, \text{numerical\_features}, \text{categorical\_features}, \text{qwen\_embeddings}]
+\end{equation}
+
+\subsection{Cross-Tower Location Consistency}
+\label{sec:location_encoding}
+
+To ensure that the same location (city/state) is mapped to the same embedding in both user and job towers, a unified location encoding is applied. This step:
+\begin{enumerate}
+    \item Collects all unique city and state values from both user and job datasets.
+    \item Creates a shared vocabulary mapping each location to a unique integer.
+    \item Re-encodes both user and job features using this shared vocabulary.
+\end{enumerate}
+
+This consistency ensures that the embedding layers learn location representations that are aligned across towers, improving the model's ability to capture location-based preferences.
+
 
 \section{Training and Evaluation}
 \label{sec:user_training}
 
-Time-based data splitting (Windows 1-4 for Training, 5-6 for Validation, 7 for Testing).
+\subsection{Training Configuration}
 
-Performance metrics: Loss, Accuracy, and AUC-ROC.
+The model is trained on the Train split (Windows 1--4) using the processed user and job features. The temporal window structure naturally provides a progression of difficulty: validation samples (Windows 5--6) become progressively harder to rank than later training windows, while test samples (Window 7) represent the most recent and challenging time period.
+
+\subsection{Loss Function and Optimization}
+
+The model learns to predict matching scores for user-job pairs. The output is a single scalar (the dot product of embeddings), which is optimized using a binary classification loss (e.g., Binary Cross-Entropy) to minimize the difference between predicted scores and ground truth labels (1 for applications, 0 for negative samples).
+
+\subsection{Performance Evaluation Metrics}
+
+Model performance is assessed using the following metrics:
+\begin{itemize}
+    \item \textbf{Loss}: Binary cross-entropy loss on validation and test sets, indicating model confidence in predictions.
+    \item \textbf{Accuracy}: Percentage of correctly classified user-job pairs (applied = 1, not applied = 0).
+    \item \textbf{AUC-ROC}: Area Under the Receiver Operating Characteristic curve, measuring the model's ability to rank positive samples higher than negatives across all score thresholds. This is particularly important for ranking systems where the order of recommendations matters more than absolute classification accuracy.
+\end{itemize}

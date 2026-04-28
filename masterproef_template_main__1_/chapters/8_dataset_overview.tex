@@ -1,0 +1,132 @@
+\chapter{Dataset Overview}
+\label{chap:dataset_overview}
+
+The research presented in this thesis relies on the CareerBuilder Job Recommendation dataset from the Kaggle competition ``Job Recommendation Engine Challenge''. This chapter provides a comprehensive overview of the dataset structure, composition, and characteristics. The dataset is used throughout the entire thesis for developing and evaluating recommender systems and congestion balancing strategies.
+
+\section{Dataset Description}
+\label{sec:dataset_description}
+
+The dataset contains real-world job applications, user demographics, and job postings from CareerBuilder.com, spanning a 13-week period. The dataset was collected to support research on job recommendation systems, with the goal of predicting which jobs users will apply to based on their historical behaviour and attibutes of both users and jobs. 
+\section{Temporal Window Structure}
+\label{sec:temporal_windows}
+
+The CareerBuilder dataset is organized into 7 temporal windows, each representing a 13-day period. In the original dataset design, each window is divided into:
+\begin{itemize}
+    \item \textbf{Training Period}: The first 9 days, during which all applications are recorded
+    \item \textbf{Test Period}: The last 4 days, during which the original challenge asked for predictions
+\end{itemize}
+
+However, in this research, we employ a different data split strategy for more realistic evaluation.
+
+\subsection{Custom Train/Validation/Test Split}
+\label{sec:custom_split}
+Instead of using the original within-window splits, we use a temporal split across all windows:
+
+\begin{itemize}
+    \item \textbf{Training Set}: All users and jobs from Windows 1--4. This comprises approximately the first 52 days of the 13-week period and serves as the historical data for model training.
+    
+    \item \textbf{Validation/Test Set}: All users and jobs from Windows 5--7. This comprises approximately the last 39 days of the 13-week period and is used for evaluation.
+    
+    \item \textbf{Original Dataset Train/Test Split Ignored}: The original dataset distinguishes between ``Train users'' (fewer than 5 applications in the window's test period) and ``Test users'' (5 or more applications). We ignore this distinction entirely and use all users and jobs from the respective windows.
+\end{itemize}
+
+This approach creates a more realistic scenario where:
+\begin{enumerate}
+    \item \textbf{Clear Temporal Boundary}: Training data is strictly from earlier time periods (Windows 1--4), and evaluation is on later time periods (Windows 5--7), simulating a realistic deployment scenario.
+    
+    \item \textbf{No User Overlap}: Users are only active in either the training or validation/test period, eliminating information leakage and creating a cold-start scenario where the model must generalize to entirely new users.
+    
+    \item \textbf{Simplified Evaluation}: Using all users from each split (rather than filtering by activity thresholds) provides clearer evaluation metrics and avoids bias toward highly-engaged users.
+    
+    \item \textbf{Scalability}: This split is easier to implement and extend to other datasets with similar temporal structures.
+\end{enumerate}
+
+This temporal structure simulates a realistic deployment scenario where the model is trained on historical behavior and must predict future applications from new users.
+\section{User and Job Assignment Strategy}
+\label{sec:assignment_strategy}
+Users and jobs are assigned to windows probabilistically based on their activity, ensuring that the dataset reflects realistic usage patterns.
+
+\subsection{User Assignment}
+
+Each user is assigned to a single window with a probability proportional to the number of applications they made in that window. For example, if a user made 70\% of their applications in Window 2 and 30\% in Window 3, they will be assigned to Window 2 with probability 0.7 and to Window 3 with probability 0.3. This approach ensures that:
+\begin{itemize}
+    \item Each user appears in exactly one window, simplifying the evaluation setup
+    \item Users are placed in their most active window, providing the strongest signal for training
+    \item The dataset reflects real usage patterns where users concentrate their job search activity in particular time periods
+\end{itemize}
+
+This means that with the split we chose mentioned in section \ref{sec:temporal_windows}, users will only be active in either the training or test period, but not both. This creates a more realistic scenario where we predict future user behavior based on past data, without any leakage of user activity across periods. In other words, we only got cold start users, which is a harder problem to solve, but also more realistic.
+
+\subsection{Job Assignment}
+
+Each job is assigned to a single window with probability proportional to the duration it was visible on CareerBuilder. This method is similar to the user assignment strategy. More specifically:
+\begin{itemize}
+    \item Jobs that were live longer during a particular window have a higher probability of being assigned to that window
+    \item Each job has a visibility window defined by \texttt{StartDate} and \texttt{EndDate} columns, indicating the exact period during which users could apply to it
+    \item Users can only apply to a job if it is visible during the application date
+\end{itemize}
+
+This assignment ensures that job availability and visibility are realistic within each temporal window.
+\vspace{1em}
+In this research, for simplicity the jobs are visible during the whole window they are assigned to meaning all users of that window can apply to it. This avoids extra complexity of modeling job visibility and allows us to focus on the core recommendation and congestion balancing problems.
+
+\section{Dataset Files}
+\label{sec:dataset_files}
+
+The CareerBuilder dataset comprises several files in tab-separated value (TSV) format:
+
+\subsection{users.tsv}
+
+Contains user demographics and professional information. Each row represents a unique user with the following attributes:
+\begin{itemize}
+    \item \textbf{UserID}: Unique identifier for each user
+    \item \textbf{WindowID}: The 13-day window to which the user is assigned (1-7)
+    \item \textbf{Split}: Either ``Train'' or ``Test'', indicating the user's classification within their window (based on application activity, but ignored in our split strategy)
+    \item \textbf{Demographic Features}: Age, education level, location (City, State, Country, ZipCode)
+    \item \textbf{Professional Features}: Education type, graduation date, and other career-related attributes
+\end{itemize}
+
+\subsection{user\_history.tsv}
+
+Contains users' employment history. Each row represents a past job held by a user:
+\begin{itemize}
+    \item \textbf{UserID, WindowID, Split}: Link to the corresponding user
+    \item \textbf{JobTitle}: Title of the job held by the user
+    \item \textbf{Sequence}: Order in which the user held that job (smaller numbers = more recent jobs)
+\end{itemize}
+
+\subsection{jobs.tsv}
+
+Contains job posting information. Each row represents a unique job posting with attributes including:
+\begin{itemize}
+    \item \textbf{JobID}: Unique identifier for each job posting
+    \item \textbf{WindowID}: The window to which the job is assigned
+    \item \textbf{Title, Description, Requirements}: Text information about the job
+    \item \textbf{Location}: City, State, Country, Zip5 indicating where the job is located
+    \item \textbf{StartDate, EndDate}: The visibility window during which the job was open for applications
+    \item \textbf{Categorical Features}: Industry, job type, salary range, and other job attributes
+\end{itemize}
+
+\subsection{apps.tsv}
+
+Contains application records. Each row represents a user-job application with:
+\begin{itemize}
+    \item \textbf{UserID}: The applicant user
+    \item \textbf{JobID}: The target job
+    \item \textbf{WindowID}: The window to which both user and job are assigned
+    \item \textbf{Split}: Whether the application is in the training period (always) and whether the user is Train or Test
+    \item \textbf{ApplicationDate}: The exact date and time the application was submitted (not used in our split strategy)
+\end{itemize}
+
+\section{Dataset Statistics and Characteristics}
+\label{sec:dataset_statistics}
+\subsection{Scale}
+\subsection{Distribution}
+\subsection{Temporal Characteristics}
+
+\section{Usage Throughout the Thesis}
+\label{sec:dataset_usage}
+The dataset is first preprocessed for usage in all Chapters. In Chapter \ref{chap:user_recommendation}, the dataset is used to train a two-tower recommendation model for users. In Chapter \ref{chap:recruiter_recommendation}, the dataset is used to generate training data for a lightweight job recommendation model. Finally, in Chapter \ref{chap:congestion_balancing}, it is used to do historical analysis of congestion, testing and evaluating the congestion balancing strategies.
+
+
+

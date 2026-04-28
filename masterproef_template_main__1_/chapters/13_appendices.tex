@@ -1,17 +1,87 @@
 \begin{appendices}
-\section*{Attachment A}
-\addcontentsline{toc}{section}{Attachment A}  
+\section{Two-Tower Model Implementation}
+\label{app:two_tower_model}
+\addcontentsline{toc}{section}{Two-Tower Model Implementation}
 
-Attachment description.
+The complete PyTorch implementation of the two-tower neural network model for job recommendation is presented below. This code implements both the user and job towers with their embedding layers, fully-connected layers, batch normalization, and regularization techniques described in Chapter \ref{chap:user_recommendation}.
 
+\begin{listing}[h]
+\begin{minted}[fontsize=\footnotesize]{python3}
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
+class TwoTowerModel(nn.Module):
+    def __init__(self, num_user_cat, num_job_cat, num_user_numeric, num_job_numeric, output_dim=64):
+        super().__init__()
+        # User tower embeddings and layers
+        self.user_embeddings = nn.ModuleList([nn.Embedding(card, 16) for card in num_user_cat])
+        user_input_dim = len(num_user_cat) * 16 + num_user_numeric
+        self.user_tower = nn.Sequential(
+            nn.Linear(user_input_dim, 512),
+            nn.BatchNorm1d(512),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(512, 256),
+            nn.BatchNorm1d(256),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(256, output_dim)
+        )
+
+        # Job tower embeddings and layers
+        self.job_embeddings = nn.ModuleList([nn.Embedding(card, 16) for card in num_job_cat])
+        job_input_dim = len(num_job_cat) * 16 + num_job_numeric 
+        self.job_tower = nn.Sequential(
+            nn.Linear(job_input_dim, 512), 
+            nn.BatchNorm1d(512),
+            nn.ReLU(), 
+            nn.Dropout(0.3),
+            nn.Linear(512, 256),
+            nn.BatchNorm1d(256),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(256, output_dim)
+        )
+
+    def forward(self, u_cat, u_num, j_cat, j_num):
+        # Process user tower
+        if len(self.user_embeddings) > 0:
+            u_embeds = torch.cat([emb(u_cat[:, i]) for i, emb in enumerate(self.user_embeddings)], dim=1)
+            user_input = torch.cat([u_embeds, u_num], dim=1)
+        else:
+            user_input = u_num
+        user_vec = self.user_tower(user_input)
+
+        # Process job tower
+        if len(self.job_embeddings) > 0:
+            j_embeds = torch.cat([emb(j_cat[:, i]) for i, emb in enumerate(self.job_embeddings)], dim=1)
+            job_input = torch.cat([j_embeds, j_num], dim=1)
+        else:
+            job_input = j_num
+        job_vec = self.job_tower(job_input)
+
+        # Return matching score as dot product
+        return (user_vec * job_vec).sum(dim=1)
+\end{minted}
+\caption{Complete Two-Tower Model Implementation in PyTorch}
+\label{lst:two_tower_complete}
+\end{listing}
+
+The model takes four inputs:
+\begin{itemize}
+    \item \textbf{u\_cat}: User categorical features (shape: batch\_size $\times$ num\_user\_cat)
+    \item \textbf{u\_num}: User numeric features (shape: batch\_size $\times$ num\_user\_numeric)
+    \item \textbf{j\_cat}: Job categorical features (shape: batch\_size $\times$ num\_job\_cat)
+    \item \textbf{j\_num}: Job numeric features (shape: batch\_size $\times$ num\_job\_numeric)
+\end{itemize}
+
+The forward pass produces a matching score for each user-job pair, which is used for ranking and binary classification during training.
 
 \newpage
-\section*{Attachment B}
-\addcontentsline{toc}{section}{Attachment B}  
-
-Attachment description.
-
+\section{Additional Dataset Statistics}
+\label{app:dataset_statistics}
+\addcontentsline{toc}{section}{Additional Dataset Statistics}
 \end{appendices}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
