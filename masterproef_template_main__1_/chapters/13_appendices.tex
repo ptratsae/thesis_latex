@@ -5,7 +5,7 @@
 
 The complete PyTorch implementation of the two-tower neural network model for job recommendation is presented below. This code implements both the user and job towers with their embedding layers, fully-connected layers, batch normalization, and regularization techniques described in Chapter \ref{chap:user_recommendation}.
 
-\begin{listing}[h]
+\begin{listing}[htbp]
 \begin{minted}[fontsize=\footnotesize]{python3}
 import torch
 import torch.nn as nn
@@ -79,9 +79,182 @@ The model takes four inputs:
 The forward pass produces a matching score for each user-job pair, which is used for ranking and binary classification during training.
 
 \newpage
-\section{Additional Dataset Statistics}
-\label{app:dataset_statistics}
-\addcontentsline{toc}{section}{Additional Dataset Statistics}
+\section{Prepare Job Recommender Training Data}
+\label{app:prepare_job_recommender_data}
+\addcontentsline{toc}{section}{Prepare Job Recommender Training Data}
+
+The code snippet below consists of the python implementation for preparing the training data for the two-tower job recommender model. It includes window-based splitting and negative sampling.
+
+\begin{listing}[h]
+\begin{minted}[fontsize=\footnotesize]{python3}
+def prepare_training_data(apps_path, jobs_path, output_path, num_users_to_sample=None):
+    """Prepares training data with:
+        1. Robust Type Casting.
+        2. Window-based Split: Windows 1-4 = Train, 5-6 = Validation, 7 = Test.
+        3. Balanced Subsampling of Train windows (Val/Test users always kept).
+        4. City-based Negative Sampling (propagates split labels to negatives).
+
+        :param apps_path: Path to the raw applications data (apps.tsv).
+        :param jobs_path: Path to the raw jobs data (jobs.tsv) for negative sampling.
+        :param output_path: Path to save the prepared training data CSV.
+        :param num_users_to_sample: Optional limit on number of Train-window users to include. Val/Test users are always kept.
+    """
+    # ========== LOAD AND PREPARE DATA ==========
+    print('Loading apps data...')
+    apps = pd.read_csv(apps_path, delimiter='\t', encoding='utf-8')
+    apps['UserID'] = apps['UserID'].astype(int)
+    apps['WindowID'] = apps['WindowID'].astype(int)
+    apps['JobID'] = apps['JobID'].astype(int)
+
+    print('Pre-filtering jobs by window and city for city-based negative sampling...')
+    split_jobs_path = 'data/splitjobs/splitjobs/'
+    job_sets_by_window, job_sets_by_window_city = _load_job_sets(split_jobs_path, jobs_path)
+    
+    # Load user locations for city-based negative sampling
+    print('Loading user locations...')
+    users_path = apps_path.replace('apps.tsv', 'users.tsv')
+    users = pd.read_csv(users_path, delimiter='\t', encoding='utf-8', usecols=['UserID', 'City'])
+    users['City'] = users['City'].fillna('UNKNOWN').astype(str)
+    user_city_map = dict(zip(users['UserID'], users['City']))
+    
+    # Validate loaded job sets
+    print(f'Job Sets Loaded: {list(job_sets_by_window.keys())}')
+    for window_id, jobs_set in job_sets_by_window.items():
+        if len(jobs_set) == 0:
+            print(f'WARNING: Window {window_id} has 0 jobs!')
+
+    # ========== PREPARE POSITIVE SAMPLES ==========
+    positive_samples = apps[['UserID', 'WindowID', 'JobID', 'Split', 'ApplicationDate']].copy()
+    positive_samples['Label'] = 1
+    positive_samples['Split'] = positive_samples.apply(_assign_split_label, axis=1)
+    
+    excluded = positive_samples['Split'].isna().sum()
+    positive_samples = positive_samples.dropna(subset=['Split'])
+    print(f'Excluded {excluded} rows (Test users from train/val windows)')
+
+    # ========== SUBSAMPLE TRAIN USERS (OPTIONAL) ==========
+    val_test_user_ids = positive_samples[positive_samples['Split'].isin(['Validation', 'Test'])]['UserID'].unique()
+    train_users_df = positive_samples[positive_samples['Split'] == 'Train'][['UserID', 'WindowID']].drop_duplicates()
+    
+    if num_users_to_sample is not None:
+        unique_train_windows = train_users_df['WindowID'].nunique()
+        target_per_window = num_users_to_sample // unique_train_windows
+        print(f'Subsampling: Aiming for ~{target_per_window} Train users per window (Total target: {num_users_to_sample})')
+        keep_train_ids = []
+        for window_id, group in train_users_df.groupby('WindowID'):
+            window_users = group['UserID'].tolist()
+            n = min(len(window_users), target_per_window)
+            keep_train_ids.extend(random.sample(window_users, n))
+        final_users_to_keep = set(val_test_user_ids).union(set(keep_train_ids))
+        positive_samples = positive_samples[positive_samples['UserID'].isin(final_users_to_keep)]
+        print(f'Final dataset: {len(val_test_user_ids)} Val/Test Users + {len(keep_train_ids)} sampled Train Users')
+    else:
+        print('Using all users (no subsampling)')
+
+    positive_samples = positive_samples.drop(columns=['ApplicationDate'], errors='ignore')
+    print('Split distribution (Positives):')
+    print(positive_samples['Split'].value_counts())
+
+    # ========== GENERATE NEGATIVE SAMPLES ==========
+    training_data_list = [positive_samples]
+    print('Starting city-based negative sampling...')
+    city_hits = 0
+    city_fallbacks = 0
+    
+    for (user_id, window_id), user_apps in tqdm(positive_samples.groupby(['UserID', 'WindowID']), 
+                                                desc='Generating Negatives'):
+        split_labels = user_apps['Split'].values
+        negative_ids, hits, fallbacks = _generate_negatives_for_user(
+            user_id, window_id, user_apps, 
+            job_sets_by_window, job_sets_by_window_city, user_city_map
+        )
+        
+        city_hits += hits
+        city_fallbacks += fallbacks
+        
+        if negative_ids:
+            neg_df = pd.DataFrame({
+                'UserID': user_id,
+                'WindowID': window_id,
+                'JobID': negative_ids,
+                'Split': split_labels[:len(negative_ids)],
+                'Label': 0
+            })
+            training_data_list.append(neg_df)
+
+    total_negatives = city_hits + city_fallbacks
+    print(f'City-based sampling stats:')
+    print(f'  Same-city negatives: {city_hits} ({100*city_hits/max(1,total_negatives):.1f}%)')
+    print(f'  Fallback negatives:   {city_fallbacks} ({100*city_fallbacks/max(1,total_negatives):.1f}%)')
+
+    # ========== SAVE RESULTS ==========
+    print('Concatenating...')
+    training_data = pd.concat(training_data_list, ignore_index=True)
+    print('Shuffling...')
+    training_data = training_data.sample(frac=1, random_state=42).reset_index(drop=True)
+    
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    training_data.to_csv(output_path, index=False)
+    print(f'Saved to {output_path}')
+    
+    print('\n--- Final Dataset Stats ---')
+    print(f'Total Rows: {len(training_data)}')
+    print(training_data['Split'].value_counts())
+    print(f"Label Distribution:\n{training_data['Label'].value_counts()}")
+    return training_data
+\end{minted}
+caption{Data Preparation Code for Two-Tower Job Recommender}
+\label{lst:data_preparation}
+\end{listing}
+
+\section{Prompt for Recruiter LLM}
+\label{app:recruiter_llm_prompt}
+\addcontentsline{toc}{section}{Prompt for Recruiter LLM}
+The prompt below was used to instruct the large language model (LLM) in the recruiter assistant application. It provides context about the task, the input format, and the expected output.
+\begin{verbatim}
+\subsection{LLM-Based Label Generation}
+
+The label generation process uses the Qwen 3.5 (35B) model  via the Ollama API \cite{ollama2024} to evaluate the fit between a candidate and a job posting. For each candidate-job pair, the LLM is prompted to assess suitability across multiple dimensions:
+
+\begin{itemize}
+    \item \textbf{Experience Match}: Whether the candidate's years of experience align with the job requirements.
+    \item \textbf{Education Alignment}: Whether the candidate's education level matches job expectations.
+    \item \textbf{Skill Overlap}: Semantic similarity between the candidate's background and job requirements.
+    \item \textbf{Career Progression}: Whether the role represents a logical next step in the candidate's career.
+\end{itemize}
+
+Based on these dimensions, the LLM assigns each pair a fit level: \textit{Very Good Fit}, \textit{Good Fit}, \textit{Poor Fit}, or \textit{Very Poor Fit}. These are then converted to binary labels (1 for \textit{Very Good Fit} and \textit{Good Fit}, 0 for \textit{Poor Fit} and \textit{Very Poor Fit}).
+\subsubsection{Prompt Design}
+The prompt designed was an iterative process, starting with a simple instruction and then refining it to elicit more detailed and consistent responses from the LLM. B
+\vspace{1em}
+A chain-of-thought prompting approach was used, where the LLM is guided through human-like reasoning steps to evaluate the pairs more consistently. Without this, the LLM would be incosistent in its labeling.  Besides the chain-of-thought prompting, the prompt also includes specific instructions on how to evaluate each dimension and how to assign fit levels based on the overall assessment. This structured approach helps ensure that the LLM's outputs are more reliable and aligned with human judgment of candidate-job fit. The final prompt used for label generation is as follows:
+\begin{verbatim}
+Task: You are an HR recruiter. You need to check how good a person fits the job based on user profile and job description (IMPORTANT: Treat each job-user pair independently).
+Assign a fit level:  - "Very Good Fit" : All must-haves covered, and many nice-to-haves covered, with strong reasoning. No deal-breakers.
+-"Good Fit" : Most must-haves covered, and some nice-to-haves covered (e.g. job asks for degree but applicant doesn't have it, but he has a lot of experience ), with reasonable reasoning. No major deal-breakers.
+-"Poor Fit" : Few must-haves covered, and few nice-to-haves covered, with weak reasoning. Some deal-breakers.
+-"Very Poor Fit": Most or all must-haves missing, and no nice-to-haves covered, with poor reasoning. Many deal-breakers.
+
+Return a JSON object with a "results" key containing an array of candidate decisions:
+{{"results": [{{"candidate_id": <id>, "must_haves": "xxx", "nice_to_haves": "xxx", "deal_breakers": "xxx", "reasoning": "xxx", "fit_level": "Good Fit"}}]}}
+
+Extra Notes:
+- Be a bit strict as these jobs have many applicants. Only candidates that truly meet the requirements should be rated as "Very Good Fit" or "Good Fit". If there are any significant gaps in must-haves, it should be reflected in the fit level and reasoning.
+- Be objective and specific in your reasoning. Focus on concrete matches/mismatches between the candidate's profile and the job requirements. Avoid vague statements.
+- Keep the JSON output concise. Fields shouldn't be phrases but just short descriptors, for example must haves "Bachelor's Degree in Computer Science, 5+ years of experience in software development". 
+The reasoning should be very brief (max 3 sentences) but specific to the candidate's profile and the job description.
+- If a feature is empty, missing or NaN in Degree, Major, Experience or History, assume the candidate does not have that feature. For example, if Degree is empty, assume no degree. If History is empty, assume no relevant job history.
+- Assume all applicants are adults (18+), if specific age is missing.
+- Assume availability is not an issue unless explicitly stated.
+- Assume physical ability is not an issue.
+
+Job Description:
+{job_desc}
+
+Candidate Profiles:
+{profiles_text}
+\end{verbatim}
+
 \end{appendices}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

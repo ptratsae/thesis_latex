@@ -16,12 +16,14 @@ The two-tower model is trained and evaluated on the CareerBuilder Job Recommenda
 \subsection{User Tower}
 \label{sec:user_tower}
 
-The user tower consists of a multi-layer feedforward neural network that transforms the input user features into a dense embedding vector. This embedding captures the underlying preferences and characteristics of the user, which can then be used to compute similarity with job embeddings from the job tower. The cold start problem is solved by the fact that the model can learn to generalize from the features of users and jobs, allowing it to make recommendations even for new users or jobs that were not seen during training.
+The user tower consists of a multi-layer feedforward neural network that transforms the input user features into a dense embedding vector. This embedding captures the underlying preferences and characteristics of the user, which can then be used to compute similarity with job embeddings from the job tower.
 
 \subsubsection{Input Layer}
-\begin{listing}[h]
+\begin{listing}[H]
 \begin{minted}{python3}
-        self.user_embeddings = nn.ModuleList([nn.Embedding(card, 16) for card in num_user_cat])
+self.user_embeddings = nn.ModuleList([
+    nn.Embedding(card, 16) for card in num_user_cat
+])
 \end{minted}
 \caption{User embedding layer initialization in the two-tower model}
 \label{lst:user_embeddings}
@@ -29,34 +31,73 @@ The user tower consists of a multi-layer feedforward neural network that transfo
 
 Categorical features are converted to 16-dimensional embeddings using learnable embedding layers. These embeddings are then concatenated with numeric features (e.g., age, years of experience). The total input dimension is calculated as:
 
-\begin{equation}
-\text{user\_input\_dim} = (\text{number of categorical features} \times 16) + \text{number of numeric features}
-\end{equation}
+\begin{listing}[H]
+\begin{minted}{python3}
+user_input_dim = len(num_user_cat) * 16 + num_user_numeric
+\end{minted}
+\caption{User input dimension calculation}
+\label{lst:user_input_dim}
+\end{listing}
 
 \subsubsection{Neural Network Stack}
 
 The user tower consists of three fully-connected layers with regularization:
 \begin{itemize}
-    \item \textbf{Layer 1}: Linear transformation from user\_input\_dim to 512 neurons, followed by batch normalization, ReLU activation, and 30\% dropout for regularization.
-    \item \textbf{Layer 2}: Linear transformation from 512 to 256 neurons, followed by batch normalization, ReLU activation, and 20\% dropout.
-    \item \textbf{Output Layer}: Linear transformation from 256 to 64 neurons, producing a 64-dimensional user embedding.
+    \item \textbf{Layer 1}: Linear(job\_input\_dim $\rightarrow$ 512) with batch normalization, ReLU, and 30\% dropout.
+    \item \textbf{Layer 2}: Linear(512 $\rightarrow$ 256) with batch normalization, ReLU, and 20\% dropout.
+    \item \textbf{Output Layer}: Linear(256 $\rightarrow$ 64) producing a 64-dimensional job embedding.
+
 \end{itemize}
 
-The decreasing layer sizes (512 $\rightarrow$ 256 $\rightarrow$ 64) act as a bottleneck, forcing the network to learn compressed and meaningful representations of user profiles.
+The decreasing layer sizes (512 $\rightarrow$ 256 $\rightarrow$ 64) act as a bottleneck, forcing the network to learn compressed and meaningful representations of user profiles. The implementation of this tower is shown here:
+
+\begin{listing}[H]
+\begin{minted}{python3}
+self.user_tower = nn.Sequential(
+        nn.Linear(user_input_dim, 512),
+        nn.BatchNorm1d(512),
+        nn.ReLU(),
+        nn.Dropout(0.3),
+        nn.Linear(512, 256),
+        nn.BatchNorm1d(256),
+        nn.ReLU(),
+        nn.Dropout(0.2),
+        nn.Linear(256, output_dim)
+    )
+\end{minted}
+\caption{User tower architecture in the two-tower model}
+\label{lst:user_tower}
+\end{listing}
 
 \subsection{Job Tower}
 \label{sec:job_tower}
 
-The job tower mirrors the architecture of the user tower to process job-related features. This symmetric design ensures both towers learn complementary representations suitable for matching user-job pairs. The only difference is the input dimension, which depends on the number of job features.
+The job tower mirrors the architecture of the user tower to process job-related features, it learns compact representations for each job. The only difference is the input dimension, which depends on the number of job features. 
 
 \subsubsection{Input Layer}
 
+\begin{listing}[H]
+\begin{minted}{python3}
+self.job_embeddings = nn.ModuleList([
+    nn.Embedding(card, 16) for card in num_job_cat
+])
+\end{minted}
+\caption{Job embedding layer initialization in the two-tower model}
+\label{lst:job_embeddings}
+\end{listing}
+
 Similar to the user tower, categorical job attributes (e.g., location, industry, job type) are embedded to 16 dimensions. Numeric features representing the job, including FastText embeddings of job descriptions, are concatenated with these categorical embeddings. The total input dimension mirrors the user tower calculation:
-\begin{equation}
-\text{job\_input\_dim} = (\text{number of categorical features} \times 16) + \text{number of numeric features}
-\end{equation}
+
+\begin{listing}[H]
+\begin{minted}{python3}
+job_input_dim = len(num_job_cat) * 16 + num_job_numeric
+\end{minted}
+\caption{Job input dimension calculation}
+\label{lst:job_input_dim}
+\end{listing}
 
 \subsubsection{Neural Network Stack}
+
 
 The job tower employs an identical layer progression as the user tower:
 \begin{itemize}
@@ -64,6 +105,24 @@ The job tower employs an identical layer progression as the user tower:
     \item \textbf{Layer 2}: Linear(512 $\rightarrow$ 256) with batch normalization, ReLU, and 20\% dropout.
     \item \textbf{Output Layer}: Linear(256 $\rightarrow$ 64) producing a 64-dimensional job embedding.
 \end{itemize}
+
+\begin{listing}[H]
+\begin{minted}{python3}
+self.job_tower = nn.Sequential(
+    nn.Linear(job_input_dim, 512), 
+    nn.BatchNorm1d(512),
+    nn.ReLU(), 
+    nn.Dropout(0.3),
+    nn.Linear(512, 256),
+    nn.BatchNorm1d(256),
+    nn.ReLU(),
+    nn.Dropout(0.2),
+    nn.Linear(256, output_dim)
+)
+\end{minted}
+\caption{Job tower architecture in the two-tower model}
+\label{lst:job_tower}
+\end{listing}
 
 \subsection{Prediction Layer}
 \label{sec:user_prediction}
@@ -79,7 +138,7 @@ This dot product measures the semantic similarity between the learned user and j
 \section{Data Pipeline and Feature Engineering}
 \label{sec:user_data_pipeline}
 
-The raw data needs to be preprocessed before it can be used by the two-tower model. The data pipeline consists of four main stages: (\ref{sec:training_data_gen}) training data generation with balanced sampling, (\ref{sec:user_features_processing}) user feature processing, (\ref{sec:job_feature_processing}) job feature processing, and (\ref{sec:text_embedding_generation}) text embedding generation. Each stage is designed to handle large-scale data efficiently while preserving data integrity and semantic information.
+The raw data needs to be preprocessed before it can be used by the two-tower model. The data pipeline consists of four main stages: training data generation with balanced sampling (\ref{sec:training_data_gen}), user feature processing (\ref{sec:user_features_processing}), job feature processing (\ref{sec:job_features_processing}), and text embedding generation (\ref{sec:text_embedding}). Each stage is designed to handle large-scale data efficiently due to the size of the CareerBuilder dataset.
 
 \subsection{Training Data Generation}
 \label{sec:training_data_gen}
@@ -88,31 +147,22 @@ The training data generation process creates a balanced dataset with explicit po
 
 \subsubsection{Temporal Window-Based Splitting}
 
-The raw applications data consists of a timeline separated into 7 temporal windows, where each window represents a distinct time period. The split is defined as follows:
+As already described in Chapter \ref{chap:dataset_overview}, the original dataset is organized into 7 temporal windows, each representing a different time period. For this research, we use a custom temporal split where:
 \begin{itemize}
-    \item \textbf{Training Set}: Windows 1--4 (early time periods)
-    \item \textbf{Validation Set}: Windows 5--6 (intermediate time periods)
-    \item \textbf{Test Set}: Window 7 (most recent time period)
+    \item \textbf{Training Set}: All users and jobs from Windows 1--4 (first 52 days).
+    \item \textbf{Validation Set}: All users and jobs from Windows 5--6 (last 26 days).
+    \item \textbf{Test Set}: All users and jobs from Window 7 (last 13 days).
 \end{itemize}
 
-This temporal split ensures that the model is trained on historical data and evaluated on future predictions, simulating a realistic deployment scenario where recommendations must generalize to unseen temporal patterns.
+This split creates a realistic scenario where the model is trained on historical data and evaluated on future data, simulating a real-world deployment scenario.
 
 \subsubsection{Label Assignment and Data Filtering}
 
-Positive samples are generated directly from the applications data: each user-job pair where an application was submitted receives a label of 1. All applications from users originally designated as \textit{Split=Train} are preserved, ensuring reliable ground truth. Users from the \textit{Split=Test} category (used in the original competition for blind evaluation) are excluded to avoid incomplete labels.
-
-Each application is assigned to a train/validation/test split based on its window:
-\begin{equation}
-\text{Split} = \begin{cases}
-\text{Train} & \text{if } \text{WindowID} \in \{1, 2, 3, 4\} \\
-\text{Validation} & \text{if } \text{WindowID} \in \{5, 6\} \\
-\text{Test} & \text{if } \text{WindowID} = 7
-\end{cases}
-\end{equation}
+Positive samples are extracted directly from the applications data as each application means the user applied and thus matches the job. Negative samples aren't explicitly given in the dataset. In the next section, the method for generating negative samples is described.
 
 \subsubsection{City-Based Negative Sampling}
 
-To create a balanced binary classification problem, negative samples (user-job pairs that were \textit{not} applied to) are generated synthetically. The ratio of negative to positive samples is maintained at 1:1 to avoid severe class imbalance.
+To create a balanced binary classification problem, negative samples (user-job pairs that were \textit{not} applied to) are generated synthetically. The ratio of negative to positive samples is maintained at 1:1 to avoid class imbalance.
 
 Negative sampling is performed using a city-based strategy to generate realistic hard negatives. For each user in each window:
 \begin{enumerate}
@@ -127,7 +177,11 @@ This strategy creates a dataset with:
     \item \textbf{Cross-city negatives}: Harder negatives representing jobs outside the user's typical geographic range
 \end{itemize}
 
-The city-based strategy biases the model toward learning location-aware preferences, which is important for a job recommendation system.
+The city-based strategy biases the model toward learning location-aware preferences, which is important for a job recommendation system. The implementation of the training data generation process is provided in Appendix \ref{app:prepare_job_recommender_data}.
+
+\vspace*{1em}
+\noindent\textbf{Important Note}: The way this balanced dataset is created will lead to an easier validation compared to the test set, as for each positive sample, there is only one negative sample. In a the test set with a more realistic distribution, there would be many more negative samples than positive samples, which would make the evaluation more difficult. This is an important point to keep in mind when interpreting the results of the model.
+
 
 \subsection{User Feature Processing}
 \label{sec:user_features_processing}
@@ -136,12 +190,12 @@ User features are extracted and engineered to create a comprehensive representat
 
 \subsubsection{Feature Extraction and Merging}
 
-Raw user features (demographics, education, location) are merged with user employment history. The most recent job titles (up to 3 previous positions) are extracted and concatenated with recency labels:
+First, raw user features (demographics, education, location) are merged with user employment history. The most recent job titles (up to 3 previous positions) are extracted and concatenated with recency labels:
 \begin{equation}
 \text{Recent\_JobTitle} = \text{``Current: JobTitle}_{1}\text{ | Previous: JobTitle}_{2}\text{ | Earlier: JobTitle}_{3}\text{'}
 \end{equation}
 
-This concatenation preserves the temporal sequence of employment, allowing the model to understand career progression and specialization.
+This concatenation will be embedded using the Qwen3-Embedding-0.6B model to capture the semantic meaning of the user's career (see Section \ref{sec:user_embedding}). 
 
 \subsubsection{Feature Engineering}
 
@@ -149,11 +203,11 @@ Several domain-specific features are engineered from raw attributes:
 
 \begin{itemize}
     \item \textbf{Years Since Graduation}: Calculated from the graduation date as $\text{current\_year} - \text{graduation\_year}$. Missing values are imputed with the median, representing years of professional experience.
-    \item \textbf{Location Standardization}: Country and ZipCode columns are dropped; City and State are retained for geographic granularity.
+    \item \textbf{Location Standardization}: Country and ZipCode columns are dropped; City and State are retained for geographic granularity. The reason to drop country is because the dataset is US-based, so all users are from the same country. ZipCode is dropped because it is unnecessary given that we have City and State, and it can introduce noise due to missing or inconsistent values.
 \end{itemize}
 
 \subsubsection{Embedding and Encoding}
-
+\label{sec:user_embedding}
 The engineered features are processed based on their data type:
 
 \begin{itemize}
@@ -162,6 +216,35 @@ The engineered features are processed based on their data type:
     \item \textbf{Categorical Features}: Features such as education level, location, and other discrete attributes are label-encoded, mapping each unique value to an integer starting from 1 (0 is reserved for missing values).
 \end{itemize}
 
+The table below summarizes the user feature engineering pipeline, including the raw features, their types, processing steps, and the resulting output format.
+\begin{table}[htbp]
+    \centering
+    \caption{User Feature Engineering Pipeline}
+    \label{tab:user_features}
+    \begin{tabular}{|l|l|l|l|l|}
+        \hline
+        \textbf{Category} & \textbf{Raw Feature} & \textbf{Type} & \textbf{Processing} & \textbf{Output} \\
+        \hline
+        \multirow{2}{*}{\textbf{Identifiers}} & UserID & int & — & UserID \\
+        & WindowID & int & — & WindowID \\
+        \hline
+        \multirow{2}{*}{\textbf{Location}} & City & categorical & LabelEncoder & int [1, N] \\
+        & State & categorical & LabelEncoder & int [1, N] \\
+        \hline
+        \multirow{3}{*}{\textbf{Education}} & DegreeType & categorical & LabelEncoder & int [1, N] \\
+        & Major & categorical & LabelEncoder & int [1, N] \\
+        & GraduationDate & date & $\rightarrow$ YearsSinceGrad & float (scaled) \\
+        \hline
+        \multirow{4}{*}{\textbf{Work Experience}} & WorkHistoryCount & int & StandardScaler & float (scaled) \\
+        & TotalYearsExperience & int & StandardScaler & float (scaled) \\
+        & CurrentlyEmployed & categorical & LabelEncoder & int [0, 1] \\
+        & ManagedOthers & categorical & LabelEncoder & int [0, 1] \\
+        & ManagedHowMany & int & StandardScaler & float (scaled) \\
+        \hline
+        \textbf{Job History} & Recent\_JobTitle (top 3) & text & Qwen Embedding & $\mathbb{R}^{100}$ \\
+        \hline
+    \end{tabular}
+\end{table}
 \subsection{Job Feature Processing}
 \label{sec:job_features_processing}
 
