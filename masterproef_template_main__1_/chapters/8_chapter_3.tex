@@ -1,8 +1,13 @@
 \chapter{Market Congestion and Hybrid Balancing}
 \label{chap:congestion_balancing}
-
+Now that both user-side (Chapter \ref{chap:user_side}) and job-side (Chapter \ref{chap:job_side}) recommender systems have been build. The next step is analyzing the congestion created due to recommendation systems and mitigating it for both sides. In this chapter, we first analyze and mitigate both congestions separately, and then combine both mitigation strategies into a hybrid strategy that balances the market for both sides.
+As mentioned before, the strategies will be tested on window 7. Windows 1-6 will be used as past data and we will use those results to mitigate the congestion in window 7, as if we were in a real-time setting. The results of window 7 will then be used to evaluate the effectiveness of the mitigation strategies.
 \section{Job-Side Congestion Analysis}
 \label{sec:job_congestion}
+Job-side congestion occurs when a large number of users are recommended the same job, leading to an overwhelming number of applications for that job. This can result in a poor user experience, as users may feel that they have no chance of being selected for the job, and it can also lead to inefficiencies for employers who have to sift through a large number of applications. The reason for congestion on the job side is that the recommender system may be recommending the same popular jobs to many users, especially if those jobs have high relevance scores for a large portion of the user base. This can create a feedback loop where popular jobs become even more popular, while less popular jobs are overlooked.
+
+\subsection{Job-Side Congestion in our dataset}
+\label{sec:job_congestion_dataset}
 
 \section{User-Side Congestion Analysis}
 \label{sec:user_congestion}

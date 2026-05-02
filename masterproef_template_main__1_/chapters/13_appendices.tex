@@ -212,23 +212,6 @@ caption{Data Preparation Code for Two-Tower Job Recommender}
 \addcontentsline{toc}{section}{Prompt for Recruiter LLM}
 The prompt below was used to instruct the large language model (LLM) in the recruiter assistant application. It provides context about the task, the input format, and the expected output.
 \begin{verbatim}
-\subsection{LLM-Based Label Generation}
-
-The label generation process uses the Qwen 3.5 (35B) model  via the Ollama API \cite{ollama2024} to evaluate the fit between a candidate and a job posting. For each candidate-job pair, the LLM is prompted to assess suitability across multiple dimensions:
-
-\begin{itemize}
-    \item \textbf{Experience Match}: Whether the candidate's years of experience align with the job requirements.
-    \item \textbf{Education Alignment}: Whether the candidate's education level matches job expectations.
-    \item \textbf{Skill Overlap}: Semantic similarity between the candidate's background and job requirements.
-    \item \textbf{Career Progression}: Whether the role represents a logical next step in the candidate's career.
-\end{itemize}
-
-Based on these dimensions, the LLM assigns each pair a fit level: \textit{Very Good Fit}, \textit{Good Fit}, \textit{Poor Fit}, or \textit{Very Poor Fit}. These are then converted to binary labels (1 for \textit{Very Good Fit} and \textit{Good Fit}, 0 for \textit{Poor Fit} and \textit{Very Poor Fit}).
-\subsubsection{Prompt Design}
-The prompt designed was an iterative process, starting with a simple instruction and then refining it to elicit more detailed and consistent responses from the LLM. B
-\vspace{1em}
-A chain-of-thought prompting approach was used, where the LLM is guided through human-like reasoning steps to evaluate the pairs more consistently. Without this, the LLM would be incosistent in its labeling.  Besides the chain-of-thought prompting, the prompt also includes specific instructions on how to evaluate each dimension and how to assign fit levels based on the overall assessment. This structured approach helps ensure that the LLM's outputs are more reliable and aligned with human judgment of candidate-job fit. The final prompt used for label generation is as follows:
-\begin{verbatim}
 Task: You are an HR recruiter. You need to check how good a person fits the job based on user profile and job description (IMPORTANT: Treat each job-user pair independently).
 Assign a fit level:  - "Very Good Fit" : All must-haves covered, and many nice-to-haves covered, with strong reasoning. No deal-breakers.
 -"Good Fit" : Most must-haves covered, and some nice-to-haves covered (e.g. job asks for degree but applicant doesn't have it, but he has a lot of experience ), with reasonable reasoning. No major deal-breakers.

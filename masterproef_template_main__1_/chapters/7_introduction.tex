@@ -2,26 +2,33 @@
 \label{chap:intro}
 
 \section{Context}
-The job market is a complex ecosystem where both sides, job seekers and recruiters, try to find the best match for their needs. Unlike markets like Netflix, the job market has unique characteristics where only 1 job can be assigned to 1 person. The digitization should in theory make this process more efficient, enabling rapid and accurate matching. However, in practice, the job market suffers from this digital transformation due to its characteristics. While accessing information has become easier, the efficiency of matching decreased due to market congestion, information overload and systemic algorithmic biases. This thesis investigates how AI, more specifically \gls{RS}, can be used to improve matching quality in this two-side market by reducing congestion and improving recommendation relevance for both job seekers and recruiters.
+Recommender systems are widely used in various domains, such as entertainment \cite{ytrecommender}, e-commerce \cite{recommenderecommerce} or jobs \cite{qin2020enhanced}, to help users discover relevant personalized content. However, the application of recommender systems in the job market presents a unique set of challenges.
+
 \section{Motivation}
 \label{sec:intro:motivation}
 
-As more and more job search and recruitment processes are taking place online, the need for efficient and effective \gls{RS} becomes increasingly important. The need for a fair and efficient two-sided recommendation system forms a foundation for a more balanced job market. 
-\vspace{1em}
-In digital platfoms, visibility is key for success. Recommendation systems suffer from the problem of market congestion, where popular items (jobs) receive more attention compared to new or less popular items. 
+The integration of \gls{AI} and recommendation systems into the job market is driven by the need to address macroeconomic inefficiencies and market frictions. The need of improving job matching goes beyond individual benefits for job seekers and recruiters, as it has broader implications for economic growth, productivity and social welfare. The need for a redesigned job recommendation framework is underpinned by the following motivations:
+\begin{itemize}
+	\item \textbf{Macroeconomic Cost of ineffienciy and Skills Mismatch:} Inefficient job matching leads to the degradation of global productivity. Both overqualification and underqualification can lead to reduced job satisfaction, rapid employed burnout, and higher labor turnover \cite{cedefop_skills}.
+	\item \textbf{Information Overload:}  While digitalization has made information more accessible, it has simultaneously overwhelmed both job seekers and recruiters with an abundance of options. The sheer volume of job listings lead to decision fatigue and suboptimal choices \cite{nurfadillah2026analysis}. Both job seekers and recruiters struggle navigation throught the great amount of options, creating a bottleneck in the matching process.
+	\item \textbf{Inequality of Visibility:} Standard recommendation systems often prioritize popular jobs, also known as the "rich-get-richer" effect or popularity bias \cite{Klimashevskaia_2024}. This leads to a situation where popular jobs receive most applications, while less popular jobs remain vacant. Consequently, highly qualified candidates may miss out on relevant opportunities at lesser-known companies, while recruiters at these companies struggle to attract top talent \cite{li2023feirquantifyingreducingenvy}.
 
+\end{itemize}
+
+Addressing these challenges requires a shift from the standard recommendation systems, to fairness-aware and congestion-aware recommendation systems that can balance the needs of both job seekers and recruiters by providing accurate recommendations while also ensuring a more equitable distribution of opportunities and reducing congestion in the job market. 
 
 \section{Problem Statement}
 \label{sec:intro:problem}
-
-Having set the stage for the importance of optimizing the labor market through improved recommendation systems, it is important to clearly define the specific technical challenges this thesis aims to address. The problem consists of 2 parts:
-
+The job market is a complex ecosystem where both sides, job seekers and recruiters, try to find the best match for their needs. Unlike markets such as Netflix, the job market has unique characteristics where only 1 job can be assigned to 1 person \cite{mashayekhi2023reconreducingcongestionjob}. The digitization should in theory make this process more efficient, enabling rapid and accurate matching. However, in practice, the job market suffers from this digital transformation due to its characteristics. While accessing information has become easier, the efficiency of matching decreased due to market congestion, information overload and systemic algorithmic biases \cite{mashayekhi2023challengebasedsurveyerecruitmentrecommendation}. In \cite{mashayekhi2023reconreducingcongestionjob} the example is given of 4 jobs and 4 job seekers, where all job seekers get the same top 2 recommendations. If all 4 job seekers apply to the same 2 jobs, this creates congestion where only 2 job seekers can be matched to a job, while the other 2 are left unmatched. On the other side, 2 jobs are left vacant while they could have been filled by the other 2 job seekers. This is a clear example of how the current state of the art in job recommendation systems can lead to inefficiencies and suboptimal outcomes for both job seekers and recruiters. Specifically, the standard recommendation systems fail to address 3 key issues:
 \begin{itemize}
-	\item \textbf{For job seekers:} The current recommendation systems often fail to provide relevant job recommendations due to the overwhelming amount of information and the presence of popular jobs that overshadow less popular but potentially more suitable or probable opportunities. This leads to a suboptimal user experience and can result in job seekers missing out on relevant opportunities.
-	\item \textbf{For recruiters:} Recruiters face the challenge of efficiently identifying suitable candidates from a large pool of applicants. The current systems may not effectively prioritize candidates based on relevance, leading to increased time and effort in the recruitment process and potentially overlooking qualified candidates.
-\end{itemize}
+	\item \textbf{Capacity Constraints:} Traditional systems optimize for point-wise relvance rather than considering the market capacity. Research has already shown that incorporating capacity constraints into the recommendation process can lead to improved matching outcomes and reduced congestion \cite{mashayekhi2023reconreducingcongestionjob} \cite{li2023feirquantifyingreducingenvy}.
+	\item \textbf{Unidirectional Optimization:} Standard recommendation systems typically optimize for one side of the market, either job seekers or recruiters, without considering the needs and preferences of the other side. This can lead to imbalances and suboptimal matches, as the system may prioritize the preferences of one group over the other.
+	\item \textbf{Data Sparsity:} While job seeker behaviour (clicks, views) is often well-documented, recruiter behaviour (job postings, hiring decisions) is less so. This leads to a data imbalance that can bias the recommendation system towards the preferences of job seekers, further exacerbating the issues of imbalance and congestion in the job market.
 
-Summarized, there's need for a \gls{RS} which provides relevant recommendations for both sides and mitigates the problem of market congestion, ensuring that both job seekers and recruiters can efficiently find suitable matches without being overwhelmed by irrelevant information or overshadowed by popular items.
+
+
+This master's dissertation investigates how AI, more specifically recommender systems, can be improved to enhance matching quality in this two-side market by reducing congestion and improving recommendation relevance for both job seekers and recruiters. To solve the identified problems, this research proposes a two-way recommendation framework consisting of a two-tower job recommendation system and a recruiter-side lightweight logistic regression model for candidate suitability ranking. To overcome the data sparsity on the recruiter side, synthetic data is generated using a \gls{LLM}. Finally a hybrid congestion balancing strategy is proposed. This is done by first reducing congestion for both sides individually, followed by a combined strategy.
+
 
 
 

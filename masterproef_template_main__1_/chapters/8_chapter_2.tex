@@ -1,16 +1,16 @@
 \chapter{Recruiter-Side Recommendation System}
 \label{chap:recruiter_recommendation}
-This chapter describes the recruiter-side recommendation system. The system acts as a lightweight recruiter, predicting the suitability of a candidate for a given job. The difference between the recruiter and user recommendation systems is that the recruiter system focuses on predicting whether a candidate is a good fit for a specific job, while the user system focuses on predicting whether a user would apply to a job. This way, both complementary systems can be used together to provide a comprehensive recommendation experience. 
-\vspace{1em}
-The recruiter system is designed as a lightweight, interpretable ensemble model that combines heuristic features (based on domain knowledge and regex patterns) with semantic features (based on neural embeddings). This hybrid approach balances predictive performance with computational efficiency and explainability. While this recommender system is not returning a list of recommended candidates, it can be used to rank candidates for a given job by their predicted suitability scores. 
-\vspace{1em}
+This chapter describes the recruiter-side recommendation system which acts as a lightweight recruiter, predicting the suitability of a candidate for a given job. The difference between the recruiter and user recommendation systems is that the recruiter system focuses on predicting whether a candidate is a good fit for a specific job, while the user system focuses on predicting whether a user would apply to a job. This way, both complementary systems can be used together to create the narrative of job seekers and recruiters.
+
+The recruiter system is designed as a lightweight, interpretable model that combines heuristic features (based on domain knowledge and regex patterns) with semantic features (based on neural embeddings). This hybrid approach balances predictive performance with computational efficiency and explainability. While this recommender system is not returning a list of recommended candidates, it can be used to rank candidates for a given job by their predicted suitability scores.
+
 First, the need for synthetic label generation is discussed and explained in Section \ref{sec:recruiter_data_gen}. Then, the architecture of the lightweight recommender model is described in Section \ref{sec:recruiter_lightweight}. The heuristic and semantic features used as input to the model are detailed in Section \ref{sec:recruiter_heuristic}. Finally, the training procedure and evaluation strategy are outlined in Section \ref{sec:recruiter_training}.
 
 \section{Data Generation and Labeling}
 \label{sec:recruiter_data_gen}
 
-While the CareerBuilder dataset contains information about candidates applying to jobs, there's no information about the recruiter's perspective on candidate suitability. -Therefore, there is need to create synthetic labels for candidate-job fit to train the recruiter recommendation model.
-\vspace{1em}
+While the CareerBuilder dataset contains information about candidates applying to jobs, there's no information about the recruiter's perspective on candidate suitability. Therefore, there is need to create synthetic labels for candidate-job fit to train the recruiter recommendation model.
+
 To generate these labels, an open-source \gls{LLM} is used. The \gls{LLM} is prompted with \gls{CoT} approach to evaluate the fit between a candidate and a job posting across multiple dimensions (experience, education, skills, career progression). The \gls{LLM}'s output is then converted into binary labels indicating whether the candidate is a good fit for the job. 
 
 \subsection{LLM-Based Label Generation}
@@ -26,31 +26,44 @@ The label generation process uses the Qwen 3.5 (35B) model  via the Ollama API \
 
 Based on these dimensions, the LLM assigns each pair a fit level: \textit{Very Good Fit}, \textit{Good Fit}, \textit{Poor Fit}, or \textit{Very Poor Fit}. These are then converted to binary labels (1 for \textit{Very Good Fit} and \textit{Good Fit}, 0 for \textit{Poor Fit} and \textit{Very Poor Fit}).
 \subsubsection{Prompt Design}
-The prompt designed was an iterative process, starting with a simple instruction and then refining it to elicit more detailed and consistent responses from the LLM.
-A prompting approach was used, where the LLM is guided through human-like reasoning steps to evaluate the pairs more consistently. Without this, the LLM would be incosistent in its labeling.  Besides the \gls{CoT} prompting, the prompt also includes specific instructions on how to evaluate each dimension and how to assign fit levels based on the overall assessment. This structured approach helps ensure that the LLM's outputs are more reliable and aligned with human judgment of candidate-job fit. The final prompt used for label generation is as follows:
+The designed prompt was an iterative process, starting with a simple instruction and then refining it to elicit more detailed and consistent responses from the LLM by sanity checking the outputs. The final prompt was designed to guide the LLM through human-like reasoning steps to evaluate the pairs more consistently, also known as \gls{CoT}. Without this, the LLM would be inconsistent in its labeling.  Besides the \gls{CoT} prompting, the prompt also includes specific instructions on how to evaluate each dimension and how to assign fit levels based on the overall assessment. This structured approach helps ensure that the LLM's outputs are more reliable and aligned with human judgment of candidate-job fit. 
+%Show part of prompt
+\begin{listing}[H]
+\begin{minted}{text}
+Task: You are an HR recruiter. You need to check how good a person fits the job based on user profile and job description (IMPORTANT: Treat each job-user pair independently).
+Assign a fit level:  
+-"Very Good Fit": Meets 100% of Must-Haves AND meets 50% or more of Nice-to-Haves 
+AND has 0 Deal-Breakers.
+-"Good Fit": Meets 100% of Must-Haves (OR misses exactly 1 Must-Have but compensates with extensive relevant experience) AND has 0 Deal-Breakers.
+-"Poor Fit": Missing 2 or more Must-Haves OR has exactly 1 Deal-Breaker.
+-"Very Poor Fit": Missing 3 or more Must-Haves OR has 2 or more Deal-Breakers.
+
+Return a JSON object with a "results" key containing an array of candidate decisions:
+{"results": [{"candidate_id": <id>, "must_haves": "xxx", "nice_to_haves": "xxx", 
+"deal_breakers": "xxx", "reasoning": "xxx", "fit_level": "Good Fit"}]}
+\end{minted}
+\caption{LLM Prompt for Candidate-Job Fit Evaluation}
+\label{lst:recruiter_llm_prompt}
+\end{listing}
+
+The prompt starts with the task definition, instructing the LLM to act as an HR recruiter evaluating candidates. An important instruction is to treat each pair independently, to prevent the LLM from making inconsistent judgments. Then the criteria for assigning fit levels are clearly defined, providing specific thresholds for what constitutes a \textit{Very Good Fit}, \textit{Good Fit}, \textit{Poor Fit}, and \textit{Very Poor Fit}. The criteria is designed to be specific such that the \gls{LLM} is consistent and there's no ambiguity. Finally, the prompt specifies the expected output format as a JSON object containing an array of candidate decisions, which includes the candidate ID, identified must-haves, nice-to-haves, deal-breakers, reasoning, and assigned fit level. By structuring the prompt in this way, the LLM is guided to provide detailed and consistent evaluations of candidate-job fit.
+
+
 \subsection{Balanced Dataset Construction}
 
-To ensure a balanced training dataset, we employ city-based negative sampling, similar to the negative sampling strategy employed in previous chapter. Given the imbalance in the generated data, due to the fact that each applying candidate is mostly a good fit for the job, we need to create negative samples to train the model effectively. 
-\vspace{1em}
+To ensure a balanced training dataset, we employ city-based negative sampling, similar to the negative sampling strategy employed in previous chapter. Given the imbalance in the generated data, due to the fact that each applying candidate is mostly a good fit for the job, we need to create negative samples to train the model effectively.
+
 For each job posting, we identify all candidates who applied (positive samples) and then randomly select candidates who did \textit{not} apply to create negative examples. To ensure that the negative samples are realistic, the job title and user history words are compared. If the job title and user history have no words in common, the candidate is considered a valid negative sample. This way, the negative samples represent candidates that are not only not applying but also less likely to be a good fit for the job. The sampling strategy is designed to create a balanced dataset with a 1:1 ratio of positive to negative samples, which is crucial for training an effective binary classification model.
-\vspace{1em}
-The effective generation of the labels is a time-consuming process, as it requires multiple calls to the LLM for each candidate-job pair. This is the reason a lightweight model is chosen for the recruiter recommendation system instead of a two-tower architecture as this needs more data.
+
+The effective generation of the labels is a time-consuming process, as it requires multiple calls to the LLM for each candidate-job pair which is why a lightweight model is chosen for the recruiter recommendation system, as it can be trained on a smaller dataset and still achieve good performance.
 
 \section{Lightweight Recommender Architecture}
 \label{sec:recruiter_lightweight}
 
-The recruiter recommendation system employs a lightweight ensemble approach optimized for computational efficiency while maintaining predictive performance. The model receives a feature vector combining heuristic and semantic features and outputs a binary suitability prediction.
-
+The recruiter recommendation system employs a lightweight ensemble approach optimized for computational efficiency while maintaining predictive performance. The model receives a feature vector combining heuristic and semantic features and outputs a score representing the predicted suitability of a candidate for a given job.
 \subsection{Model Selection and Ensemble}
 
-We evaluated multiple classification algorithms:
-
-\begin{itemize}
-    \item \textbf{Logistic Regression}: Simple, interpretable, fast inference.
-    \item \textbf{Random Forest}: Handles non-linear patterns, inherent feature importance.
-    \item \textbf{XGBoost}: Gradient boosting with strong empirical performance.
-    \item \textbf{Voting Ensemble}: Combines predictions from multiple base models.
-\end{itemize}
+Multiple models were evaluated and compared. The models considered were Logistic Regression, Random Forest, XGBoost and a ensemble of the three.
 
 Through stratified 5-fold cross-validation on the entire dataset (combining train, validation, and test splits), we found that \textbf{Logistic Regression} achieved competitive performance while offering superior computational efficiency and interpretability. The logistic regression model learns:
 
@@ -60,31 +73,17 @@ P(\text{fit} = 1 | \mathbf{x}) = \frac{1}{1 + e^{-(\mathbf{w}^T \mathbf{x} + b)}
 
 where $\mathbf{x}$ is the feature vector and $\mathbf{w}$ are learned weights. The feature weights provide direct interpretability: positive weights indicate features that increase suitability, while negative weights indicate features that decrease it.
 
-\subsection{Training Procedure}
-
-The training procedure follows these steps:
-
-\begin{enumerate}
-    \item \textbf{Feature Engineering}: All features (described in Section \ref{sec:recruiter_features}) are computed for each candidate-job pair.
-    \item \textbf{Feature Scaling}: All features are standardized using z-score normalization (StandardScaler) to have mean 0 and standard deviation 1.
-    \item \textbf{Model Training}: Logistic regression is trained on the entire dataset using binary cross-entropy loss with L2 regularization.
-    \item \textbf{Cross-Validation}: Stratified 5-fold cross-validation estimates performance on unseen data, ensuring that the dataset split is balanced across folds.
-\end{enumerate}
-
-The trained model, along with the feature scaler and preprocessing artifacts (TF-IDF vectorizer, PCA model), are saved for inference.
-
-\section{Heuristic and Semantic Interaction Features}
+\subsection{Heuristic and Semantic Interaction Features}
 \label{sec:recruiter_heuristic}
 
-The feature engineering pipeline combines interpretable heuristic features derived from domain knowledge with learned semantic features from neural embeddings. This hybrid approach balances explainability with predictive power.
+The feature engineering pipeline combines heuristic features  based on the candidate's profile and job requirements with semantic features derived from neural embeddings. This hybrid approach captures both explicit domain knowledge and deeper semantic relationships, providing a rich feature set for the logistic regression model.
 
-\subsection{Heuristic Features}
+The challenge is designing features which translates how the \gls{LLM} is evaluating the candidate-job fit, as the model is trained to predict the LLM-generated labels. Therefore, the features are designed to capture the same dimensions that the LLM considers when evaluating fit: experience alignment, education matching, skill overlap, and job history.
+\subsubsection{Heuristic Features}
 
 Heuristic features are based on explicit rules and pattern matching, making them inherently interpretable.
 
-\subsubsection{Experience Delta}
-
-Experience delta measures the difference between a candidate's total years of experience and the job's required years of experience:
+\paragraph{Experience Delta} This feature captures the gap between the candidate's total years of experience and the required experience specified in the job requirements:
 
 \begin{equation}
 \text{exp\_delta} = \text{TotalYearsExperience} - \text{Required Experience}
@@ -92,9 +91,7 @@ Experience delta measures the difference between a candidate's total years of ex
 
 Required experience is extracted from the job requirements text using regex patterns that identify phrases like \textit{``5+ years of experience''} or \textit{``8 years required''}. If no required experience is specified in the requirements, exp\_delta is set to 0. A positive exp\_delta indicates the candidate meets or exceeds the experience requirement, while negative values indicate shortfall.
 
-\subsubsection{Degree Matching}
-
-Degree matching is a binary heuristic that assesses whether the candidate's education aligns with job requirements:
+\paragraph{Degree Matching} This feature is a binary heuristic that assesses whether the candidate's education aligns with job requirements:
 
 \begin{equation}
 \text{degree\_match} = \begin{cases}
@@ -105,11 +102,9 @@ Degree matching is a binary heuristic that assesses whether the candidate's educ
 \end{cases}
 \end{equation}
 
-Job requirement keywords (``degree'', ``bachelor'', ``master'', etc.) are detected through keyword matching on the requirements text.
+The method to do this is again based on regex patterns that identify degree requirements in the job requirements text (e.g., \textit{``Bachelor's degree required''}, \textit{``Master's preferred''}). This feature captures the importance of education alignment in candidate suitability.
 
-\subsubsection{TF-IDF Keyword Overlap}
-
-TF-IDF (Term Frequency-Inverse Document Frequency) overlap captures lexical similarity between candidate and job profiles:
+\paragraph{TF-IDF Keyword Overlap} \gls{TF-IDF} is used to capture keyword-level overlap between candidate profiles and job descriptions. The library used is scikit-learn's TfidfVectorizer. The process is as follows:
 
 \begin{enumerate}
     \item A TF-IDF vectorizer is fit on all job postings (titles, requirements, descriptions).
@@ -120,13 +115,15 @@ TF-IDF (Term Frequency-Inverse Document Frequency) overlap captures lexical simi
 
 This feature captures keyword-level overlap (e.g., Python skills, AWS experience) in a computationally efficient manner.
 
+\paragraph{Total Years of Experience} Next to the difference in experience, which is not always a filled in requirement (e.g. if the job doesn't specify a required experience, the exp\_delta will be 0 for all candidates), the total years of experience is also included as a feature, which is part of the features in the dataset.
+
 \subsection{Semantic Features}
 
 Semantic features are derived from neural embeddings, capturing deeper semantic relationships beyond keyword matching.
 
 \subsubsection{Qwen Embedding Cosine Similarity}
 
-Similar to the user-side system, Qwen 3.5 embeddings (100 dimensions) are computed for each candidate profile and job posting, capturing semantic meaning of careers and job descriptions. The cosine similarity between candidate and job embeddings is computed:
+Using the embeddings created in chapter \ref{chap:user_recommendation}, the cosine similarity between candidate and job embeddings is computed as a semantic similarity feature:
 
 \begin{equation}
 \text{cosine\_sim} = \frac{\mathbf{u} \cdot \mathbf{j}}{|\mathbf{u}| \cdot |\mathbf{j}|}
@@ -153,8 +150,7 @@ Since the original 200-dimensional interaction vectors are high-dimensional and 
 This produces 80 PCA features capturing the most important variance in embedding interactions. These features are more computationally efficient for downstream modeling and help reduce overfitting.
 
 \subsubsection{Full Profile Semantic Similarity}
-
-We compute an additional semantic similarity score using the all-MiniLM-L6-v2 embedding model, which provides more context-aware representations than Qwen embeddings alone. For each candidate, a rich profile document is constructed:
+%NOt yet sure of this
 
 \begin{equation}
 \text{candidate\_doc} = \text{``Degree: } d\text{. Major: } m\text{. Experience: } e\text{ years.''}
@@ -189,9 +185,22 @@ The complete feature set for the recruiter recommendation system includes:
 \end{enumerate}
 
 This gives a total of $1 + 3 + 1 + 80 + 1 = 86$ features per candidate-job pair.
+\subsection{Training Procedure}
+
+The training procedure follows these steps:
+
+\begin{enumerate}
+    \item \textbf{Feature Engineering}: All features (described in Section \ref{sec:recruiter_heuristic}) are computed for each candidate-job pair.
+    \item \textbf{Feature Scaling}: All features are standardized using z-score normalization (StandardScaler) to have mean 0 and standard deviation 1.
+    \item \textbf{Model Training}: Logistic regression is trained using 5-fold cross-validation on the entire dataset using binary cross-entropy loss with L2 regularization.
+    \item \textbf{Cross-Validation}: Stratified 5-fold cross-validation estimates performance on unseen data, ensuring that the dataset split is balanced across folds. 
+\end{enumerate}
+
+The trained model, along with the feature scaler and preprocessing artifacts (TF-IDF vectorizer, PCA model), are saved for inference.
 
 \section{Training and Evaluation}
 \label{sec:recruiter_training}
+
 
 \subsection{Data Split Strategy}
 
