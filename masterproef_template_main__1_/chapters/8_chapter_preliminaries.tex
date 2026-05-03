@@ -74,6 +74,24 @@ A neural embedding is a learned mapping from a discrete or high-dimensional inpu
 
 \textbf{Pre-trained text embeddings} are used to encode natural language fields such as job titles, descriptions and work history. In this thesis, the Qwen3 Embedding model (0.6B parameters) is used to produce continuous vector representations of text. Further discussed in Chapter~\ref{chap:user_recommendation}).
 
+
+\section{Large Language Models and Prompting}
+\label{sec:prelim_llm}
+ 
+A Large Language Model (LLM) is a neural network trained on large amounts of text to predict the probability of the next token in a sequence. Through this objective, \gls{LLM} acquire generalised knowledge about language, facts and reasoning patterns. At inference time, an \gls{LLM} takes a natural language \emph{prompt} as input and generates a continuation --- making it usable as a reasoner without any task-specific retraining.
+ 
+In this thesis, an \gls{LLM} is used not as a recommender system in itself, but as a \textbf{label generator}. Because no ground-truth recruiter feedback exists in the available dataset, an \gls{LLM} is prompted to act as a recruiter and evaluate candidate-job fit using different features and assign a binary label to each pair. The quality of these synthetic labels determines the quality of the recruiter-side model trained on them, making the prompting strategy a critical design choice.
+ 
+\subsection{Naive Prompting and Its Limitations}
+ 
+A naive prompt instructs the model to perform a task in a single step: for example, \emph{``Given this candidate profile and job description, is this a good fit? Answer yes or no.''}. In practice, this approach produces inconsistent outputs for structured evaluation tasks. The model may apply different implicit criteria across examples as each prompt is independently generated when making different calls to the model. This leads to incosistent labels and noise, which consequently degrades the performance of models trained on the labeled data.
+\subsection{Chain-of-Thought Prompting}
+\label{sec:prelim_cot}
+ 
+Chain-of-Thought (CoT) prompting addresses this by explicitly instructing the model to reason step by step before arriving at a conclusion \cite{wei2023chainofthoughtpromptingelicitsreasoning}. Rather than asking for a direct answer, the prompt structures the reasoning process: the model is asked to first identify must-have criteria for the role, then assess whether the candidate meets each one, and only then assign an overall fit level based on defined thresholds.
+ 
+This structured elicitation has two practical benefits for label generation. First, it forces the model to be explicit about the criteria it is applying, making inconsistencies visible and correctable through prompt refinement. Second, it anchors the final label to intermediate reasoning steps, reducing the risk of outputs that are superficially plausible but logically unsupported. The iterative design of the CoT prompt used in this thesis and its effect on label quality are discussed in Chapter~\ref{chap:recruiter_recommendation}.
+
 \section{Evaluation Metrics}
 \label{sec:prelim_metrics}
 
