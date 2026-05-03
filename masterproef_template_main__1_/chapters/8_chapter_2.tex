@@ -1,262 +1,432 @@
-\chapter{Recruiter-Side Recommendation System}
-\label{chap:recruiter_recommendation}
-This chapter describes the recruiter-side recommendation system which acts as a lightweight recruiter, predicting the suitability of a candidate for a given job. The difference between the recruiter and user recommendation systems is that the recruiter system focuses on predicting whether a candidate is a good fit for a specific job, while the user system focuses on predicting whether a user would apply to a job. This way, both complementary systems can be used together to create the narrative of job seekers and recruiters.
+\chapter{User-Side Job Recommendation System}
+\label{chap:user_recommendation}
 
-The recruiter system is designed as a lightweight, interpretable model that combines heuristic features (based on domain knowledge and regex patterns) with semantic features (based on neural embeddings). This hybrid approach balances predictive performance with computational efficiency and explainability. While this recommender system is not returning a list of recommended candidates, it can be used to rank candidates for a given job by their predicted suitability scores.
+This chapter details the job recommendation system built for users using PyTorch, consisting of the preprocessing of the data and the architecture of the two-tower model. This model will be used in Chapter \ref{chap:congestion_balancing} to implement the user-side congestion reduction strategy.
 
-First, the need for synthetic label generation is discussed and explained in Section \ref{sec:recruiter_data_gen}. Then, the architecture of the lightweight recommender model is described in Section \ref{sec:recruiter_lightweight}. The heuristic and semantic features used as input to the model are detailed in Section \ref{sec:recruiter_heuristic}. Finally, the training procedure and evaluation strategy are outlined in Section \ref{sec:recruiter_training}.
+First, in Section \ref{sec:user_arch}, the architecture of the two-tower model is explained. Then, in Section \ref{sec:user_data_pipeline}, the data pipeline and feature engineering techniques are described. In Section \ref{sec:user_training}, the training procedure and optimization are discussed. Finally, in Section \ref{sec:user_experiments}, the experimental results and ablation studies are presented.
 
-\section{Data Generation and Labeling}
-\label{sec:recruiter_data_gen}
+The need for a two-tower \gls{RS} is due to the fact that a neural network can deal with the cold start problem, which is important due to how the dataset is split (see Section \ref{sec:custom_split}).
 
-While the CareerBuilder dataset contains information about candidates applying to jobs, there's no information about the recruiter's perspective on candidate suitability. Therefore, there is need to create synthetic labels for candidate-job fit to train the recruiter recommendation model.
+\section{Architecture: The Two-Tower Model}
+\label{sec:user_arch}
 
-To generate these labels, an open-source \gls{LLM} is used. The \gls{LLM} is prompted with \gls{CoT} approach to evaluate the fit between a candidate and a job posting across multiple dimensions (experience, education, skills, career progression). The \gls{LLM}'s output is then converted into binary labels indicating whether the candidate is a good fit for the job. 
+The two-tower model is trained and evaluated on the CareerBuilder Job Recommendation dataset (see Chapter \ref{chap:dataset_overview} for a comprehensive dataset overview). The model consists of two separate neural networks: one for processing the user features, the user tower, and one for processing the job features, the job tower. Each tower learns a vector representation of its respective features. The output of both towers is then combined to produce a final matching score for a user-job pair. The architecture is designed to capture complex interactions between user and job features.
 
-\subsection{LLM-Based Label Generation}
+\subsection{User Tower}
+\label{sec:user_tower}
 
-The label generation process uses the Qwen 3.5 (35B) model  via the Ollama API \cite{ollama2024} to evaluate the fit between a candidate and a job posting. For each candidate-job pair, the LLM is prompted to assess suitability across multiple dimensions:
+The user tower consists of a multi-layer feedforward neural network that transforms the input user features into a dense embedding vector. This embedding captures the underlying preferences and characteristics of the user, which can then be used to compute similarity with job embeddings from the job tower.
 
-\begin{itemize}
-    \item \textbf{Experience Match}: Whether the candidate's years of experience align with the job requirements.
-    \item \textbf{Education Alignment}: Whether the candidate's education level matches job expectations.
-    \item \textbf{Skill Overlap}: Semantic similarity between the candidate's background and job requirements.
-    \item \textbf{Career Progression}: Whether the role represents a logical next step in the candidate's career.
-\end{itemize}
-
-Based on these dimensions, the LLM assigns each pair a fit level: \textit{Very Good Fit}, \textit{Good Fit}, \textit{Poor Fit}, or \textit{Very Poor Fit}. These are then converted to binary labels (1 for \textit{Very Good Fit} and \textit{Good Fit}, 0 for \textit{Poor Fit} and \textit{Very Poor Fit}).
-\subsubsection{Prompt Design}
-The designed prompt was an iterative process, starting with a simple instruction and then refining it to elicit more detailed and consistent responses from the LLM by sanity checking the outputs. The final prompt was designed to guide the LLM through human-like reasoning steps to evaluate the pairs more consistently, also known as \gls{CoT}. Without this, the LLM would be inconsistent in its labeling.  Besides the \gls{CoT} prompting, the prompt also includes specific instructions on how to evaluate each dimension and how to assign fit levels based on the overall assessment. This structured approach helps ensure that the LLM's outputs are more reliable and aligned with human judgment of candidate-job fit. 
-%Show part of prompt
+\subsubsection{Input Layer}
 \begin{listing}[H]
-\begin{minted}{text}
-Task: You are an HR recruiter. You need to check how good a person fits the job based on user profile and job description (IMPORTANT: Treat each job-user pair independently).
-Assign a fit level:  
--"Very Good Fit": Meets 100% of Must-Haves AND meets 50% or more of Nice-to-Haves 
-AND has 0 Deal-Breakers.
--"Good Fit": Meets 100% of Must-Haves (OR misses exactly 1 Must-Have but compensates with extensive relevant experience) AND has 0 Deal-Breakers.
--"Poor Fit": Missing 2 or more Must-Haves OR has exactly 1 Deal-Breaker.
--"Very Poor Fit": Missing 3 or more Must-Haves OR has 2 or more Deal-Breakers.
-
-Return a JSON object with a "results" key containing an array of candidate decisions:
-{"results": [{"candidate_id": <id>, "must_haves": "xxx", "nice_to_haves": "xxx", 
-"deal_breakers": "xxx", "reasoning": "xxx", "fit_level": "Good Fit"}]}
+\begin{minted}{python3}
+self.user_embeddings = nn.ModuleList([
+    nn.Embedding(card, 16) for card in num_user_cat
+])
 \end{minted}
-\caption{LLM Prompt for Candidate-Job Fit Evaluation}
-\label{lst:recruiter_llm_prompt}
+\caption{User embedding layer initialization in the two-tower model}
+\label{lst:user_embeddings}
 \end{listing}
 
-The prompt starts with the task definition, instructing the LLM to act as an HR recruiter evaluating candidates. An important instruction is to treat each pair independently, to prevent the LLM from making inconsistent judgments. Then the criteria for assigning fit levels are clearly defined, providing specific thresholds for what constitutes a \textit{Very Good Fit}, \textit{Good Fit}, \textit{Poor Fit}, and \textit{Very Poor Fit}. The criteria is designed to be specific such that the \gls{LLM} is consistent and there's no ambiguity. Finally, the prompt specifies the expected output format as a JSON object containing an array of candidate decisions, which includes the candidate ID, identified must-haves, nice-to-haves, deal-breakers, reasoning, and assigned fit level. By structuring the prompt in this way, the LLM is guided to provide detailed and consistent evaluations of candidate-job fit.
+Categorical features are converted to 16-dimensional embeddings using learnable embedding layers. These embeddings are then concatenated with numeric features (e.g., years of experience, work history count). The total input dimension is calculated as:
 
+\begin{listing}[H]
+\begin{minted}{python3}
+user_input_dim = len(num_user_cat) * 16 + num_user_numeric
+\end{minted}
+\caption{User input dimension calculation}
+\label{lst:user_input_dim}
+\end{listing}
 
-\subsection{Balanced Dataset Construction}
+\subsubsection{Neural Network Stack}
 
-To ensure a balanced training dataset, we employ city-based negative sampling, similar to the negative sampling strategy employed in previous chapter. Given the imbalance in the generated data, due to the fact that each applying candidate is mostly a good fit for the job, we need to create negative samples to train the model effectively.
+The user tower consists of three fully-connected layers with regularization:
+\begin{itemize}
+    \item \textbf{Layer 1}: Linear(user\_input\_dim $\rightarrow$ 512) with batch normalization, ReLU, and 30\% dropout.
+    \item \textbf{Layer 2}: Linear(512 $\rightarrow$ 256) with batch normalization, ReLU, and 20\% dropout.
+    \item \textbf{Output Layer}: Linear(256 $\rightarrow$ 64) producing a 64-dimensional user embedding.
+\end{itemize}
 
-For each job posting, we identify all candidates who applied (positive samples) and then randomly select candidates who did \textit{not} apply to create negative examples. To ensure that the negative samples are realistic, the job title and user history words are compared. If the job title and user history have no words in common, the candidate is considered a valid negative sample. This way, the negative samples represent candidates that are not only not applying but also less likely to be a good fit for the job. The sampling strategy is designed to create a balanced dataset with a 1:1 ratio of positive to negative samples, which is crucial for training an effective binary classification model.
+The decreasing layer sizes (512 $\rightarrow$ 256 $\rightarrow$ 64) act as a bottleneck, forcing the network to learn a compressed and meaningful representations of user profiles. The implementation of this tower is shown here:
 
-The effective generation of the labels is a time-consuming process, as it requires multiple calls to the LLM for each candidate-job pair which is why a lightweight model is chosen for the recruiter recommendation system, as it can be trained on a smaller dataset and still achieve good performance.
+\begin{listing}[H]
+\begin{minted}{python3}
+self.user_tower = nn.Sequential(
+    nn.Linear(user_input_dim, 512),
+    nn.BatchNorm1d(512),
+    nn.ReLU(),
+    nn.Dropout(0.3),
+    nn.Linear(512, 256),
+    nn.BatchNorm1d(256),
+    nn.ReLU(),
+    nn.Dropout(0.2),
+    nn.Linear(256, output_dim)
+)
+\end{minted}
+\caption{User tower architecture in the two-tower model}
+\label{lst:user_tower}
+\end{listing}
 
-\section{Lightweight Recommender Architecture}
-\label{sec:recruiter_lightweight}
+\subsection{Job Tower}
+\label{sec:job_tower}
 
-The recruiter recommendation system employs a lightweight ensemble approach optimized for computational efficiency while maintaining predictive performance. The model receives a feature vector combining heuristic and semantic features and outputs a score representing the predicted suitability of a candidate for a given job.
-\subsection{Model Selection and Ensemble}
+The job tower mirrors the architecture of the user tower to process job-related features, learning compact representations for each job. The only difference is the input dimension, which depends on the number of job features.
 
-Multiple models were evaluated and compared. The models considered were Logistic Regression, Random Forest, XGBoost and a ensemble of the three.
+\subsubsection{Input Layer}
 
-Through stratified 5-fold cross-validation on the entire dataset (combining train, validation, and test splits), we found that \textbf{Logistic Regression} achieved competitive performance while offering superior computational efficiency and interpretability. The logistic regression model learns:
+\begin{listing}[H]
+\begin{minted}{python3}
+self.job_embeddings = nn.ModuleList([
+    nn.Embedding(card, 16) for card in num_job_cat
+])
+\end{minted}
+\caption{Job embedding layer initialization in the two-tower model}
+\label{lst:job_embeddings}
+\end{listing}
 
+Similar to the user tower, categorical job attributes (e.g., city, state) are embedded to 16 dimensions. Numeric features, including the Qwen3 text embeddings of job titles, are concatenated with these categorical embeddings. The total input dimension mirrors the user tower calculation:
+
+\begin{listing}[H]
+\begin{minted}{python3}
+job_input_dim = len(num_job_cat) * 16 + num_job_numeric
+\end{minted}
+\caption{Job input dimension calculation}
+\label{lst:job_input_dim}
+\end{listing}
+
+\subsubsection{Neural Network Stack}
+
+The job tower employs an identical layer progression as the user tower:
+\begin{itemize}
+    \item \textbf{Layer 1}: Linear(job\_input\_dim $\rightarrow$ 512) with batch normalization, ReLU, and 30\% dropout.
+    \item \textbf{Layer 2}: Linear(512 $\rightarrow$ 256) with batch normalization, ReLU, and 20\% dropout.
+    \item \textbf{Output Layer}: Linear(256 $\rightarrow$ 64) producing a 64-dimensional job embedding.
+\end{itemize}
+
+The implementation of the job tower is as follows:
+
+\begin{listing}[H]
+\begin{minted}{python3}
+self.job_tower = nn.Sequential(
+    nn.Linear(job_input_dim, 512),
+    nn.BatchNorm1d(512),
+    nn.ReLU(),
+    nn.Dropout(0.3),
+    nn.Linear(512, 256),
+    nn.BatchNorm1d(256),
+    nn.ReLU(),
+    nn.Dropout(0.2),
+    nn.Linear(256, output_dim)
+)
+\end{minted}
+\caption{Job tower architecture in the two-tower model}
+\label{lst:job_tower}
+\end{listing}
+
+\subsection{Prediction Layer}
+\label{sec:user_prediction}
+
+The final user-job matching score is computed via the dot product of the learned user and job embeddings:
 \begin{equation}
-P(\text{fit} = 1 | \mathbf{x}) = \frac{1}{1 + e^{-(\mathbf{w}^T \mathbf{x} + b)}}
+\text{score} = \text{user\_vec} \cdot \text{job\_vec} = \sum_{i=1}^{64} \text{user\_vec}_i \times \text{job\_vec}_i
 \end{equation}
 
-where $\mathbf{x}$ is the feature vector and $\mathbf{w}$ are learned weights. The feature weights provide direct interpretability: positive weights indicate features that increase suitability, while negative weights indicate features that decrease it.
+This dot product measures the similarity between the learned user and job representations. Higher scores indicate better matches, while lower scores suggest poor alignment between user preferences and job characteristics. This approach allows the model to capture non-linear relationships between user and job features through the multi-layer architecture. The complete two-tower model implementation in PyTorch is provided in Appendix \ref{app:two_tower_model}.
 
-\subsection{Heuristic and Semantic Interaction Features}
-\label{sec:recruiter_heuristic}
-
-The feature engineering pipeline combines heuristic features  based on the candidate's profile and job requirements with semantic features derived from neural embeddings. This hybrid approach captures both explicit domain knowledge and deeper semantic relationships, providing a rich feature set for the logistic regression model.
-
-The challenge is designing features which translates how the \gls{LLM} is evaluating the candidate-job fit, as the model is trained to predict the LLM-generated labels. Therefore, the features are designed to capture the same dimensions that the LLM considers when evaluating fit: experience alignment, education matching, skill overlap, and job history.
-\subsubsection{Heuristic Features}
-
-Heuristic features are based on explicit rules and pattern matching, making them inherently interpretable.
-
-\paragraph{Experience Delta} This feature captures the gap between the candidate's total years of experience and the required experience specified in the job requirements:
-
+Note that L2 normalization of the output vectors was considered. The dot product between two L2-normalized vectors is equivalent to cosine similarity:
 \begin{equation}
-\text{exp\_delta} = \text{TotalYearsExperience} - \text{Required Experience}
+\text{cosine\_similarity} = \frac{\text{user\_vec} \cdot \text{job\_vec}}{\|\text{user\_vec}\| \|\text{job\_vec}\|}
 \end{equation}
 
-Required experience is extracted from the job requirements text using regex patterns that identify phrases like \textit{``5+ years of experience''} or \textit{``8 years required''}. If no required experience is specified in the requirements, exp\_delta is set to 0. A positive exp\_delta indicates the candidate meets or exceeds the experience requirement, while negative values indicate shortfall.
+It has been excluded after evaluation showed it consistently hurt performance (see Section \ref{sec:ablation}). Without normalization, the dot product is unbounded, allowing the model to encode match confidence in both the direction and magnitude of the learned embeddings.
 
-\paragraph{Degree Matching} This feature is a binary heuristic that assesses whether the candidate's education aligns with job requirements:
+\section{Data Pipeline and Feature Engineering}
+\label{sec:user_data_pipeline}
 
-\begin{equation}
-\text{degree\_match} = \begin{cases}
-1.0 & \text{if job requires degree AND candidate has degree} \\
--1.0 & \text{if job requires degree AND candidate lacks degree} \\
-0.5 & \text{if job doesn't require degree AND candidate has degree} \\
-0.0 & \text{otherwise}
-\end{cases}
-\end{equation}
+The raw data needs to be preprocessed before it can be used by the two-tower model. The data pipeline consists of four main stages: training data generation (\ref{sec:training_data_gen}), user feature processing (\ref{sec:user_features_processing}), job feature processing (\ref{sec:job_features_processing}), and text embedding generation (\ref{sec:text_embedding}). Each stage is designed to handle large-scale data efficiently due to the size of the CareerBuilder dataset (see Section \ref{sec:dataset_overview}).
 
-The method to do this is again based on regex patterns that identify degree requirements in the job requirements text (e.g., \textit{``Bachelor's degree required''}, \textit{``Master's preferred''}). This feature captures the importance of education alignment in candidate suitability.
+\subsection{Training Data Generation}
+\label{sec:training_data_gen}
 
-\paragraph{TF-IDF Keyword Overlap} \gls{TF-IDF} is used to capture keyword-level overlap between candidate profiles and job descriptions. The library used is scikit-learn's TfidfVectorizer. The process is as follows:
+The training data generation process creates a labeled dataset with explicit positive and negative samples while ensuring temporal consistency across train, validation, and test sets.
 
+\subsubsection{Temporal Window-Based Splitting}
+
+As already described in Chapter \ref{chap:dataset_overview}, the original dataset is organized into 7 temporal windows, each representing a different time period. For this research, we use a custom temporal split where:
+\begin{itemize}
+    \item \textbf{Training Set}: All users and jobs from Windows 1--4 (first 52 days).
+    \item \textbf{Validation Set}: All users and jobs from Windows 5--6 (next 26 days).
+    \item \textbf{Test Set}: All users and jobs from Window 7 (last 13 days).
+\end{itemize}
+
+This split creates a realistic scenario where the model is trained on historical data and evaluated on future data, simulating a real-world deployment scenario.
+
+\subsubsection{Label Assignment}
+
+Positive samples are extracted directly from the applications data, as each application represents a confirmed user-job match (label = 1). Negative samples are not explicitly given in the dataset and are generated synthetically as described below.
+
+\subsubsection{City-Based Negative Sampling}
+\label{sec:negative_sampling}
+
+Negative samples (user-job pairs that were not applied to) are generated using a city-based strategy. A 4:1 ratio of negative to positive samples is used, meaning each positive application is paired with four negative job samples. This ratio was chosen to better approximate the real inference distribution, where a user must be ranked against a large pool of jobs rather than a single alternative. An overly high negative ratio (e.g., 100:1) would be more accurate but would make training and validating the model computationally infeasible given the dataset size.
+
+The city-based strategy works as follows for each user in each window:
 \begin{enumerate}
-    \item A TF-IDF vectorizer is fit on all job postings (titles, requirements, descriptions).
-    \item For each candidate, a document is constructed from their history and degree type.
-    \item For each candidate-job pair, the cosine similarity between their TF-IDF vectors is computed.
-    \item The final tfidf\_overlap feature is this cosine similarity score, normalized to [0, 1].
+    \item All job IDs that the user has already applied to are excluded.
+    \item Jobs from the same city as the user are preferentially selected as negative samples, as they represent realistic alternatives the user might consider.
+    \item If insufficient same-city jobs exist, jobs from other cities in the same window are used as fallback negatives.
 \end{enumerate}
 
-This feature captures keyword-level overlap (e.g., Python skills, AWS experience) in a computationally efficient manner.
+A key design decision is that by sampling negatives from the same city, location is deliberately removed as a discriminative signal — both positives and negatives share the same geographic context if there are enough samples. This forces the model to learn semantic job-fit based on career progression, education, and job title similarity rather than relying on location as a shortcut. Geographic preference is instead handled as a separate post-processing step at inference time (see Section \ref{sec:inference_postprocessing}).
 
-\paragraph{Total Years of Experience} Next to the difference in experience, which is not always a filled in requirement (e.g. if the job doesn't specify a required experience, the exp\_delta will be 0 for all candidates), the total years of experience is also included as a feature, which is part of the features in the dataset.
+Due to the large number of users in training windows, a random sample of 100,000 training users is used to keep the dataset size manageable while preserving full coverage of all validation and test users.
 
-\subsection{Semantic Features}
+\noindent\textbf{Note on evaluation}: The per-epoch validation metrics reported during training are computed over the balanced validation set (4:1 negative ratio), which yields a much smaller candidate pool per user than real inference (Window 7). As a result, ranking metrics such as Hit@K computed during training are optimistic relative to real-world performance. The most important evaluation is performed at inference time by ranking each test user against all jobs from Window 7 (see Section \ref{sec:user_results}) and performing sanity checks.
 
-Semantic features are derived from neural embeddings, capturing deeper semantic relationships beyond keyword matching.
+\subsection{User Feature Processing}
+\label{sec:user_features_processing}
 
-\subsubsection{Qwen Embedding Cosine Similarity}
+User features are extracted and engineered to create a comprehensive representation of each job seeker's profile.
 
-Using the embeddings created in chapter \ref{chap:user_recommendation}, the cosine similarity between candidate and job embeddings is computed as a semantic similarity feature:
+\subsubsection{Feature Extraction and Merging}
 
+Raw user features (demographics, education, location) are merged with user employment history. The most recent job titles (up to 3 previous positions) are extracted and concatenated with recency labels:
 \begin{equation}
-\text{cosine\_sim} = \frac{\mathbf{u} \cdot \mathbf{j}}{|\mathbf{u}| \cdot |\mathbf{j}|}
+\text{Recent\_JobTitle} = \text{``Current: JobTitle}_{1}\text{ | Previous: JobTitle}_{2}\text{ | Earlier: JobTitle}_{3}\text{''}
 \end{equation}
 
-where $\mathbf{u}$ is the candidate profile embedding and $\mathbf{j}$ is the job posting embedding.
+This concatenation is embedded using the Qwen3-Embedding-0.6B model to capture the semantic meaning of the user's career trajectory (see Section \ref{sec:user_embedding}).
 
-\subsubsection{Interaction Matrix Features via PCA}
+\subsubsection{Feature Engineering}
 
-To capture complex non-linear interactions between candidate and job embeddings, we compute an interaction matrix for each pair:
+Several domain-specific features are engineered from raw attributes:
 
-\begin{equation}
-\text{interaction\_matrix} = [\mathbf{u} \odot \mathbf{j}, |\mathbf{u} - \mathbf{j}|]
-\end{equation}
+\begin{itemize}
+    \item \textbf{Years Since Graduation}: Calculated from the graduation date as $\text{current\_year} - \text{graduation\_year}$. Missing values are imputed with the median.
+    \item \textbf{Location Standardization}: Country and ZipCode columns are dropped. Country is dropped because the dataset is US-based. ZipCode is dropped as it is redundant given City and State, and introduces noise due to missing or inconsistent values. City and State are retained.
+\end{itemize}
 
-where $\odot$ denotes element-wise multiplication (Hadamard product) and $|\cdot|$ denotes absolute difference. This concatenation produces a $1 \times 200$ vector per pair.
+\subsubsection{Embedding and Encoding}
+\label{sec:user_embedding}
 
-Since the original 200-dimensional interaction vectors are high-dimensional and potentially correlated, we apply Principal Component Analysis (PCA) to reduce dimensionality while preserving variance:
+The engineered features are processed based on their data type:
 
-\begin{equation}
-\text{interaction\_pca} = \text{PCA}_{80}(\text{interaction\_matrix})
-\end{equation}
+\begin{itemize}
+    \item \textbf{Recent Job History}: The Recent\_JobTitle field is encoded into a dense 100-dimensional vector using the Qwen3 Embedding Model (0.6B), capturing semantic meaning of job titles and career progression. This embedding is stored as 100 columns prefixed with \texttt{ft\_recent\_job0} through \texttt{ft\_recent\_job99}.
+    \item \textbf{Numeric Features}: Features such as years of experience are standardized using z-score normalization (StandardScaler) to have mean 0 and standard deviation 1, ensuring scale invariance across the \gls{MLP} input.
+    \item \textbf{Categorical Features}: Features such as education level and other discrete attributes are label-encoded independently per feature file, mapping each unique value to an integer starting from 1 (0 is reserved for missing values). The only exception is City and State, which are encoded using a shared vocabulary across both user and job feature files (see Section \ref{sec:location_encoding}), ensuring that the same location maps to the same embedding index in both towers. All label-encoded features are fed into learnable embedding layers, not the \gls{MLP} 
+    directly, so normalization is not required.
+\end{itemize}
 
-This produces 80 PCA features capturing the most important variance in embedding interactions. These features are more computationally efficient for downstream modeling and help reduce overfitting.
+The table below summarizes the user feature engineering pipeline.
+\begin{table}[htbp]
+    \centering
+    \caption{User Feature Engineering Pipeline}
+    \label{tab:user_features}
+    \begin{tabular}{|l|l|l|l|l|}
+        \hline
+        \textbf{Category} & \textbf{Raw Feature} & \textbf{Type} & \textbf{Processing} & \textbf{Output} \\
+        \hline
+        \multirow{2}{*}{\textbf{Identifiers}} & UserID & int & --- & UserID \\
+        & WindowID & int & --- & WindowID \\
+        \hline
+        \multirow{2}{*}{\textbf{Location}} & City & categorical & LabelEncoder & int [1, N] \\
+        & State & categorical & LabelEncoder & int [1, N] \\
+        \hline
+        \multirow{3}{*}{\textbf{Education}} & DegreeType & categorical & LabelEncoder & int [1, N] \\
+        & Major & categorical & LabelEncoder & int [1, N] \\
+        & GraduationDate & date & $\rightarrow$ YearsSinceGrad & float (scaled) \\
+        \hline
+        \multirow{5}{*}{\textbf{Work Experience}} & WorkHistoryCount & int & StandardScaler & float (scaled) \\
+        & TotalYearsExperience & int & StandardScaler & float (scaled) \\
+        & CurrentlyEmployed & categorical & LabelEncoder & int [0, 1] \\
+        & ManagedOthers & categorical & LabelEncoder & int [0, 1] \\
+        & ManagedHowMany & int & StandardScaler & float (scaled) \\
+        \hline
+        \textbf{Job History} & Recent\_JobTitle (top 3) & text & Qwen Embedding & $\mathbb{R}^{100}$ \\
+        \hline
+    \end{tabular}
+\end{table}
 
-\subsubsection{Full Profile Semantic Similarity}
-%NOt yet sure of this
+\subsection{Job Feature Processing}
+\label{sec:job_features_processing}
 
-\begin{equation}
-\text{candidate\_doc} = \text{``Degree: } d\text{. Major: } m\text{. Experience: } e\text{ years.''}
-\end{equation}
+Job features are processed in a scalable manner using chunked processing to handle large job datasets efficiently.
 
-Similarly, for each job, a rich document is constructed by concatenating and cleaning the job title, description, and requirements. These documents are embedded using all-MiniLM-L6-v2 (384 dimensions), and the cosine similarity between embeddings is computed:
+\subsubsection{Data Organization}
 
-\begin{equation}
-\text{full\_profile\_cosine\_sim} = \cos(\text{embed}(\text{candidate\_doc}), \text{embed}(\text{job\_doc}))
-\end{equation}
+Raw job data is separated into three categories:
+\begin{itemize}
+    \item \textbf{Meta Columns}: JobID, WindowID, StartDate, EndDate (preserved without transformation)
+    \item \textbf{Text Columns}: Title, Description, Requirements (extracted for separate text cleaning and embedding)
+    \item \textbf{Feature Columns}: All numerical and categorical attributes used for the two-tower model
+\end{itemize}
 
-This feature provides a holistic semantic measure of candidate-job fit based on complete profiles rather than just embeddings of individual components.
+\subsubsection{Chunked Processing Strategy}
 
-\subsection{Feature Summary}
-
-The complete feature set for the recruiter recommendation system includes:
+Given the large size of the job dataset, processing is performed in chunks of 50,000 records using a two-pass approach:
 
 \begin{enumerate}
-    \item Baseline Features: \texttt{TotalYearsExperience} (candidate's years of experience)
-    \item Heuristic Interaction Features:
-    \begin{itemize}
-        \item \texttt{exp\_delta}: Experience gap relative to job requirement
-        \item \texttt{tfidf\_overlap}: Keyword-level match between candidate and job
-        \item \texttt{degree\_match}: Education alignment heuristic
-    \end{itemize}
-    \item Semantic Features:
-    \begin{itemize}
-        \item \texttt{cosine\_sim}: Qwen embedding similarity
-        \item \texttt{interaction\_pca\_0} through \texttt{interaction\_pca\_79}: PCA-reduced interaction features (80 total)
-        \item \texttt{full\_profile\_cosine\_sim}: all-MiniLM-L6-v2 similarity
-    \end{itemize}
+    \item \textbf{First Pass}: Iterate through all chunks to collect unique categorical values and compute scaling statistics (mean, variance) from numerical features across the entire dataset.
+    \item \textbf{Second Pass}: Apply learned encoders and scalers consistently to transform the data, ensuring that categorical mappings and numerical scaling are coherent across all jobs.
 \end{enumerate}
 
-This gives a total of $1 + 3 + 1 + 80 + 1 = 86$ features per candidate-job pair.
-\subsection{Training Procedure}
+\subsubsection{Feature Transformation}
 
-The training procedure follows these steps:
+During the second pass, features are transformed as follows:
 
+\begin{itemize}
+    \item \textbf{Numerical Features}: Standardized using StandardScaler fitted on the full dataset, ensuring consistent scaling across all chunks.
+    \item \textbf{Categorical Features}: Mapped to integers using a consistent encoding dictionary built from all unique values (1-indexed; 0 for missing values).
+    \item \textbf{Location Features}: City and State are retained and label-encoded. As they are categorical features which are present in both user and job datasets, a shared encoding dictionary is created to ensure that the same city/state maps to the same integer in both towers (see Section \ref{sec:location_encoding}).
+\end{itemize}
+
+\subsection{Text Cleaning and Embedding}
+\label{sec:text_embedding}
+Text data from job postings is processed to extract semantic information through cleaning and embedding.
+
+\subsubsection{Text Cleaning}
+Job titles and descriptions often contain HTML tags, special characters, and inconsistent formatting. The cleaning process:
 \begin{enumerate}
-    \item \textbf{Feature Engineering}: All features (described in Section \ref{sec:recruiter_heuristic}) are computed for each candidate-job pair.
-    \item \textbf{Feature Scaling}: All features are standardized using z-score normalization (StandardScaler) to have mean 0 and standard deviation 1.
-    \item \textbf{Model Training}: Logistic regression is trained using 5-fold cross-validation on the entire dataset using binary cross-entropy loss with L2 regularization.
-    \item \textbf{Cross-Validation}: Stratified 5-fold cross-validation estimates performance on unseen data, ensuring that the dataset split is balanced across folds. 
+    \item Removes HTML tags using the BeautifulSoup parser.
+    \item Converts text to lowercase for consistency.
+    \item Strips leading and trailing whitespace.
 \end{enumerate}
 
-The trained model, along with the feature scaler and preprocessing artifacts (TF-IDF vectorizer, PCA model), are saved for inference.
+\subsubsection{Semantic Embedding with Qwen}
+The cleaned job titles are encoded into dense vectors using the Qwen3 Embedding Model (0.6B). The embedding process:
+\begin{enumerate}
+    \item Encodes each job title into a 100-dimensional vector, truncated from the full embedding dimension. The truncation serves two purposes: computational efficiency, and preventing the text embeddings from dominating the input signal. 
+    With 100 Qwen dimensions out of a total job tower input of $2 \times 16 + 100 = 132$ dimensions, the text embedding represents a significant, as this contains the most information, but not overwhelming portion of the input, allowing categorical and other numerical features to contribute meaningfully to the learned job representation. The same 100-dimensional truncation is applied to user job history embeddings for consistency.
+    \item Normalizes embeddings to unit norm to ensure comparable similarity scores across the corpus.
+    \item Stores embeddings with columns prefixed as \texttt{qwen\_0} through \texttt{qwen\_99}.
+\end{enumerate}
+
+These Qwen embeddings capture semantic relationships between job titles (e.g., ``Software Engineer'' and ``Developer'' have similar embeddings), enabling the job tower to learn meaningful job-to-job relationships beyond categorical attributes.
+
+\subsubsection{Merging with Job Features}
+Qwen embeddings are merged with the processed job features using JobID as the key. Missing embeddings (if any) are filled with 0. The final job feature matrix contains:
+\begin{equation}
+\text{job\_features} = [\text{meta\_cols},\ \text{numerical\_features},\ \text{categorical\_features},\ \text{qwen\_embeddings}]
+\end{equation}
+
+\subsection{Cross-Tower Location Consistency}
+\label{sec:location_encoding}
+
+An important preprocessing step that emerged from empirical investigation is ensuring that the same location (city/state) is mapped to the same integer in both the user and job feature files. Without this step, user features and job features are label-encoded independently, meaning city ``New York'' might be encoded as 42 in the user file and 137 in the job file. As a result, user city embedding 42 and job city embedding 42 would refer to completely different cities, and the model would learn no meaningful location signal from the embedding layers.
+
+To fix this, a shared vocabulary is constructed after both feature files are generated:
+\begin{enumerate}
+    \item All unique city and state values from both user and job datasets are collected.
+    \item A single shared mapping is created from location string to integer.
+    \item Both user and job feature files are re-encoded using this shared vocabulary.
+\end{enumerate}
+
+The impact of this step is validated in the ablation study (Section \ref{sec:ablation}), where including location features with the shared vocabulary significantly outperforms excluding them.
 
 \section{Training and Evaluation}
-\label{sec:recruiter_training}
+\label{sec:user_training}
 
+\subsection{Training Configuration}
+\label{sec:training_config}
 
-\subsection{Data Split Strategy}
+The model is trained on the Train split (Windows 1--4) using the Adam optimizer with a learning rate of 0.001 and a batch size of 1024. The output embedding dimension is set to 64 for both towers. Early stopping is applied with a patience of 5 epochs based on validation loss, preventing overfitting. In the final training run, the model converged at epoch 11 out of a maximum of 50 epochs, confirming that early stopping is effective for this dataset.
 
-To prevent data leakage and simulate realistic evaluation, we use a group-based splitting strategy based on JobID:
+\subsection{Loss Function and Optimization}
+\label{sec:loss_function}
 
-\begin{enumerate}
-    \item All unique JobIDs are randomly shuffled.
-    \item 80\% of JobIDs are assigned to the training set.
-    \item 10\% of JobIDs are assigned to the validation set.
-    \item 10\% of JobIDs are assigned to the test set.
-    \item All candidate-job pairs associated with a given JobID are placed together in the same split.
-\end{enumerate}
+The model is optimized using Binary Cross-Entropy with Logits loss (\texttt{BCEWithLogitsLoss}), which combines a sigmoid activation with the binary cross-entropy loss in a numerically stable way:
+\begin{equation}
+\mathcal{L} = -\frac{1}{N} \sum_{i=1}^{N} \left[ y_i \log(\sigma(\hat{y}_i)) + (1 - y_i) \log(1 - \sigma(\hat{y}_i)) \right]
+\end{equation}
 
-This ensures that the model is evaluated on its ability to generalize to new jobs not seen during training, rather than simply memorizing job-specific patterns.
+where $y_i \in \{0, 1\}$ is the ground truth label and $\hat{y}_i$ is the raw dot product score output by the model. The sigmoid $\sigma$ maps the unbounded dot product to a probability. 
 
-\subsection{Cross-Validation}
+At inference, the raw dot product scores are used for ranking. This is because the sigmoid funtion transforms scores to a [0, 1] range, where high-confidence matches map to 1.0000 in float32 precision while raw dot product scores are still distinguishable. 
+\subsection{Performance Evaluation Metrics}
+\label{sec:eval_metrics}
 
-We perform stratified 5-fold cross-validation on the combined training and validation sets to estimate model performance and select hyperparameters. Stratification ensures that each fold maintains the same proportion of positive and negative samples as the full dataset.
-
-\subsection{Evaluation Metrics}
-
-Model performance is assessed using the following metrics:
-
+Model performance during training is assessed using the following metrics computed on the validation set:
 \begin{itemize}
-    \item \textbf{Accuracy}: Percentage of correctly classified candidate-job pairs.
-    \begin{equation}
-        \text{Accuracy} = \frac{\text{TP} + \text{TN}}{\text{TP} + \text{TN} + \text{FP} + \text{FN}}
-    \end{equation}
-    
-    \item \textbf{Precision}: Proportion of predicted positive samples that are actually positive. High precision minimizes false recommendations to recruiters.
-    \begin{equation}
-        \text{Precision} = \frac{\text{TP}}{\text{TP} + \text{FP}}
-    \end{equation}
-    
-    \item \textbf{Recall}: Proportion of actual positive samples that are correctly identified. High recall ensures promising candidates are not missed.
-    \begin{equation}
-        \text{Recall} = \frac{\text{TP}}{\text{TP} + \text{FN}}
-    \end{equation}
-    
-    \item \textbf{F1-Score}: Harmonic mean of precision and recall, balancing both concerns.
-    \begin{equation}
-        \text{F1} = 2 \cdot \frac{\text{Precision} \cdot \text{Recall}}{\text{Precision} + \text{Recall}}
-    \end{equation}
-    
-    \item \textbf{ROC-AUC}: Area under the Receiver Operating Characteristic curve, measuring the model's ability to rank good fits higher than poor fits across all confidence thresholds.
+    \item \textbf{AUC-ROC}: \gls{ROC-AUC}, measuring the model's ability to rank positive samples higher than negatives across all score thresholds. This is used as the primary early stopping criterion.
+    \item \textbf{Accuracy}: Percentage of correctly classified user-job pairs at a 0.5 probability threshold.
+    \item \textbf{Hit@K}: Whether at least one relevant job appears in the top-K recommendations for a user.
+    \item \textbf{Recall@K}: Fraction of a user's relevant jobs that appear in the top-K recommendations.
+    \item \textbf{NDCG@K}: \gls{NDCG}, measuring ranking quality by penalizing relevant items ranked lower.
 \end{itemize}
 
-\subsection{Results and Insights}
+It is important to note that Hit@K, Recall@K, and NDCG@K computed during validation are measured over a small per-user candidate pool (the balanced validation set), not against all jobs. These metrics are therefore optimistic relative to real-world inference, where a user is ranked against the full job pool. \gls{ROC-AUC} is the most reliable metric during training as it is less sensitive to candidate pool size.
 
-The trained logistic regression model achieves strong performance on the held-out test set. The model's feature weights provide direct insights into which factors are most predictive of candidate-job fit. For example, positive coefficients on semantic similarity features indicate that candidates whose profiles semantically align with job descriptions tend to be better fits. Conversely, large negative values for experience delta may indicate that overqualified candidates are sometimes poor fits (e.g., for entry-level roles), captured by the model's learned non-linearity via the sigmoid function.
+\section{Experimental Results and Ablation Study}
+\label{sec:user_experiments}
 
-The hybrid approach of combining heuristic and semantic features offers several advantages:
+\subsection{Ablation Study}
+\label{sec:ablation}
 
-\begin{itemize}
-    \item \textbf{Interpretability}: Heuristic features like experience delta and degree match have clear business meanings.
-    \item \textbf{Robustness}: Semantic features capture nuanced relationships that pure heuristics would miss.
-    \item \textbf{Efficiency}: The lightweight logistic regression model enables real-time inference for large-scale recruitment scenarios.
-    \item \textbf{Explainability}: Feature importance and model coefficients can be explained to recruiters for transparency.
-\end{itemize}
+To determine the optimal model configuration, a systematic ablation study was conducted comparing two design choices: whether to include location features (City and State) and whether to apply L2 normalization to the output embeddings. Each configuration was trained for 3 epochs under identical conditions (lr=0.001, batch size=1024, 4:1 negative ratio) and compared by validation \gls{ROC-AUC}.
+
+\begin{table}[htbp]
+    \centering
+    \caption{Ablation study results after 3 training epochs. \gls{ROC-AUC} on the validation set.}
+    \label{tab:ablation}
+    \begin{tabular}{|l|l|c|c|c|}
+        \hline
+        \textbf{Location Features} & \textbf{L2 Normalization} & \textbf{Val Loss} & \textbf{Accuracy} & \textbf{AUC} \\
+        \hline
+        Excluded & No  & 0.3513 & 84.60\% & 0.8591 \\
+        Excluded & Yes & 0.4687 & 84.18\% & 0.7954 \\
+        Included & No  & 0.2317 & 91.24\% & \textbf{0.9365} \\
+        Included & Yes & 0.4693 & 84.13\% & 0.7950 \\
+        \hline
+    \end{tabular}
+\end{table}
+
+The results reveal two clear findings. First, L2 normalization consistently hurts performance regardless of whether location features are included. Without normalization, the dot product is unbounded and the model can encode match confidence in both the direction and magnitude of the embeddings. Constraining all vectors to the unit sphere removes this degree of freedom, forcing the model to rely on direction alone, which is evidently insufficient for this task.
+
+Second, including location features (City and State) with the shared vocabulary encoding significantly improves performance, with \gls{ROC-AUC} improving from 0.8591 to 0.9365. This result is initially surprising, given that city-based negative sampling deliberately places positives and negatives in the same city, which should prevent the model from learning location as a discriminative signal. The improvement is better explained by the richer model capacity provided by the city and state embedding layers, which allow the model to capture latent job market characteristics per location (e.g., certain cities may be associated with particular industries or application rates).
+
+It is worth noting that in an earlier experimental phase, before the cross-tower location consistency fix described in Section \ref{sec:location_encoding}, including location features \textit{hurt} model performance. This confirmed that independently encoded city/state integers produce noise rather than signal, as the same integer refers to different cities in the user and job towers. The fix is therefore a critical preprocessing step.
+
+Based on these results, the final model configuration uses location features with no L2 normalization.
+
+\subsection{Final Model Results}
+\label{sec:user_results}
+
+The final model was trained with the optimal configuration (location features included, no L2 normalization) for a maximum of 50 epochs with early stopping (patience=5). Training converged at epoch 11, achieving the following results on the validation set:
+
+\begin{table}[htbp]
+    \centering
+    \caption{Final model validation results.}
+    \label{tab:final_results}
+    \begin{tabular}{|l|c|}
+        \hline
+        \textbf{Metric} & \textbf{Value} \\
+        \hline
+        Validation Loss & 0.2233 \\
+        Accuracy        & TODO\% \\
+        AUC-ROC         & 0.9461 \\
+        Hit@5           & TODO \\
+        Recall@5        & TODO \\
+        NDCG@5          & TODO \\
+        Hit@10          & TODO \\
+        Recall@10       & TODO \\
+        NDCG@10         & TODO \\
+        \hline
+    \end{tabular}
+\end{table}
+
+% TODO: Add inference evaluation results here once available.
+% Run: python -m src.recommender.main --inference --same-state-first
+% Report: qualitative examples of recommendations for 3-4 test users,
+% and if possible a Hit@K / Recall@K computed against the full Window 7 job pool.
+
+The early stopping at epoch 11 indicates the model converges quickly and does not overfit, which is consistent with the use of batch normalization and dropout regularization throughout both towers.
+
+\subsection{Inference and Post-Processing}
+\label{sec:inference_postprocessing}
+
+At inference time, recommendations are generated efficiently using a precomputed job vector cache. All job embeddings from the job tower are computed once and stored in GPU memory. For each user, only the user tower forward pass is executed, followed by a batched dot product against all precomputed job vectors. This reduces per-user recommendation time to a single matrix multiplication.
+
+Since the model is trained without location features as a discriminative signal (by design of the city-based negative sampling), geographic preference is applied as a post-processing step. Jobs located in the same state as the user are boosted in ranking, ensuring geographically relevant recommendations without conflating location preference with semantic job-fit during training. This separation of concerns — semantic relevance learned by the model, geographic preference applied post-hoc — allows each component to be tuned and evaluated independently.
+
+At inference, recommendations are restricted to jobs from the current test window (Window 7) to avoid recommending jobs from earlier windows that may no longer be active.

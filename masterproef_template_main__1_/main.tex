@@ -45,7 +45,8 @@
 \usepackage{subcaption}
 \usepackage[toc,page]{appendix}
 \usepackage{fontspec}
-
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, chains, decorations.pathreplacing}
 % Don't indent table of contents, list of figures, and list of tables
 \usepackage{tocloft}
 \setlength{\cftsecindent}{0pt}    % Remove indent for \section in Table of Contents
@@ -185,7 +186,7 @@
 \pagestyle{empty}
 
 % Download the cover sheet from Plato
-\includepdf{cover-sheet.pdf}
+\includepdf{images/cover-sheet.pdf}
 
 \include{chapters/1_confidentiality}
 \include{chapters/2_acknowledgment}
@@ -205,10 +206,11 @@
 \mainmatter
 \pagestyle{fancy} % Use header
 \include{chapters/7_introduction}
-\include{chapters/8_dataset_overview}
 \include{chapters/8_chapter_1}
 \include{chapters/8_chapter_2}
 \include{chapters/8_chapter_3}
+\include{chapters/8_chapter_4}
+\include{chapters/8_chapter_5}
 \include{chapters/9_conclusion}
 \include{chapters/10_future-work}
 \include{chapters/11_ethical-reflection}

@@ -1,0 +1,219 @@
+\chapter{Experiments}
+\label{chap:experiments}
+
+This chapter presents the experimental evaluation of all systems developed in this master's dissertation. First, the shared experiment settings are described in Section \ref{sec:exp_settings}, including the custom dataset split, dataset statistics, and hardware configuration. Then, experiments are presented for the user-side recommendation system (Section \ref{sec:exp_user}), the recruiter-side recommendation system (Section \ref{sec:exp_recruiter}), and the congestion balancing strategies (Section \ref{sec:exp_congestion}).
+
+% ============================================================
+\section{Experiment Settings}
+\label{sec:exp_settings}
+% ============================================================
+
+\subsection{Custom Train/Validation/Test Split}
+\label{sec:custom_split}
+
+% Move section 2.2.1 from old chapter 2 here.
+% Explain: why window-based split instead of within-window split,
+% cold-start motivation, ignoring the original Train/Test user distinction.
+% Include figure fig:custom_split.
+TODO
+
+\subsection{Dataset Statistics and Characteristics}
+\label{sec:dataset_stats}
+
+% Fill in the empty section 2.4 from old chapter 2 here.
+% Include: number of users, jobs, applications per window,
+% distribution of applications per user, sparsity of the interaction matrix.
+TODO
+
+\subsection{Hardware and Software Configuration}
+\label{sec:hardware}
+
+% Describe the machine used for training (GPU type, RAM, etc.)
+% PyTorch version, Python version, any relevant library versions.
+TODO
+
+% ============================================================
+\section{User-Side Recommendation Experiments}
+\label{sec:exp_user}
+% ============================================================
+
+\subsection{Experiment Goal}
+\label{sec:exp_user_goal}
+
+% One paragraph: what are you trying to show?
+% Goal: build a two-tower model that ranks relevant jobs highly for each user,
+% evaluated on Window 7 as a cold-start scenario.
+TODO
+
+\subsection{Experiment Setting}
+\label{sec:exp_user_setting}
+
+% Describe the specific setup for these experiments:
+% - Negative sampling strategy (city-based, 4:1 ratio) and motivation
+% - Training users sampled (100,000)
+% - Hyperparameters: lr=0.001, batch_size=1024, output_dim=64, patience=5
+% - Early stopping criterion (validation AUC)
+% - Evaluation restricted to Window 7 jobs at inference
+TODO
+
+\subsection{Ablation Study}
+\label{sec:exp_user_ablation}
+
+% Move ablation table and discussion from chapter 3 here.
+% 2x2 comparison: address vs no address, norm vs no norm.
+% Explain findings: normalization hurts, address helps after fix-location.
+% Mention the broken encoding finding and its impact.
+TODO
+
+\begin{table}[htbp]
+    \centering
+    \caption{Ablation study results after 3 training epochs (AUC-ROC on validation set).}
+    \label{tab:ablation_user}
+    \begin{tabular}{|l|l|c|c|c|}
+        \hline
+        \textbf{Location Features} & \textbf{L2 Normalization} & \textbf{Val Loss} & \textbf{Accuracy} & \textbf{AUC} \\
+        \hline
+        Excluded & No  & 0.3513 & 84.60\% & 0.8591 \\
+        Excluded & Yes & 0.4687 & 84.18\% & 0.7954 \\
+        Included & No  & 0.2317 & 91.24\% & \textbf{0.9365} \\
+        Included & Yes & 0.4693 & 84.13\% & 0.7950 \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\subsection{Final Model Results}
+\label{sec:exp_user_results}
+
+% Report final validation metrics for the winning configuration.
+% Val Loss: 0.2233, AUC: 0.9461, stopped at epoch 11.
+% Fill in remaining metrics (Accuracy, Hit@K, Recall@K, NDCG@K) once available.
+TODO
+
+\begin{table}[htbp]
+    \centering
+    \caption{Final model validation results (location features included, no L2 normalization).}
+    \label{tab:user_final_results}
+    \begin{tabular}{|l|c|}
+        \hline
+        \textbf{Metric} & \textbf{Value} \\
+        \hline
+        Validation Loss & 0.2233 \\
+        Accuracy        & TODO\% \\
+        AUC-ROC         & 0.9461 \\
+        Hit@5           & TODO \\
+        Recall@5        & TODO \\
+        NDCG@5          & TODO \\
+        Hit@10          & TODO \\
+        Recall@10       & TODO \\
+        NDCG@10         & TODO \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\subsection{Qualitative Inference Evaluation}
+\label{sec:exp_user_inference}
+
+% Add 3-4 example users from Window 7 with their actual applications
+% and what the model recommended. Discuss whether recommendations make sense
+% qualitatively (job title match, career progression, location).
+% Also discuss the effect of same-state-first post-processing.
+TODO
+
+% ============================================================
+\section{Recruiter-Side Recommendation Experiments}
+\label{sec:exp_recruiter}
+% ============================================================
+
+\subsection{Experiment Goal}
+\label{sec:exp_recruiter_goal}
+
+% One paragraph: what are you trying to show?
+% Goal: evaluate whether the lightweight logistic regression model 
+% can reliably predict LLM-generated suitability labels,
+% and whether the features capture meaningful candidate-job fit signals.
+TODO
+
+\subsection{Experiment Setting}
+\label{sec:exp_recruiter_setting}
+
+% Describe the specific setup:
+% - How many candidate-job pairs were generated
+% - LLM used (Qwen 3.5 35B via Ollama), label distribution
+% - Negative sampling strategy for balanced dataset
+% - JobID-based train/val/test split (80/10/10)
+% - 5-fold stratified cross-validation setup
+% - Features used (86 total: heuristic + semantic)
+TODO
+
+\subsection{Results}
+\label{sec:exp_recruiter_results}
+
+% Report cross-validation and test set results.
+% Metrics: Accuracy, Precision, Recall, F1, AUC-ROC.
+% Discuss feature importance / model coefficients if available.
+% Compare Logistic Regression vs Random Forest vs XGBoost vs Ensemble.
+TODO
+
+\begin{table}[htbp]
+    \centering
+    \caption{Recruiter-side model comparison (5-fold cross-validation).}
+    \label{tab:recruiter_results}
+    \begin{tabular}{|l|c|c|c|c|c|}
+        \hline
+        \textbf{Model} & \textbf{Accuracy} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} & \textbf{AUC} \\
+        \hline
+        Logistic Regression & TODO & TODO & TODO & TODO & TODO \\
+        Random Forest       & TODO & TODO & TODO & TODO & TODO \\
+        XGBoost             & TODO & TODO & TODO & TODO & TODO \\
+        Ensemble            & TODO & TODO & TODO & TODO & TODO \\
+        \hline
+    \end{tabular}
+\end{table}
+
+% ============================================================
+\section{Congestion Balancing Experiments}
+\label{sec:exp_congestion}
+% ============================================================
+
+\subsection{Experiment Goal}
+\label{sec:exp_congestion_goal}
+
+% One paragraph: what are you trying to show?
+% Goal: measure congestion in the current recommendation system
+% and evaluate whether the hybrid strategy reduces it for both sides
+% without significantly hurting recommendation quality.
+TODO
+
+\subsection{Experiment Setting}
+\label{sec:exp_congestion_setting}
+
+% Describe the setup:
+% - Use Window 7 as the evaluation window
+% - Windows 1-6 as historical data for congestion analysis
+% - How congestion is measured (job-side: application concentration,
+%   user-side: recommendation overlap)
+% - Metrics used to evaluate balancing effectiveness
+TODO
+
+\subsection{Job-Side Congestion Analysis}
+\label{sec:exp_job_congestion}
+
+% Present the job-side congestion analysis results.
+% Show distribution of applications per job in Window 7.
+% Identify over-exposed jobs.
+TODO
+
+\subsection{User-Side Congestion Analysis}
+\label{sec:exp_user_congestion}
+
+% Present the user-side congestion analysis results.
+% Show recommendation overlap across users.
+TODO
+
+\subsection{Hybrid Balancing Results}
+\label{sec:exp_hybrid_results}
+
+% Present the results of the combined strategy.
+% Show before/after congestion metrics.
+% Show impact on recommendation quality (does relevance drop?).
+TODO

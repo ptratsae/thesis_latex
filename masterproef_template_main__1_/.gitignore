@@ -20,7 +20,8 @@
 *.synctex.gz
 *.toc
 *.xdv
-*.pdf
+main.pdf
+
 
 # Minted cache
 _minted/
