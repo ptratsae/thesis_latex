@@ -1,0 +1,131 @@
+\chapter{Preliminaries}
+\label{chap:preliminaries}
+
+This chapter introduces the background knowledge, notation and evaluation metrics used throughout the thesis. The goal is to make the subsequent method chapters self-contained: a reader familiar with machine learning but not with recommender systems or two-sided markets should be able to follow the technical content without consulting external references.
+
+\section{Notation}
+\label{sec:notation}
+
+The following notation is used consistently across all chapters. Let $\mathcal{U}$ denote the set of all users (job seekers) and $\mathcal{J}$ denote the set of all jobs. An individual user is denoted $u \in \mathcal{U}$ and an individual job $j \in \mathcal{J}$. The set of jobs that user $u$ has applied to is written $\mathcal{J}^{+}_u \subseteq \mathcal{J}$. The set of jobs that the user $u$ didn't apply to are written as $\mathcal{J}^{-}_u \subseteq \mathcal{J}$ and defined as $\mathcal{J}^{-}_u = \mathcal{J} \setminus \mathcal{J}^{+}_u$.
+
+Each user $u$ is associated with a feature vector $\mathbf{x}_u \in \mathbb{R}^{d_u}$ and each job $j$ with a feature vector $\mathbf{x}_j \in \mathbb{R}^{d_j}$, where $d_u$ and $d_j$ are the respective input dimensionalities. A recommendation model maps these features to dense embedding vectors $\mathbf{e}_u \in \mathbb{R}^{d}$ and $\mathbf{e}_j \in \mathbb{R}^{d}$ in a shared $d$-dimensional space. The compatibility score between a user and a job is then a function $s : \mathbb{R}^d \times \mathbb{R}^d \rightarrow \mathbb{R}$, typically the dot product $s(\mathbf{e}_u, \mathbf{e}_j) = \mathbf{e}_u \cdot \mathbf{e}_j$.
+
+Table~\ref{tab:notation} summarises the key symbols used throughout.
+
+\begin{table}[htbp]
+    \centering
+    \caption{Summary of notation used throughout the thesis.}
+    \label{tab:notation}
+    \begin{tabular}{cl}
+        \toprule
+        \textbf{Symbol} & \textbf{Meaning} \\
+        \midrule
+        $\mathcal{U}$ & Set of all users (job seekers) \\
+        $\mathcal{J}$ & Set of all jobs \\
+        $u, j$ & Individual user and job \\
+        $\mathcal{J}^{+}_u$ & Jobs applied to by user $u$ (positive interactions) \\
+        $\mathbf{x}_u, \mathbf{x}_j$ & Raw feature vectors for user and job \\
+        $\mathbf{e}_u, \mathbf{e}_j$ & Learned embedding vectors for user and job \\
+        $d$ & Embedding dimension (shared between towers) \\
+        $d_u, d_j$ & Input feature dimensionalities for user and job \\
+        $d_{\text{text}}$ & Dimensionality of text embeddings \\
+        $s(\mathbf{e}_u, \mathbf{e}_j)$ & Compatibility score between user $u$ and job $j$ \\
+        $\hat{y}$ & Predicted score or probability \\
+        $y \in \{0,1\}$ & Binary ground truth label \\
+        $N$ & Number of training examples \\
+        $K$ & Cutoff for ranking metrics (e.g.\ Hit@$K$) \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\section{Recommender Systems}
+\label{sec:prelim_rs}
+
+A \gls{RS} is a function that, given a user $u$, returns a ranked list of items from a catalogue, in this case jobs. The core challenge is predicting which items a user will find relevant before they have interacted with them. Three broad approaches exist in the literature.
+
+\textbf{Collaborative filtering} cite{glauber2019collaborativefilteringvscontentbased} exploits the collective behaviour of all users: if two users have historically applied to similar jobs, they are likely to find similar future jobs relevant. Pure collaborative filtering does not require any item or user features --- only the interaction matrix --- but it suffers from the cold-start problem: new users or new items with no interaction history cannot be represented. 
+
+\textbf{Content-based filtering} \cite{glauber2019collaborativefilteringvscontentbased} instead represents each user and item by their features and learns to match them directly. A new user can immediately receive recommendations based on their profile, bypassing the cold-start problem, but the system is limited to surface-level feature similarity and cannot discover preferences the user has not yet expressed.
+
+\textbf{Hybrid systems} combine both signals, typically by learning a joint representation that incorporates both interaction history and feature information cite{li2018hybridrecommendationmethodbased}. The two-tower neural architecture used in this thesis (Chapter~\ref{chap:user_recommendation}) is a state-of-the-art hybrid approach: it operates on user and job features, but the training objective is defined over observed application interactions.
+
+\section{Two-Sided Markets and Congestion}
+\label{sec:prelim_twosided}
+
+A two-sided market is a platform that serves two distinct groups of participants whose value derives from interacting with each other \cite{mashayekhi2023challengebasedsurveyerecruitmentrecommendation}. The job market is a canonical example: job seekers derive value from being matched to a suitable employer, and recruiters derive value from being matched to a suitable candidate. Unlike a one-sided market such as video streaming, where the same item can be consumed by arbitrarily many users simultaneously, the job market operates under \emph{capacity constraints}: each position can be filled by at most one candidate.
+
+This constraint leads to \textbf{market congestion}. Formally, congestion occurs when the recommendation distribution is highly concentrated: a large fraction of users are directed towards a small subset of jobs, resulting in those jobs receiving far more applications than they can process, while other jobs receive too few. Congestion is harmful on both sides: over-exposed jobs create noise and decision fatigue for recruiters, and under-exposed jobs represent missed opportunities for seekers.
+
+Two concrete manifestations of congestion are studied in this thesis:
+
+\begin{itemize}
+    \item \textbf{Job-side congestion}: a small number of jobs accumulate a disproportionate share of recommended applications. This is closely related to the popularity bias described in Section~\ref{sec:intro:motivation}.
+    \item \textbf{User-side congestion}: a large fraction of users receive heavily overlapping recommendation lists, reducing the diversity of outcomes across the market. A good example was mentioned in Section \ref{sec:intro:problem}.
+\end{itemize}
+
+A key goal of this thesis is to propose strategies that reduce both forms of congestion while preserving recommendation relevance for individual users.
+
+\section{Neural Embeddings}
+\label{sec:prelim_embeddings}
+
+A neural embedding is a learned mapping from a discrete or high-dimensional input to a dense, low-dimensional vector. Embeddings are the core representational tool used throughout this thesis. Two types appear:
+
+\textbf{Learnable embedding layers} are used for categorical features such as city or education level. Each unique category value is assigned a vector of dimension $d_{\text{cat}}$, and these vectors are updated during training by gradient descent. Unlike one-hot encodings, learned embeddings can capture semantic similarity: categories that behave similarly in the training data will converge to nearby vectors.
+
+\textbf{Pre-trained text embeddings} are used to encode natural language fields such as job titles, descriptions and work history. In this thesis, the Qwen3 Embedding model (0.6B parameters) is used to produce continuous vector representations of text. Further discussed in Chapter~\ref{chap:user_recommendation}).
+
+\section{Evaluation Metrics}
+\label{sec:prelim_metrics}
+
+The thesis evaluates models using two families of metrics: classification metrics and ranking metrics. Both families are defined here for reference throughout the experimental chapter.
+
+\subsection{Classification Metrics}
+\label{sec:prelim_classification}
+
+Given a binary prediction $\hat{y} \in \{0,1\}$ and ground truth $y \in \{0,1\}$, the standard confusion matrix quantities are true positives (TP), true negatives (TN), false positives (FP) and false negatives (FN).
+
+\textbf{Accuracy} measures the fraction of correctly classified examples:
+\begin{equation}
+    \text{Accuracy} = \frac{\text{TP} + \text{TN}}{\text{TP} + \text{TN} + \text{FP} + \text{FN}}
+\end{equation}
+
+\textbf{Precision} measures what fraction of predicted positives are correct, which is relevant when false recommendations are costly:
+\begin{equation}
+    \text{Precision} = \frac{\text{TP}}{\text{TP} + \text{FP}}
+\end{equation}
+
+\textbf{Recall} measures what fraction of true positives are retrieved, which matters when missing good matches is costly:
+\begin{equation}
+    \text{Recall} = \frac{\text{TP}}{\text{TP} + \text{FN}}
+\end{equation}
+
+\textbf{F1-Score} is the harmonic mean of precision and recall, providing a single summary when both matter:
+\begin{equation}
+    \text{F1} = 2 \cdot \frac{\text{Precision} \cdot \text{Recall}}{\text{Precision} + \text{Recall}}
+\end{equation}
+
+\textbf{AUC-ROC} (Area Under the Receiver Operating Characteristic Curve) measures the probability that a randomly chosen positive example is scored higher than a randomly chosen negative example. Unlike accuracy, it is threshold-independent and therefore more informative when the positive-negative ratio in the evaluation set differs from the deployment setting (further discussed in Chapter~\ref{chap:experiments}). AUC-ROC is the primary metric for evaluating the user-side recommendation model during training.
+
+\subsection{Ranking Metrics}
+\label{sec:prelim_ranking}
+
+Ranking metrics evaluate the quality of a top-$K$ ranked list returned for a user, rather than a single prediction. Let $R_u^K$ denote the top-$K$ recommendations for user $u$ and $\mathcal{J}^{+}_u$ their set of relevant items.
+
+\textbf{Hit@$K$} indicates whether at least one relevant item appears in the top-$K$ list:
+\begin{equation}
+    \text{Hit@}K = \mathbf{1}\left[ R_u^K \cap \mathcal{J}^{+}_u \neq \emptyset \right]
+\end{equation}
+
+\textbf{Recall@$K$} measures the fraction of relevant items that are retrieved within the top-$K$:
+\begin{equation}
+    \text{Recall@}K = \frac{|R_u^K \cap \mathcal{J}^{+}_u|}{|\mathcal{J}^{+}_u|}
+\end{equation}
+
+\textbf{NDCG@$K$} (Normalised Discounted Cumulative Gain) rewards relevant items that appear higher in the ranking, penalising systems that retrieve the right items but rank them poorly. Let $r_i \in \{0,1\}$ be the relevance of the item at position $i$:
+\begin{equation}
+    \text{DCG@}K = \sum_{i=1}^{K} \frac{r_i}{\log_2(i+1)}, \qquad
+    \text{NDCG@}K = \frac{\text{DCG@}K}{\text{IDCG@}K}
+\end{equation}
+where IDCG@$K$ is the DCG of the ideal (perfectly ranked) list, used for normalisation to $[0,1]$.
+
+An important caveat applies to all ranking metrics: their values depend heavily on the size of the candidate pool against which ranking is performed. Hit@$K$, Recall@$K$ and NDCG@$K$ computed against a small balanced validation set are considerably more optimistic than the same metrics computed against the full job pool at inference. This distinction is discussed further in Chapter~\ref{chap:experiments}, where the implications for interpreting training-time metrics are made explicit. AUC-ROC is less sensitive to this effect and is therefore used as the primary early stopping criterion.
