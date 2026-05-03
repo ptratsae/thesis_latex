@@ -88,9 +88,9 @@ A naive prompt instructs the model to perform a task in a single step: for examp
 \subsection{Chain-of-Thought Prompting}
 \label{sec:prelim_cot}
  
-Chain-of-Thought (CoT) prompting addresses this by explicitly instructing the model to reason step by step before arriving at a conclusion \cite{wei2023chainofthoughtpromptingelicitsreasoning}. Rather than asking for a direct answer, the prompt structures the reasoning process: the model is asked to first identify must-have criteria for the role, then assess whether the candidate meets each one, and only then assign an overall fit level based on defined thresholds.
+Chain-of-Thought (CoT) prompting addresses this issue by explicitly instructing the model to reason step by step before arriving at a conclusion \cite{wei2023chainofthoughtpromptingelicitsreasoning}. Rather than asking for a direct answer, the prompt structures the reasoning process which guides the \gls{LLM} to build up its answer from explicit intermediate steps.
  
-This structured elicitation has two practical benefits for label generation. First, it forces the model to be explicit about the criteria it is applying, making inconsistencies visible and correctable through prompt refinement. Second, it anchors the final label to intermediate reasoning steps, reducing the risk of outputs that are superficially plausible but logically unsupported. The iterative design of the CoT prompt used in this thesis and its effect on label quality are discussed in Chapter~\ref{chap:recruiter_recommendation}.
+This structured approach has two practical benefits for label generation. First, it forces the model to be explicit about the criteria it is applying, making inconsistencies visible and correctable through prompt refinement, also known as prompt engineering. Second, it anchors the final label to intermediate reasoning steps, reducing the risk of outputs that are superficially plausible but logically unsupported. The design of the \gls{CoT} prompt used in this thesis is discussed in Chapter~\ref{chap:recruiter_recommendation}.
 
 \section{Evaluation Metrics}
 \label{sec:prelim_metrics}
