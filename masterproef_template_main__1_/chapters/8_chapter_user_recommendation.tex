@@ -1,20 +1,16 @@
 \chapter{User-Side Job Recommendation System}
 \label{chap:user_recommendation}
 
-This chapter details the job recommendation system built for users using PyTorch, consisting of the preprocessing of the data and the architecture of the two-tower model. This model will be used in Chapter \ref{chap:congestion_balancing} to implement the user-side congestion reduction strategy.
+This chapter details the job recommendation system built for users using PyTorch, consisting of the preprocessing of the data and the architecture of the two-tower model. This model will be used in Chapter \ref{chap:congestion_balancing} to implement the user-side congestion reduction strategy. The need for a two-tower \gls{RS} is due to the fact that a neural network can deal with the cold start problem \cite{rama2019deeplearningaddresscandidate}, which is important considering how the dataset is split (see Section \ref{sec:custom_split}). 
 
-First, in Section \ref{sec:user_arch}, the architecture of the two-tower model is explained. Then, in Section \ref{sec:user_data_pipeline}, the data pipeline and feature engineering techniques are described. In Section \ref{sec:user_training}, the training procedure and optimization are discussed. Finally, in Section \ref{sec:user_experiments}, the experimental results and ablation studies are presented.
-
-The need for a two-tower \gls{RS} is due to the fact that a neural network can deal with the cold start problem, which is important due to how the dataset is split (see Section \ref{sec:custom_split}).
+First, in Section \ref{sec:user_arch}, the architecture of the two-tower model is explained. Then, in Section \ref{sec:user_data_pipeline}, the data pipeline and feature engineering techniques are described. In Section \ref{sec:user_training}, the training procedure and optimization are discussed. For experiments and results related to the user-side recommendation system, please refer to Chapter \ref{chap:experiments}.
 
 \section{Architecture: The Two-Tower Model}
 \label{sec:user_arch}
-
 The two-tower model is trained and evaluated on the CareerBuilder Job Recommendation dataset (see Chapter \ref{chap:dataset_overview} for a comprehensive dataset overview). The model consists of two separate neural networks: one for processing the user features, the user tower, and one for processing the job features, the job tower. Each tower learns a vector representation of its respective features. The output of both towers is then combined to produce a final matching score for a user-job pair. The architecture is designed to capture complex interactions between user and job features.
 
 \subsection{User Tower}
 \label{sec:user_tower}
-
 The user tower consists of a multi-layer feedforward neural network that transforms the input user features into a dense embedding vector. This embedding captures the underlying preferences and characteristics of the user, which can then be used to compute similarity with job embeddings from the job tower.
 
 \subsubsection{Input Layer}
@@ -133,55 +129,13 @@ The final user-job matching score is computed via the dot product of the learned
 
 This dot product measures the similarity between the learned user and job representations. Higher scores indicate better matches, while lower scores suggest poor alignment between user preferences and job characteristics. This approach allows the model to capture non-linear relationships between user and job features through the multi-layer architecture. The complete two-tower model implementation in PyTorch is provided in Appendix \ref{app:two_tower_model}.
 
-Note that L2 normalization of the output vectors was considered. The dot product between two L2-normalized vectors is equivalent to cosine similarity:
-\begin{equation}
-\text{cosine\_similarity} = \frac{\text{user\_vec} \cdot \text{job\_vec}}{\|\text{user\_vec}\| \|\text{job\_vec}\|}
-\end{equation}
-
-It has been excluded after evaluation showed it consistently hurt performance (see Section \ref{sec:ablation}). Without normalization, the dot product is unbounded, allowing the model to encode match confidence in both the direction and magnitude of the learned embeddings.
+Note that L2 normalization of the output vectors was considered. Extra information about this design choice and its impact on performance is provided in Chapter \ref{chap:ablation}.
 
 \section{Data Pipeline and Feature Engineering}
 \label{sec:user_data_pipeline}
 
-The raw data needs to be preprocessed before it can be used by the two-tower model. The data pipeline consists of four main stages: training data generation (\ref{sec:training_data_gen}), user feature processing (\ref{sec:user_features_processing}), job feature processing (\ref{sec:job_features_processing}), and text embedding generation (\ref{sec:text_embedding}). Each stage is designed to handle large-scale data efficiently due to the size of the CareerBuilder dataset (see Section \ref{sec:dataset_overview}).
+The raw data needs to be preprocessed before it can be used by the two-tower model. The data pipeline consists of 3 main stages: user feature processing (\ref{sec:user_features_processing}), job feature processing (\ref{sec:job_features_processing}), and text embedding generation (\ref{sec:text_embedding}) which is applied to the user and job features. Each stage is designed to handle large-scale data efficiently due to the size of the CareerBuilder dataset. The training data generation is explained in Chapter \ref{chap:experiments}.
 
-\subsection{Training Data Generation}
-\label{sec:training_data_gen}
-
-The training data generation process creates a labeled dataset with explicit positive and negative samples while ensuring temporal consistency across train, validation, and test sets.
-
-\subsubsection{Temporal Window-Based Splitting}
-
-As already described in Chapter \ref{chap:dataset_overview}, the original dataset is organized into 7 temporal windows, each representing a different time period. For this research, we use a custom temporal split where:
-\begin{itemize}
-    \item \textbf{Training Set}: All users and jobs from Windows 1--4 (first 52 days).
-    \item \textbf{Validation Set}: All users and jobs from Windows 5--6 (next 26 days).
-    \item \textbf{Test Set}: All users and jobs from Window 7 (last 13 days).
-\end{itemize}
-
-This split creates a realistic scenario where the model is trained on historical data and evaluated on future data, simulating a real-world deployment scenario.
-
-\subsubsection{Label Assignment}
-
-Positive samples are extracted directly from the applications data, as each application represents a confirmed user-job match (label = 1). Negative samples are not explicitly given in the dataset and are generated synthetically as described below.
-
-\subsubsection{City-Based Negative Sampling}
-\label{sec:negative_sampling}
-
-Negative samples (user-job pairs that were not applied to) are generated using a city-based strategy. A 4:1 ratio of negative to positive samples is used, meaning each positive application is paired with four negative job samples. This ratio was chosen to better approximate the real inference distribution, where a user must be ranked against a large pool of jobs rather than a single alternative. An overly high negative ratio (e.g., 100:1) would be more accurate but would make training and validating the model computationally infeasible given the dataset size.
-
-The city-based strategy works as follows for each user in each window:
-\begin{enumerate}
-    \item All job IDs that the user has already applied to are excluded.
-    \item Jobs from the same city as the user are preferentially selected as negative samples, as they represent realistic alternatives the user might consider.
-    \item If insufficient same-city jobs exist, jobs from other cities in the same window are used as fallback negatives.
-\end{enumerate}
-
-A key design decision is that by sampling negatives from the same city, location is deliberately removed as a discriminative signal — both positives and negatives share the same geographic context if there are enough samples. This forces the model to learn semantic job-fit based on career progression, education, and job title similarity rather than relying on location as a shortcut. Geographic preference is instead handled as a separate post-processing step at inference time (see Section \ref{sec:inference_postprocessing}).
-
-Due to the large number of users in training windows, a random sample of 100,000 training users is used to keep the dataset size manageable while preserving full coverage of all validation and test users.
-
-\noindent\textbf{Note on evaluation}: The per-epoch validation metrics reported during training are computed over the balanced validation set (4:1 negative ratio), which yields a much smaller candidate pool per user than real inference (Window 7). As a result, ranking metrics such as Hit@K computed during training are optimistic relative to real-world performance. The most important evaluation is performed at inference time by ranking each test user against all jobs from Window 7 (see Section \ref{sec:user_results}) and performing sanity checks.
 
 \subsection{User Feature Processing}
 \label{sec:user_features_processing}
@@ -202,7 +156,7 @@ This concatenation is embedded using the Qwen3-Embedding-0.6B model to capture t
 Several domain-specific features are engineered from raw attributes:
 
 \begin{itemize}
-    \item \textbf{Years Since Graduation}: Calculated from the graduation date as $\text{current\_year} - \text{graduation\_year}$. Missing values are imputed with the median.
+    \item \textbf{Years Since Graduation}: Calculated from the graduation date as $\text{current\_year} - \text{graduation\_year}$. Missing values are imputed with the median. This is done because the graduation date itself is not as informative as how long ago the user graduated, which can indicate career stage.
     \item \textbf{Location Standardization}: Country and ZipCode columns are dropped. Country is dropped because the dataset is US-based. ZipCode is dropped as it is redundant given City and State, and introduces noise due to missing or inconsistent values. City and State are retained.
 \end{itemize}
 
@@ -212,7 +166,7 @@ Several domain-specific features are engineered from raw attributes:
 The engineered features are processed based on their data type:
 
 \begin{itemize}
-    \item \textbf{Recent Job History}: The Recent\_JobTitle field is encoded into a dense 100-dimensional vector using the Qwen3 Embedding Model (0.6B), capturing semantic meaning of job titles and career progression. This embedding is stored as 100 columns prefixed with \texttt{ft\_recent\_job0} through \texttt{ft\_recent\_job99}.
+    \item \textbf{Recent Job History}: The Recent\_JobTitle field is encoded into a dense 100-dimensional vector using the Qwen3 Embedding Model (0.6B), capturing semantic meaning of job titles and career progression. This embedding is stored as 100 columns prefixed with \texttt{ft\_recent\_job0} through \texttt{ft\_recent\_job99}. The choice of 100 dimensions is to not allow the text embedding to completely dominate the input signal.
     \item \textbf{Numeric Features}: Features such as years of experience are standardized using z-score normalization (StandardScaler) to have mean 0 and standard deviation 1, ensuring scale invariance across the \gls{MLP} input.
     \item \textbf{Categorical Features}: Features such as education level and other discrete attributes are label-encoded independently per feature file, mapping each unique value to an integer starting from 1 (0 is reserved for missing values). The only exception is City and State, which are encoded using a shared vocabulary across both user and job feature files (see Section \ref{sec:location_encoding}), ensuring that the same location maps to the same embedding index in both towers. All label-encoded features are fed into learnable embedding layers, not the \gls{MLP} 
     directly, so normalization is not required.
@@ -344,7 +298,7 @@ where $y_i \in \{0, 1\}$ is the ground truth label and $\hat{y}_i$ is the raw do
 
 At inference, the raw dot product scores are used for ranking. This is because the sigmoid funtion transforms scores to a [0, 1] range, where high-confidence matches map to 1.0000 in float32 precision while raw dot product scores are still distinguishable. 
 \subsection{Performance Evaluation Metrics}
-\label{sec:eval_metrics}
+\label{sec:user_eval_metrics}
 
 Model performance during training is assessed using the following metrics computed on the validation set:
 \begin{itemize}
@@ -357,70 +311,6 @@ Model performance during training is assessed using the following metrics comput
 
 It is important to note that Hit@K, Recall@K, and NDCG@K computed during validation are measured over a small per-user candidate pool (the balanced validation set), not against all jobs. These metrics are therefore optimistic relative to real-world inference, where a user is ranked against the full job pool. \gls{ROC-AUC} is the most reliable metric during training as it is less sensitive to candidate pool size.
 
-\section{Experimental Results and Ablation Study}
-\label{sec:user_experiments}
-
-\subsection{Ablation Study}
-\label{sec:ablation}
-
-To determine the optimal model configuration, a systematic ablation study was conducted comparing two design choices: whether to include location features (City and State) and whether to apply L2 normalization to the output embeddings. Each configuration was trained for 3 epochs under identical conditions (lr=0.001, batch size=1024, 4:1 negative ratio) and compared by validation \gls{ROC-AUC}.
-
-\begin{table}[htbp]
-    \centering
-    \caption{Ablation study results after 3 training epochs. \gls{ROC-AUC} on the validation set.}
-    \label{tab:ablation}
-    \begin{tabular}{|l|l|c|c|c|}
-        \hline
-        \textbf{Location Features} & \textbf{L2 Normalization} & \textbf{Val Loss} & \textbf{Accuracy} & \textbf{AUC} \\
-        \hline
-        Excluded & No  & 0.3513 & 84.60\% & 0.8591 \\
-        Excluded & Yes & 0.4687 & 84.18\% & 0.7954 \\
-        Included & No  & 0.2317 & 91.24\% & \textbf{0.9365} \\
-        Included & Yes & 0.4693 & 84.13\% & 0.7950 \\
-        \hline
-    \end{tabular}
-\end{table}
-
-The results reveal two clear findings. First, L2 normalization consistently hurts performance regardless of whether location features are included. Without normalization, the dot product is unbounded and the model can encode match confidence in both the direction and magnitude of the embeddings. Constraining all vectors to the unit sphere removes this degree of freedom, forcing the model to rely on direction alone, which is evidently insufficient for this task.
-
-Second, including location features (City and State) with the shared vocabulary encoding significantly improves performance, with \gls{ROC-AUC} improving from 0.8591 to 0.9365. This result is initially surprising, given that city-based negative sampling deliberately places positives and negatives in the same city, which should prevent the model from learning location as a discriminative signal. The improvement is better explained by the richer model capacity provided by the city and state embedding layers, which allow the model to capture latent job market characteristics per location (e.g., certain cities may be associated with particular industries or application rates).
-
-It is worth noting that in an earlier experimental phase, before the cross-tower location consistency fix described in Section \ref{sec:location_encoding}, including location features \textit{hurt} model performance. This confirmed that independently encoded city/state integers produce noise rather than signal, as the same integer refers to different cities in the user and job towers. The fix is therefore a critical preprocessing step.
-
-Based on these results, the final model configuration uses location features with no L2 normalization.
-
-\subsection{Final Model Results}
-\label{sec:user_results}
-
-The final model was trained with the optimal configuration (location features included, no L2 normalization) for a maximum of 50 epochs with early stopping (patience=5). Training converged at epoch 11, achieving the following results on the validation set:
-
-\begin{table}[htbp]
-    \centering
-    \caption{Final model validation results.}
-    \label{tab:final_results}
-    \begin{tabular}{|l|c|}
-        \hline
-        \textbf{Metric} & \textbf{Value} \\
-        \hline
-        Validation Loss & 0.2233 \\
-        Accuracy        & TODO\% \\
-        AUC-ROC         & 0.9461 \\
-        Hit@5           & TODO \\
-        Recall@5        & TODO \\
-        NDCG@5          & TODO \\
-        Hit@10          & TODO \\
-        Recall@10       & TODO \\
-        NDCG@10         & TODO \\
-        \hline
-    \end{tabular}
-\end{table}
-
-% TODO: Add inference evaluation results here once available.
-% Run: python -m src.recommender.main --inference --same-state-first
-% Report: qualitative examples of recommendations for 3-4 test users,
-% and if possible a Hit@K / Recall@K computed against the full Window 7 job pool.
-
-The early stopping at epoch 11 indicates the model converges quickly and does not overfit, which is consistent with the use of batch normalization and dropout regularization throughout both towers.
 
 \subsection{Inference and Post-Processing}
 \label{sec:inference_postprocessing}

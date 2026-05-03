@@ -1,0 +1,328 @@
+\chapter{Experiments}
+\label{chap:experiments}
+
+This chapter presents the experimental evaluation of all systems developed in this master's dissertation. First, the shared experiment settings are described in Section \ref{sec:exp_settings}, including the custom dataset split, dataset statistics, and hardware configuration. Then, experiments are presented for the user-side recommendation system (Section \ref{sec:exp_user}), the recruiter-side recommendation system (Section \ref{sec:exp_recruiter}), and the congestion balancing strategies (Section \ref{sec:exp_congestion}).
+
+\section{Experiment Settings}
+\label{sec:exp_settings}
+
+\subsection{Custom Train/Validation/Test Split}
+\label{sec:custom_split}
+\begin{figure}[ht]
+    \centering
+    \begin{tikzpicture}[
+        window/.style={draw, minimum width=1.4cm, minimum height=0.8cm, font=\footnotesize, fill=white},
+        label_node/.style={font=\small\bfseries, align=center}
+    ]
+
+    % --- The Timeline of Windows ---
+    % Training Windows (1-4)
+    \node [window] (w1) at (0,0) {W1};
+    \node [window] (w2) at (1.5,0) {W2};
+    \node [window] (w3) at (3,0) {W3};
+    \node [window] (w4) at (4.5,0) {W4};
+    
+    % Validation/Test Windows (5-7)
+    \node [window] (w5) at (6.5,0) {W5};
+    \node [window] (w6) at (8,0) {W6};
+    \node [window] (w7) at (9.5,0) {W7};
+
+    % Separator/Boundary
+    \draw [dashed, line width=1.5pt, red!80!black] (5.5, 1.2) -- (5.5, -2.5) 
+        node[below, font=\footnotesize\itshape, text=red!80!black] {Temporal Boundary};
+
+    % Timeline Arrow
+    \draw [-{Stealth}, thick] (-1, -0.7) -- (10.5, -0.7) node[right] {Time};
+
+    % --- Custom Grouping Braces ---
+    
+    % Training Group
+    \draw [decorate, decoration={brace, amplitude=10pt}] 
+        (-0.7, 0.6) -- (5.2, 0.6) 
+        node [midway, yshift=0.6cm, label_node, color=blue!70!black] {Training Set (Windows 1--4)};
+        
+    \node [align=center, font=\scriptsize, color=gray!80!black] at (2.25, 1.6) {Historical Data};
+
+    % Validation/Test Group
+    \draw [decorate, decoration={brace, amplitude=10pt}] 
+        (5.8, 0.6) -- (10.2, 0.6) 
+        node [midway, yshift=0.6cm, label_node, color=green!50!black] {Validation/Test Set (Windows 5--7)};
+        
+    \node [align=center, font=\scriptsize, color=gray!80!black] at (8, 1.6) {Cold-Start Evaluation};
+
+    % --- Key Features (Optional bottom labels) ---
+    \node [draw, rounded corners, fill=gray!5, font=\tiny, align=left] at (2.25, -1.8) {
+        \textbullet\ All users/jobs included \\
+        \textbullet\ Historical behavior used for training
+    };
+    
+    \node [draw, rounded corners, fill=gray!5, font=\tiny, align=left] at (8, -1.8) {
+        \textbullet\ No overlap with training users \\
+        \textbullet\ Simulates realistic deployment
+    };
+
+    \end{tikzpicture}
+    \caption{Custom temporal split for the CareerBuilder dataset. Unlike \ref{fig:careerbuilder_timeline}, this approach splits by window rather than within-window, ensuring a strict cold-start scenario.}
+    \label{fig:custom_temporal_split}
+\end{figure}
+Instead of using the original within-window splits, we use a temporal split across all windows \ref{fig:custom_temporal_split}:
+
+\begin{itemize}
+    \item \textbf{Training Set}: All training users and jobs from Windows 1--4. This comprises approximately the first 52 days of the 13-week period and serves as the historical data for model training.
+    
+    \item \textbf{Validation/Test Set}: All training users and jobs from Windows 5--7. This comprises approximately the last 39 days of the 13-week period and is used for evaluation.
+    
+    \item \textbf{Original Dataset Train/Test Split Ignored}:  The distinction between training and test users is ignored entirely and all users and jobs from the respective windows are used. This simplifies evaluation and avoids biasing the test set towards active users, creating a more generalizable evaluation scenario.
+\end{itemize}
+
+This approach creates a more realistic scenario where:
+\begin{enumerate}
+    \item \textbf{Clear Temporal Boundary}: Training data is strictly from earlier time periods (Windows 1--4), and evaluation is on later time periods (Windows 5--7), simulating realistic deployment.
+    
+    \item \textbf{Cold-Start Scenario}: Users are only active in either the training or validation/test period, eliminating information leakage. The model must generalize to entirely new users, which is harder but more realistic.
+    
+    \item \textbf{Simplified Evaluation}: Using all users from each split (rather than filtering by activity thresholds) provides clearer metrics and avoids bias toward highly-engaged users.
+    
+    \item \textbf{Scalability}: This split is easier to implement and extend to other datasets with similar temporal structures.
+\end{enumerate}
+
+\subsection{Dataset Statistics and Characteristics}
+\label{sec:dataset_stats}
+
+% Fill in the empty section 2.4 from old chapter 2 here.
+% Include: number of users, jobs, applications per window,
+% distribution of applications per user, sparsity of the interaction matrix.
+TODO
+
+\subsection{Hardware and Software Configuration}
+\label{sec:hardware}
+
+% Describe the machine used for training (GPU type, RAM, etc.)
+% PyTorch version, Python version, any relevant library versions.
+TODO
+
+% ============================================================
+\section{User-Side Recommendation Experiments}
+\label{sec:exp_user}
+% ============================================================
+
+\subsection{Experiment Goal}
+\label{sec:exp_user_goal}
+
+% One paragraph: what are you trying to show?
+% Goal: build a two-tower model that ranks relevant jobs highly for each user,
+% evaluated on Window 7 as a cold-start scenario.
+The goal of the user-side recommendation experiments is to develop and evaluate a two-tower neural network model that can effectively learn user and job representations from the CareerBuilder dataset. The model is trained on historical interactions from Windows 1--4, validated on windows 5--6 and applied on Window 7, which contains entirely new users and jobs. This setup simulates a realistic cold-start scenario where the model must generalize to unseen data. The experiments aim to demonstrate that the proposed model can rank relevant jobs highly for each user, as measured by metrics such as AUC-ROC, Hit@K, Recall@K, and NDCG@K. As mentioned in section \ref{sec:user_eval_metrics}, only \gls{ROC-AUC} is the most reliable metric due to the small class imbalance compared to reality (see section \ref{sec:negative_sampling}).
+
+
+\subsection{Experiment Setting}
+\label{sec:exp_user_setting}
+
+% Describe the specific setup for these experiments:
+% - Negative sampling strategy (city-based, 4:1 ratio) and motivation
+% - Training users sampled (100,000)
+% - Hyperparameters: lr=0.001, batch_size=1024, output_dim=64, patience=5
+% - Early stopping criterion (validation AUC)
+% - Evaluation restricted to Window 7 jobs at inference
+A subsample of 100,000 users from the training set (Windows 1--4) is used for training the user-side recommendation model. The model uses a learning rate of 0.001, a batch size of 1024, and an output embedding dimension of 64. Early stopping is employed based on the validation loss, with a patience of 5 epochs. An important
+\subsubsection{Training Data Generation}
+\label{sec:training_data_gen}
+
+The training data generation process creates a labeled dataset with explicit positive and negative samples while ensuring temporal consistency across train, validation, and test sets.
+
+\paragraph{Label Assignment} Positive samples are extracted directly from the applications data, as each application represents a confirmed user-job match (label = 1). Negative samples are not explicitly given in the dataset and are generated synthetically as described below.
+
+\paragraph{City-Based Negative Sampling}
+\label{sec:negative_sampling}
+
+Negative samples (user-job pairs that were not applied to) are generated using a city-based strategy. A 4:1 ratio of negative to positive samples is used, meaning each positive application is paired with four negative job samples. This ratio was chosen to better approximate the real inference distribution, where a user must be ranked against a large pool of jobs rather than a single alternative. An overly high negative ratio (e.g., 100:1) would be more accurate but would make training and validating the model computationally infeasible given the dataset size.
+
+The city-based strategy works as follows for each user in each window:
+\begin{enumerate}
+    \item All job IDs that the user has already applied to are excluded.
+    \item Jobs from the same city as the user are preferentially selected as negative samples, as they represent realistic alternatives the user might consider.
+    \item If insufficient same-city jobs exist, jobs from other cities in the same window are used as fallback negatives.
+\end{enumerate}
+
+A key design decision is that by sampling negatives from the same city, location is deliberately removed as a discriminative signal — both positives and negatives share the same geographic context if there are enough samples. This forces the model to learn semantic job-fit based on career progression, education, and job title similarity rather than relying on location as a shortcut. Geographic preference is instead handled as a separate post-processing step at inference time (see Section \ref{sec:inference_postprocessing}).
+
+Due to the large number of users in training windows, a random sample of 100,000 training users is used to keep the dataset size manageable while preserving full coverage of all validation and test users.
+
+\noindent\textbf{Note on evaluation}: The per-epoch validation metrics reported during training are computed over the balanced validation set (4:1 negative ratio), which yields a much smaller candidate pool per user than real inference (Window 7). As a result, ranking metrics such as Hit@K computed during training are optimistic relative to real-world performance. The most important evaluation is performed at inference time by ranking each test user against all jobs from Window 7 (see Section \ref{sec:user_results}) and performing sanity checks.
+\subsection{Ablation Study and Normalization of Output Embeddings}
+\label{sec:exp_user_ablation}
+
+% Move ablation table and discussion from chapter 3 here.
+% 2x2 comparison: address vs no address, norm vs no norm.
+% Explain findings: normalization hurts, address helps after fix-location.
+% Mention the broken encoding finding and its impact.
+\label{sec:ablation}
+
+To determine the optimal model configuration, a systematic ablation study was conducted comparing two design choices: whether to include location features (City and State) and whether to apply L2 normalization to the output embeddings. Each configuration was trained for 3 epochs (due to computational constraints) under identical conditions (lr=0.001, batch size=1024, 4:1 negative ratio) and compared by validation \gls{ROC-AUC}.
+
+The results reveal two clear findings. First, L2 normalization consistently hurts performance regardless of whether location features are included. Without normalization, the dot product is unbounded and the model can encode match confidence in both the direction and magnitude of the embeddings. 
+
+Second, including location features (City and State) with the shared vocabulary encoding significantly improves performance, with \gls{ROC-AUC} improving from 0.8591 to 0.9365. This result is initially surprising, given that city-based negative sampling deliberately places positives and negatives in the same city, which should prevent the model from learning location as a discriminative signal. The improvement is better explained by the richer model capacity provided by the city and state embedding layers, which allow the model to capture latent job market characteristics per location (e.g., certain cities may be associated with particular industries or application rates).
+
+It is worth noting that in an earlier experimental phase, before the cross-tower location consistency fix described in Section \ref{sec:location_encoding}, including location features \textit{hurt} model performance. This confirmed that independently encoded city/state integers produce noise rather than signal, as the same integer refers to different cities in the user and job towers. The fix is therefore a critical preprocessing step.
+
+Based on these results, the final model configuration uses location features with no L2 normalization.
+
+
+\begin{table}[htbp]
+    \centering
+    \caption{Ablation study results after 3 training epochs (AUC-ROC on validation set).}
+    \label{tab:ablation_user}
+    \begin{tabular}{|l|l|c|c|c|}
+        \hline
+        \textbf{Location Features} & \textbf{L2 Normalization} & \textbf{Val Loss} & \textbf{Accuracy} & \textbf{AUC} \\
+        \hline
+        Excluded & No  & 0.3513 & 84.60\% & 0.8591 \\
+        Excluded & Yes & 0.4687 & 84.18\% & 0.7954 \\
+        Included & No  & 0.2317 & 91.24\% & \textbf{0.9365} \\
+        Included & Yes & 0.4693 & 84.13\% & 0.7950 \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\subsection{Final Model Results}
+\label{sec:user_results}
+
+The final model was trained with the optimal configuration (location features included, no L2 normalization) for a maximum of 50 epochs with early stopping (patience=5). Training converged at epoch 11, achieving the following results on the validation set:
+
+\begin{table}[htbp]
+    \centering
+    \caption{Final model validation results.}
+    \label{tab:final_results}
+    \begin{tabular}{|l|c|}
+        \hline
+        \textbf{Metric} & \textbf{Value} \\
+        \hline
+        Validation Loss & 0.2233 \\
+        Accuracy        & TODO\% \\
+        AUC-ROC         & 0.9461 \\
+        Hit@5           & TODO \\
+        Recall@5        & TODO \\
+        NDCG@5          & TODO \\
+        Hit@10          & TODO \\
+        Recall@10       & TODO \\
+        NDCG@10         & TODO \\
+        \hline
+    \end{tabular}
+\end{table}
+
+% TODO: Add inference evaluation results here once available.
+% Run: python -m src.recommender.main --inference --same-state-first
+% Report: qualitative examples of recommendations for 3-4 test users,
+% and if possible a Hit@K / Recall@K computed against the full Window 7 job pool.
+
+The early stopping at epoch 11 indicates the model converges quickly and does not overfit, which is consistent with the use of batch normalization and dropout regularization throughout both towers.
+
+
+\subsection{Qualitative Inference Evaluation}
+\label{sec:exp_user_inference}
+
+% Add 3-4 example users from Window 7 with their actual applications
+% and what the model recommended. Discuss whether recommendations make sense
+% qualitatively (job title match, career progression, location).
+% Also discuss the effect of same-state-first post-processing.
+TODO
+
+% ============================================================
+\section{Recruiter-Side Recommendation Experiments}
+\label{sec:exp_recruiter}
+% ============================================================
+
+\subsection{Experiment Goal}
+\label{sec:exp_recruiter_goal}
+
+% One paragraph: what are you trying to show?
+% Goal: evaluate whether the lightweight logistic regression model 
+% can reliably predict LLM-generated suitability labels,
+% and whether the features capture meaningful candidate-job fit signals.
+TODO
+
+\subsection{Experiment Setting}
+\label{sec:exp_recruiter_setting}
+
+% Describe the specific setup:
+% - How many candidate-job pairs were generated
+% - LLM used (Qwen 3.5 35B via Ollama), label distribution
+% - Negative sampling strategy for balanced dataset
+% - JobID-based train/val/test split (80/10/10)
+% - 5-fold stratified cross-validation setup
+% - Features used (86 total: heuristic + semantic)
+TODO
+
+\subsection{Results}
+\label{sec:exp_recruiter_results}
+
+% Report cross-validation and test set results.
+% Metrics: Accuracy, Precision, Recall, F1, AUC-ROC.
+% Discuss feature importance / model coefficients if available.
+% Compare Logistic Regression vs Random Forest vs XGBoost vs Ensemble.
+TODO
+
+\begin{table}[htbp]
+    \centering
+    \caption{Recruiter-side model comparison (5-fold cross-validation).}
+    \label{tab:recruiter_results}
+    \begin{tabular}{|l|c|c|c|c|c|}
+        \hline
+        \textbf{Model} & \textbf{Accuracy} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} & \textbf{AUC} \\
+        \hline
+        Logistic Regression & TODO & TODO & TODO & TODO & TODO \\
+        Random Forest       & TODO & TODO & TODO & TODO & TODO \\
+        XGBoost             & TODO & TODO & TODO & TODO & TODO \\
+        Ensemble            & TODO & TODO & TODO & TODO & TODO \\
+        \hline
+    \end{tabular}
+\end{table}
+
+% ============================================================
+\section{Congestion Balancing Experiments}
+\label{sec:exp_congestion}
+% ============================================================
+
+\subsection{Experiment Goal}
+\label{sec:exp_congestion_goal}
+
+% One paragraph: what are you trying to show?
+% Goal: measure congestion in the current recommendation system
+% and evaluate whether the hybrid strategy reduces it for both sides
+% without significantly hurting recommendation quality.
+TODO
+
+\subsection{Experiment Setting}
+\label{sec:exp_congestion_setting}
+
+% Describe the setup:
+% - Use Window 7 as the evaluation window
+% - Windows 1-6 as historical data for congestion analysis
+% - How congestion is measured (job-side: application concentration,
+%   user-side: recommendation overlap)
+% - Metrics used to evaluate balancing effectiveness
+TODO
+
+\subsection{Job-Side Congestion Analysis}
+\label{sec:exp_job_congestion}
+
+% Present the job-side congestion analysis results.
+% Show distribution of applications per job in Window 7.
+% Identify over-exposed jobs.
+TODO
+
+\subsection{User-Side Congestion Analysis}
+\label{sec:exp_user_congestion}
+
+% Present the user-side congestion analysis results.
+% Show recommendation overlap across users.
+TODO
+
+\subsection{Hybrid Balancing Results}
+\label{sec:exp_hybrid_results}
+
+% Present the results of the combined strategy.
+% Show before/after congestion metrics.
+% Show impact on recommendation quality (does relevance drop?).
+TODO
