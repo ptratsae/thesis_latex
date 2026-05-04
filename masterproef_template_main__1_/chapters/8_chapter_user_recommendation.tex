@@ -55,7 +55,7 @@ L2 normalisation of the output embeddings was considered as an alternative desig
 \section{Data Pipeline and Feature Engineering}
 \label{sec:user_data_pipeline}
 
-The raw data must be preprocessed before it can be used by the two-tower model.The pipeline consists of two main stages: user feature processing and job feature processing. Both stages include text embedding as part of their respective pipelines. Each stage is designed to handle large-scale data efficiently. The construction of the training dataset, including the negative sampling strategy, is described in Chapter~\ref{chap:experiments}.
+The raw data must be preprocessed before it can be used by the two-tower model. The pipeline consists of two main stages: user feature processing and job feature processing. Both stages include text embedding as part of their respective pipelines. The construction of the training dataset, including the negative sampling strategy, is described in Chapter~\ref{chap:experiments}.
 
 
 
@@ -66,20 +66,20 @@ User features are extracted and engineered to form a comprehensive representatio
 
 \subsubsection{Feature Extraction and Merging}
 
-Raw user features — demographics, education and location — are merged with the user's employment history. The most recent job titles (up to three previous positions) are extracted and concatenated with recency labels to form a single career trajectory string:
+Raw user features such as demographics, education and location are merged with the user's employment history. The most recent job titles (up to three previous positions) are extracted and concatenated with recency labels to form a single career trajectory string:
 \begin{equation}
-\text{Recent\_JobTitle} = \text{``Current: } t_1 \text{ | Previous: } t_2 \text{ | Earlier: } t_3\text{''}
+\text{Recent\_JobTitle} = \text{``Latest: } t_1 \text{ | Second: } t_2 \text{ | Third: } t_3\text{''}
 \end{equation}
-where $t_1, t_2, t_3$ are the three most recent job titles in reverse chronological order. This string is subsequently embedded using the Qwen3 text embedding model to capture the semantic meaning of the user's career progression.
+where $t_1, t_2, t_3$ are the three most recent job titles in reverse chronological order. 
 
 \subsubsection{Feature Engineering}
 
-Several domain-specific features are constructed from raw attributes. Years of professional experience is derived from the graduation date as $\text{current\_year} - \text{graduation\_year}$, since elapsed time since graduation is a more informative career-stage signal than the raw date. Missing values are imputed with the median. Location fields are standardised by retaining city and state while dropping redundant or noisy columns, ensuring a consistent geographic representation across all users.
+Several domain-specific features are constructed from raw attributes. Years of professional experience is derived from the graduation date as $\text{current\_year} - \text{graduation\_year}$, since elapsed time since graduation is a more informative signal than the raw date. Missing values are imputed with the median. Location fields are standardised by retaining city and state while dropping redundant colums country and zip code as all users are from the same country and zip codes contain the same information as city and state. 
 
 \subsubsection{Encoding}
 \label{sec:user_embedding}
 
-Each feature type is processed according to its nature. Numerical features such as years of experience are standardised using z-score normalisation to ensure scale invariance at the MLP input. Categorical features such as education level are label-encoded to integers and fed into learnable embedding layers rather than the MLP directly, so no further normalisation is required. The career trajectory string is encoded into a $d_{\text{text}}$-dimensional dense vector using the Qwen3 Embedding model, capturing semantic relationships between job titles and career stages. The embedding dimension $d_{\text{text}}$ is chosen so that the text signal contributes meaningfully but does not dominate the other features; this choice is discussed in Chapter~\ref{chap:experiments}.
+Each feature type is processed according to its nature. Numerical features such as years of experience are standardised using z-score normalisation to ensure scale invariance at the \gls{MLP} input. Categorical features such as education level are label-encoded to integers and fed into learnable embedding layers  rather than the \gls{MLP} directly, so no further normalisation is required. Categorical features that appear in both the user and job feature sets are encoded using a shared vocabulary constructed jointly from both datasets, ensuring that the same value maps to the same integer index in both towers. Embeddings are normalised to ensure comparable similarity scores across the user corpus. The embedding dimension $d_{\text{text}}$ is chosen so that the text signal contributes meaningfully but does not dominate the other features. This choice is discussed in Chapter~\ref{chap:experiments}.
 
 Table~\ref{tab:user_features} summarises the full user feature engineering pipeline.
 
@@ -115,23 +115,14 @@ Table~\ref{tab:user_features} summarises the full user feature engineering pipel
 \subsection{Job Feature Processing}
 \label{sec:job_features_processing}
 
-Job features are processed using a two-pass chunked strategy to handle the large scale of the job dataset without loading it entirely into memory.
-
-In the first pass, all records are iterated to collect unique categorical values and compute scaling statistics — mean and variance — for numerical features across the full dataset. In the second pass, these fitted encoders and scalers are applied consistently, ensuring that categorical mappings and numerical normalisation are coherent across all jobs. Numerical features are standardised using z-score normalisation; categorical features are mapped to integers using a consistent encoding dictionary (1-indexed, with 0 reserved for missing values).
+Job features undergo the same encoding and scaling process as user features: numerical attributes are standardised using z-score normalisation, and categorical attributes are label-encoded to integers and passed through learnable embedding layers. As mentioned earlier, columns which appear in both the user and job feature sets are encoded using a shared vocabulary. 
 
 \subsection{Text Cleaning and Embedding}
 \label{sec:text_embedding}
 
 Job titles and descriptions often contain HTML markup, special characters and inconsistent formatting. Text is cleaned by removing HTML tags, lowercasing and stripping whitespace before embedding.
 
-The cleaned job titles are encoded into dense vectors using the Qwen3 Embedding model. As with user job history, the embedding dimension is truncated to $d_{\text{text}}$ to balance the contribution of text against other input features. The embeddings are unit-normalised to ensure comparable similarity scores across the job corpus. These Qwen embeddings capture semantic relationships between job titles --- for example, ``Software Engineer'' and ``Developer'' will have nearby representations --- enabling the job tower to learn meaningful job-to-job relationships beyond categorical attributes alone.
-
-\subsection{Cross-Tower Location Consistency}
-\label{sec:location_encoding}
-
-An important preprocessing step is ensuring that the same location — city or state — maps to the same integer index in both the user and job feature files. Without this, the two feature files are encoded independently, meaning a city encoded as integer 42 in the user file may refer to a completely different city than integer 42 in the job file. The shared embedding lookup would then learn no meaningful location signal.
-
-To resolve this, a shared vocabulary is constructed jointly from all city and state values across both datasets, and both files are re-encoded using this common mapping. The practical impact of this step is confirmed in the ablation study (Section~\ref{sec:exp_user_ablation}): including location features without the shared vocabulary hurts performance, while including them with the shared vocabulary yields a substantial improvement in validation AUC. This makes cross-tower location consistency a critical preprocessing requirement for any dataset where location appears in both user and item features.
+The cleaned job titles are encoded into dense vectors using the Qwen3 Embedding model. As with user job history, the embedding dimension is truncated to $d_{\text{text}}$ to balance the contribution of text against other input features. The embeddings are unit-normalised to ensure comparable similarity scores across the job corpus. These Qwen embeddings capture semantic relationships between job titles enabling the job tower to learn meaningful job-to-job relationships beyond categorical attributes alone.
 
 \section{Training}
 \label{sec:user_training}
@@ -149,6 +140,6 @@ where $y_i \in \{0, 1\}$ is the ground truth label and $\hat{y}_i = s(\mathbf{e}
 
 At inference time, recommendations are generated efficiently by precomputing all job embeddings once and caching them in memory. For each user, only the user tower forward pass is executed, followed by a single matrix multiplication against the precomputed job matrix. This reduces per-user recommendation time to one matrix multiply regardless of the size of the job pool.
 
-At inference, raw dot product scores are used for ranking rather than sigmoid probabilities. This is because the sigmoid saturates near 1.0 in float32 precision for high-confidence matches, making high-scoring jobs indistinguishable from one another, while the raw scores remain separable.
+At inference, raw dot product scores are used for ranking rather than sigmoid probabilities. This is because the sigmoid saturates near 1.0 in float32 precision for high-confidence matches, making high-scoring jobs having identical score 1.0000 and thus indistinguishable in the ranking. 
 
-Geographic preference is applied as a post-processing step rather than being learned by the model. Jobs in the same state as the user receive a ranking boost, ensuring geographically relevant recommendations without conflating location preference with semantic job-fit during training. This separation of concerns — semantic relevance learned by the model, geographic preference applied post-hoc — allows each component to be tuned and evaluated independently. Recommendations are further restricted to jobs from the active evaluation window to avoid surfacing positions that are no longer open.
+Geographic preference is applied as a post-processing step rather than being learned by the model. Jobs in the same state as the user receive a ranking boost, ensuring geographically relevant recommendations without conflating location preference with semantic job-fit during training. By separating these concerns, the model can focus on learning the underlying compatibility between user profiles and job characteristics, while the geographic relevance is handled as a straightforward adjustment to the final ranking. This way, both parts can be tuned independently. Recommendations are further restricted to jobs from the active evaluation window to avoid surfacing positions that are no longer open.
