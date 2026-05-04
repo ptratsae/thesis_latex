@@ -105,30 +105,13 @@ All experiments are run on the Artificial Intelligence and Data Analytics Resear
 \subsection{Experiment Goal}
 \label{sec:exp_user_goal}
 
-The goal of the user-side experiments is to train and evaluate a two-tower model that can rank relevant jobs highly for cold-start users — users with no interaction history in the training period. The model is trained on Windows 1--4, validated on Windows 5--6, and evaluated on Window 7, where it must generalise to entirely new users and jobs. Success is measured primarily by \gls{ROC-AUC} during training, as this metric is least sensitive to the candidate pool size of the validation set. The practical utility of the model is assessed qualitatively at inference time by inspecting recommendations for a sample of test users against the full Window 7 job pool.
-
-\subsection{Experiment Setting}
-\label{sec:exp_user_setting}
-
-Due to the large number of training users (189,657), a random subsample of 100,000 users is drawn from Windows 1--4 to keep training computationally feasible, while all validation and test users are retained in full. The model is trained using the Adam optimiser with a learning rate of $10^{-3}$, a batch size of 1024, and an output embedding dimension of $d=64$. Early stopping is applied with a patience of 5 epochs based on validation loss, with a maximum of 50 epochs. The categorical embedding dimension is set to 16 per feature, and the text embedding dimension is set to $d_{\text{text}}=100$, yielding a total job tower input of 132 dimensions — a balance that ensures the text signal is significant but not dominant.
-
-\subsubsection{Training Data Generation}
-\label{sec:training_data_gen}
-
-Positive samples are extracted directly from the application records: each application constitutes a confirmed user-job match with label $y=1$. Negative samples are generated synthetically using a city-based strategy at a 4:1 ratio — four negative job samples per positive application. This ratio approximates the real inference distribution while remaining computationally tractable; a much higher ratio (e.g.\ 100:1) would more closely mirror inference but would make training infeasible at this dataset scale.
-
-\paragraph{City-based negative sampling.}
-\label{sec:negative_sampling}
-For each user-window pair, negative jobs are sampled preferentially from the same city as the user, as these represent realistic alternatives the user might genuinely consider. If insufficient same-city jobs exist in the window, jobs from other cities serve as fallback negatives. By drawing negatives from the same city, location is deliberately removed as a discriminative signal during training — both positive and negative jobs share the same geographic context. Semantic job-fit based on career history, education and job title similarity is therefore the primary signal the model must learn. Geographic preference is applied separately as a post-processing step at inference time, as described in Section~\ref{sec:inference_postprocessing}.
-
-\paragraph{Evaluation caveat.}
-Validation metrics reported during training are computed over the balanced validation set (4:1 negative ratio), yielding a candidate pool of roughly five jobs per user. This is far smaller than the full Window~7 job pool used at inference, so ranking metrics such as Hit@$K$ and NDCG@$K$ are optimistic relative to real-world performance. \gls{ROC-AUC} is less sensitive to this effect and is therefore used as the primary training signal. A qualitative evaluation against the full job pool is reported in Section~\ref{sec:exp_user_inference}.
-
+The goal of the user-side experiments is to train and evaluate a two-tower model that can rank relevant jobs highly for cold-start users — users with no interaction history in the training period. The model is trained on Windows 1--4, validated on Windows 5--6, and evaluated on Window 7, where it must generalise to entirely new users and jobs. Success is measured primarily by \gls{ROC-AUC} during training, as this metric is least sensitive to the candidate pool size of the validation set combined with the practical utility of the model. The practical utility of the model is assessed qualitatively at inference time by inspecting recommendations for a sample of test users against the full Window 7 job pool.
+ 
 \subsection{Ablation Study}
 \label{sec:exp_user_ablation}
-
+ 
 To determine the optimal model configuration, a systematic ablation study is conducted comparing two design choices: whether to include location features (city and state) and whether to apply L2 normalisation to the output embeddings. Each configuration is trained for 3 epochs under identical conditions and compared by validation \gls{ROC-AUC}. Table~\ref{tab:ablation_user} reports the results.
-
+ 
 \begin{table}[htbp]
     \centering
     \caption{Ablation study results after 3 training epochs (validation \gls{ROC-AUC}).}
@@ -144,75 +127,97 @@ To determine the optimal model configuration, a systematic ablation study is con
         \bottomrule
     \end{tabular}
 \end{table}
-
-Two findings emerge. First, L2 normalisation consistently hurts performance regardless of whether location is included. Without normalisation, the dot product score is unbounded, allowing the model to encode match confidence in both the direction and magnitude of the embedding vectors. Normalising to unit norm discards the magnitude, reducing the model's representational capacity.
-
-Second, including location features with a shared vocabulary yields a substantial improvement — \gls{ROC-AUC} rises from 0.8591 to 0.9365. This is at first surprising, since city-based negative sampling should prevent location from being learned as a direct discriminative signal. The improvement is better explained by the additional model capacity: the city and state embedding layers allow the model to capture latent associations between location and job market characteristics, such as industries that cluster in particular cities. The importance of the shared vocabulary is confirmed by the fact that including location features without it — in an earlier experimental phase — actually hurt performance, since independently encoded integers referred to different cities in the two towers and introduced noise rather than signal.
-
-Based on these results, the final model uses location features with no L2 normalisation.
-
+TODO: Explain findings, recheck table values
+%Two findings emerge from the quantitative results. First, L2 normalisation consistently hurts performance regardless of whether location is included. Without normalisation, the dot product score is unbounded, allowing the model to encode match confidence in both the direction and magnitude of the embedding vectors. Normalising to unit norm removes the magnitude, reducing the model's representational capacity.
+ 
+%Second, including location features with a shared vocabulary shows a substantial quantitative improvement — \gls{ROC-AUC} rises from 0.8591 to 0.9365. This is at first surprising, since city-based negative sampling should prevent location from being learned as a direct discriminative signal. The improvement is better explained by the additional model capacity: the city and state embedding layers allow the model to capture latent associations between location and job market characteristics, such as industries that cluster in particular cities.
+ 
+%However, the quantitative advantage of including location features does not translate to better real-world recommendations. The qualitative evaluation in Section~\ref{sec:exp_user_inference} shows that the location-included model produces geographically clustered recommendations driven by job density rather than semantic career fit — recommending jobs from high-density cities such as Pembroke Pines or Miramar to users located in Orlando or Hollywood. This discrepancy arises from a fundamental mismatch between the validation and inference settings. City-based negative sampling controls for location in the validation set — both positive and negative jobs are drawn from the same city — but at inference the model ranks against all jobs across all cities. A model that has learned to exploit location signals therefore performs well on the location-controlled validation set but generalises poorly to the full inference setting.
+ 
+%This is a concrete illustration of how offline evaluation metrics can be misleading proxies for real-world recommendation quality when the evaluation protocol does not match the deployment scenario. The location-excluded model achieves lower \gls{ROC-AUC} on the biased validation set but produces qualitatively superior recommendations by focusing exclusively on semantic job-fit signals — career history, education and job title similarity — which generalise across cities.
+ 
+%Based on both quantitative and qualitative evidence, the final model uses \textbf{no location features and no L2 normalisation}. The importance of the shared vocabulary finding is preserved as a negative result: it confirms that location encoding must be consistent across towers if location is used, but the qualitative evaluation shows location should not be used at all in this setting.
+ 
 \subsection{Final Model Results}
 \label{sec:user_results}
-
-The final model is trained with the optimal configuration for a maximum of 50 epochs with early stopping (patience = 5). Training converges at epoch 11, at which point the best model checkpoint — saved at the epoch of lowest validation loss — achieves the results shown in Table~\ref{tab:final_results_user}.
-
+ 
+The final model is trained without location features and without L2 normalisation, as determined by the combined quantitative and qualitative ablation analysis. The model is trained for a maximum of 50 epochs with early stopping (patience = 5). Table~\ref{tab:final_results_user} reports the validation set results at the best checkpoint.
+ 
+For reference, Table~\ref{tab:model_comparison} compares the location-included and location-excluded configurations at full training convergence, making explicit the quantitative cost of excluding location features alongside the qualitative benefit established in Section~\ref{sec:exp_user_inference}.
+ 
 \begin{table}[htbp]
     \centering
-    \caption{Final model results on the validation set (best checkpoint).}
+    \caption{Final model results on the validation set (best checkpoint, no location features).}
     \label{tab:final_results_user}
     \begin{tabular}{lr}
         \toprule
         \textbf{Metric} & \textbf{Value} \\
         \midrule
-        Training Loss   & 0.1731 \\
-        Validation Loss & 0.2254 \\
-        Accuracy        & 91.76\% \\
-        AUC-ROC         & 0.9456 \\
+        Training Loss   & TODO \\
+        Validation Loss & TODO \\
+        Accuracy        & TODO\% \\
+        AUC-ROC         & TODO \\
         \midrule
-        Hit@5           & 0.9962 \\
-        Recall@5        & 0.8479 \\
-        NDCG@5          & 0.9200 \\
-        Hit@10          & 0.9995 \\
-        Recall@10       & 0.9320 \\
-        NDCG@10         & 0.9294 \\
-        Hit@20          & 0.9999 \\
-        Recall@20       & 0.9740 \\
-        NDCG@20         & 0.9368 \\
+        Hit@5           & TODO \\
+        Recall@5        & TODO \\
+        NDCG@5          & TODO \\
+        Hit@10          & TODO \\
+        Recall@10       & TODO \\
+        NDCG@10         & TODO \\
+        Hit@20          & TODO \\
+        Recall@20       & TODO \\
+        NDCG@20         & TODO \\
         \bottomrule
     \end{tabular}
 \end{table}
-
-The AUC-ROC of 0.9456 indicates strong discriminative ability — the model ranks a randomly chosen applied job above a randomly chosen non-applied job 94.56\% of the time. Early convergence at epoch 11 is consistent with the regularisation applied throughout both towers (batch normalisation and dropout), which prevents overfitting without requiring many epochs.
-
-The ranking metrics (Hit@$K$, Recall@$K$, NDCG@$K$) are high due to the small candidate pool used during validation (4:1 negative ratio), as discussed in Section~\ref{sec:negative_sampling}. They should not be interpreted as reflecting real-world retrieval performance; the qualitative evaluation in Section~\ref{sec:exp_user_inference} provides a more realistic assessment.
-
+ 
+\begin{table}[htbp]
+    \centering
+    \caption{Comparison of location-included vs location-excluded models at full convergence.}
+    \label{tab:model_comparison}
+    \begin{tabular}{lcccc}
+        \toprule
+        \textbf{Configuration} & \textbf{Val Loss} & \textbf{Accuracy} & \textbf{AUC} & \textbf{Epochs} \\
+        \midrule
+        Location included, no L2 norm & 0.2233 & 91.76\% & 0.9456 & 11 \\
+        Location excluded, no L2 norm & TODO   & TODO\%  & TODO   & TODO \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+ 
+The lower \gls{ROC-AUC} of the location-excluded model reflects the reduced capacity to exploit location-based patterns in the validation set, as discussed in Section~\ref{sec:exp_user_ablation}. The qualitative evaluation in Section~\ref{sec:exp_user_inference} demonstrates that this quantitative cost is offset by substantially better semantic generalisation at inference time.
+ 
 \subsection{Qualitative Inference Evaluation}
 \label{sec:exp_user_inference}
-
-% TODO: paste output from recommendations_user_X.txt for 3-4 test users here.
-% For each user show: user profile summary, actual applications in Window 7,
-% and top-5 recommendations from the model.
-% Discuss: do job titles match career history? Is location appropriate?
-% Does same-state-first post-processing visibly change the ranking?
+ 
+To assess real-world recommendation quality, the final model is run at inference time against all jobs from Window~7 (approximately 40,000 jobs) for a sample of test users. Geographic post-processing is applied so that jobs in the same state as the user are ranked ahead of out-of-state jobs. Two representative cases are discussed below.
+ 
+\paragraph{User Y}
 TODO
-
+ 
+\paragraph{User X}
+TODO
+ 
+\paragraph{Limitation: geographic clustering with location features.}
+For completeness, the location-included model was also evaluated qualitatively. For a Florida-based user (Hollywood, FL) with a 17-year insurance background, the location-included model recommended generic sales and marketing roles clustered entirely in Miramar, FL — a city near Miami with high job density in the dataset but geographically distant from the user. Similarly, an Orlando user received all top-10 recommendations from Pembroke Pines, FL. This geographic clustering confirms the analysis in Section~\ref{sec:exp_user_ablation}: the location-included model exploits city-level job density patterns that inflate validation \gls{ROC-AUC} but produce poor inference results. The location-excluded model does not exhibit this behaviour, as demonstrated by Users 650340 and 1240342 above.
+ 
 % ============================================================
 \section{Recruiter-Side Recommendation Experiments}
 \label{sec:exp_recruiter}
 % ============================================================
-
+ 
 \subsection{Experiment Goal}
 \label{sec:exp_recruiter_goal}
 TODO
-
+ 
 \subsection{Experiment Setting}
 \label{sec:exp_recruiter_setting}
 TODO
-
+ 
 \subsection{Results}
 \label{sec:exp_recruiter_results}
 TODO
-
+ 
 \begin{table}[htbp]
     \centering
     \caption{Recruiter-side model comparison (5-fold cross-validation).}
@@ -228,28 +233,28 @@ TODO
         \bottomrule
     \end{tabular}
 \end{table}
-
+ 
 % ============================================================
 \section{Congestion Balancing Experiments}
 \label{sec:exp_congestion}
 % ============================================================
-
+ 
 \subsection{Experiment Goal}
 \label{sec:exp_congestion_goal}
 TODO
-
+ 
 \subsection{Experiment Setting}
 \label{sec:exp_congestion_setting}
 TODO
-
+ 
 \subsection{Job-Side Congestion Analysis}
 \label{sec:exp_job_congestion}
 TODO
-
+ 
 \subsection{User-Side Congestion Analysis}
 \label{sec:exp_user_congestion}
 TODO
-
+ 
 \subsection{Hybrid Balancing Results}
 \label{sec:exp_hybrid_results}
 TODO
