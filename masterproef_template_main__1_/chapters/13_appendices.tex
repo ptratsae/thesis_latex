@@ -1,211 +1,65 @@
 \begin{appendices}
-\section{Two-Tower Model Implementation}
-\label{app:two_tower_model}
-\addcontentsline{toc}{section}{Two-Tower Model Implementation}
+\section{Full Ablation Study Results}
+\label{app:ablation_full}
+\addcontentsline{toc}{section}{Full Ablation Study Results}
 
-The complete PyTorch implementation of the two-tower neural network model for job recommendation is presented below. This code implements both the user and job towers with their embedding layers, fully-connected layers, batch normalization, and regularization techniques described in Chapter \ref{chap:user_recommendation}.
+Table~\ref{app:tab:full_ablation} reports the complete set of metrics for all four ablation configurations at their respective best validation checkpoints. The main text (Section~\ref{sec:exp_user_ablation}) reports only AUC for brevity; this table additionally includes all ranking metrics at $K \in \{1, 3, 5, 10\}$. As noted in Section~\ref{sec:exp_user_ablation}, all ranking metrics are computed against the balanced validation candidate pool and are therefore optimistic relative to full-scale inference.
 
-\begin{listing}[htbp]
-\begin{minted}[fontsize=\footnotesize]{python3}
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
+\begin{table}[htbp]
+    \centering
+    \small
+    \caption{Full ablation results across all metrics at best validation checkpoint.}
+    \label{app:tab:full_ablation}
+    \begin{tabular}{llccccc}
+        \toprule
+        \textbf{Location} & \textbf{L2} & \textbf{Val Loss} & \textbf{Acc.} & \textbf{AUC} & \textbf{Epochs} \\
+        \midrule
+        Included & No  & 0.2706 & 88.90\% & \textbf{0.9242} & 19 \\
+        Excluded & No  & 0.3463 & 84.92\% & 0.8641 &  9 \\
+        Included & Yes & 0.4852 & 82.15\% & 0.7331 &  8 \\
+        Excluded & Yes & 0.4892 & 81.73\% & 0.7426 &  4 \\
+        \bottomrule
+    \end{tabular}
 
-class TwoTowerModel(nn.Module):
-    def __init__(self, num_user_cat, num_job_cat, num_user_numeric, num_job_numeric, output_dim=64):
-        super().__init__()
-        # User tower embeddings and layers
-        self.user_embeddings = nn.ModuleList([nn.Embedding(card, 16) for card in num_user_cat])
-        user_input_dim = len(num_user_cat) * 16 + num_user_numeric
-        self.user_tower = nn.Sequential(
-            nn.Linear(user_input_dim, 512),
-            nn.BatchNorm1d(512),
-            nn.ReLU(),
-            nn.Dropout(0.3),
-            nn.Linear(512, 256),
-            nn.BatchNorm1d(256),
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(256, output_dim)
-        )
+    \vspace{1em}
 
-        # Job tower embeddings and layers
-        self.job_embeddings = nn.ModuleList([nn.Embedding(card, 16) for card in num_job_cat])
-        job_input_dim = len(num_job_cat) * 16 + num_job_numeric 
-        self.job_tower = nn.Sequential(
-            nn.Linear(job_input_dim, 512), 
-            nn.BatchNorm1d(512),
-            nn.ReLU(), 
-            nn.Dropout(0.3),
-            nn.Linear(512, 256),
-            nn.BatchNorm1d(256),
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(256, output_dim)
-        )
+    \begin{tabular}{llcccccc}
+        \toprule
+        \textbf{Location} & \textbf{L2} & \textbf{Hit@1} & \textbf{Hit@3} & \textbf{Hit@5} & \textbf{Hit@10} \\
+        \midrule
+        Included & No  & \textbf{0.8202} & \textbf{0.9740} & \textbf{0.9922} & \textbf{0.9979} \\
+        Excluded & No  & 0.7144 & 0.9444 & 0.9879 & 0.9987 \\
+        Included & Yes & 0.4848 & 0.8007 & 0.9404 & 0.9916 \\
+        Excluded & Yes & 0.4995 & 0.8270 & 0.9489 & 0.9935 \\
+        \bottomrule
+    \end{tabular}
 
-    def forward(self, u_cat, u_num, j_cat, j_num):
-        # Process user tower
-        if len(self.user_embeddings) > 0:
-            u_embeds = torch.cat([emb(u_cat[:, i]) for i, emb in enumerate(self.user_embeddings)], dim=1)
-            user_input = torch.cat([u_embeds, u_num], dim=1)
-        else:
-            user_input = u_num
-        user_vec = self.user_tower(user_input)
+    \vspace{1em}
 
-        # Process job tower
-        if len(self.job_embeddings) > 0:
-            j_embeds = torch.cat([emb(j_cat[:, i]) for i, emb in enumerate(self.job_embeddings)], dim=1)
-            job_input = torch.cat([j_embeds, j_num], dim=1)
-        else:
-            job_input = j_num
-        job_vec = self.job_tower(job_input)
+    \begin{tabular}{llcccccc}
+        \toprule
+        \textbf{Location} & \textbf{L2} & \textbf{Recall@1} & \textbf{Recall@3} & \textbf{Recall@5} & \textbf{Recall@10} \\
+        \midrule
+        Included & No  & \textbf{0.4193} & \textbf{0.7213} & \textbf{0.8291} & \textbf{0.9239} \\
+        Excluded & No  & 0.3678 & 0.6594 & 0.7806 & 0.8933 \\
+        Included & Yes & 0.2359 & 0.5105 & 0.6823 & 0.8339 \\
+        Excluded & Yes & 0.2479 & 0.5339 & 0.6943 & 0.8427 \\
+        \bottomrule
+    \end{tabular}
 
-        # Return matching score as dot product
-        return (user_vec * job_vec).sum(dim=1)
-\end{minted}
-\caption{Complete Two-Tower Model Implementation in PyTorch}
-\label{lst:two_tower_complete}
-\end{listing}
+    \vspace{1em}
 
-The model takes four inputs:
-\begin{itemize}
-    \item \textbf{u\_cat}: User categorical features (shape: batch\_size $\times$ num\_user\_cat)
-    \item \textbf{u\_num}: User numeric features (shape: batch\_size $\times$ num\_user\_numeric)
-    \item \textbf{j\_cat}: Job categorical features (shape: batch\_size $\times$ num\_job\_cat)
-    \item \textbf{j\_num}: Job numeric features (shape: batch\_size $\times$ num\_job\_numeric)
-\end{itemize}
-
-The forward pass produces a matching score for each user-job pair, which is used for ranking and binary classification during training.
-
-\newpage
-\section{Prepare Job Recommender Training Data}
-\label{app:prepare_job_recommender_data}
-\addcontentsline{toc}{section}{Prepare Job Recommender Training Data}
-
-The code snippet below consists of the python implementation for preparing the training data for the two-tower job recommender model. It includes window-based splitting and negative sampling.
-
-\begin{listing}[h]
-\begin{minted}[fontsize=\footnotesize]{python3}
-def prepare_training_data(apps_path, jobs_path, output_path, num_users_to_sample=None):
-    """Prepares training data with:
-        1. Robust Type Casting.
-        2. Window-based Split: Windows 1-4 = Train, 5-6 = Validation, 7 = Test.
-        3. Balanced Subsampling of Train windows (Val/Test users always kept).
-        4. City-based Negative Sampling (propagates split labels to negatives).
-
-        :param apps_path: Path to the raw applications data (apps.tsv).
-        :param jobs_path: Path to the raw jobs data (jobs.tsv) for negative sampling.
-        :param output_path: Path to save the prepared training data CSV.
-        :param num_users_to_sample: Optional limit on number of Train-window users to include. Val/Test users are always kept.
-    """
-    # ========== LOAD AND PREPARE DATA ==========
-    print('Loading apps data...')
-    apps = pd.read_csv(apps_path, delimiter='\t', encoding='utf-8')
-    apps['UserID'] = apps['UserID'].astype(int)
-    apps['WindowID'] = apps['WindowID'].astype(int)
-    apps['JobID'] = apps['JobID'].astype(int)
-
-    print('Pre-filtering jobs by window and city for city-based negative sampling...')
-    split_jobs_path = 'data/splitjobs/splitjobs/'
-    job_sets_by_window, job_sets_by_window_city = _load_job_sets(split_jobs_path, jobs_path)
-    
-    # Load user locations for city-based negative sampling
-    print('Loading user locations...')
-    users_path = apps_path.replace('apps.tsv', 'users.tsv')
-    users = pd.read_csv(users_path, delimiter='\t', encoding='utf-8', usecols=['UserID', 'City'])
-    users['City'] = users['City'].fillna('UNKNOWN').astype(str)
-    user_city_map = dict(zip(users['UserID'], users['City']))
-    
-    # Validate loaded job sets
-    print(f'Job Sets Loaded: {list(job_sets_by_window.keys())}')
-    for window_id, jobs_set in job_sets_by_window.items():
-        if len(jobs_set) == 0:
-            print(f'WARNING: Window {window_id} has 0 jobs!')
-
-    # ========== PREPARE POSITIVE SAMPLES ==========
-    positive_samples = apps[['UserID', 'WindowID', 'JobID', 'Split', 'ApplicationDate']].copy()
-    positive_samples['Label'] = 1
-    positive_samples['Split'] = positive_samples.apply(_assign_split_label, axis=1)
-    
-    excluded = positive_samples['Split'].isna().sum()
-    positive_samples = positive_samples.dropna(subset=['Split'])
-    print(f'Excluded {excluded} rows (Test users from train/val windows)')
-
-    # ========== SUBSAMPLE TRAIN USERS (OPTIONAL) ==========
-    val_test_user_ids = positive_samples[positive_samples['Split'].isin(['Validation', 'Test'])]['UserID'].unique()
-    train_users_df = positive_samples[positive_samples['Split'] == 'Train'][['UserID', 'WindowID']].drop_duplicates()
-    
-    if num_users_to_sample is not None:
-        unique_train_windows = train_users_df['WindowID'].nunique()
-        target_per_window = num_users_to_sample // unique_train_windows
-        print(f'Subsampling: Aiming for ~{target_per_window} Train users per window (Total target: {num_users_to_sample})')
-        keep_train_ids = []
-        for window_id, group in train_users_df.groupby('WindowID'):
-            window_users = group['UserID'].tolist()
-            n = min(len(window_users), target_per_window)
-            keep_train_ids.extend(random.sample(window_users, n))
-        final_users_to_keep = set(val_test_user_ids).union(set(keep_train_ids))
-        positive_samples = positive_samples[positive_samples['UserID'].isin(final_users_to_keep)]
-        print(f'Final dataset: {len(val_test_user_ids)} Val/Test Users + {len(keep_train_ids)} sampled Train Users')
-    else:
-        print('Using all users (no subsampling)')
-
-    positive_samples = positive_samples.drop(columns=['ApplicationDate'], errors='ignore')
-    print('Split distribution (Positives):')
-    print(positive_samples['Split'].value_counts())
-
-    # ========== GENERATE NEGATIVE SAMPLES ==========
-    training_data_list = [positive_samples]
-    print('Starting city-based negative sampling...')
-    city_hits = 0
-    city_fallbacks = 0
-    
-    for (user_id, window_id), user_apps in tqdm(positive_samples.groupby(['UserID', 'WindowID']), 
-                                                desc='Generating Negatives'):
-        split_labels = user_apps['Split'].values
-        negative_ids, hits, fallbacks = _generate_negatives_for_user(
-            user_id, window_id, user_apps, 
-            job_sets_by_window, job_sets_by_window_city, user_city_map
-        )
-        
-        city_hits += hits
-        city_fallbacks += fallbacks
-        
-        if negative_ids:
-            neg_df = pd.DataFrame({
-                'UserID': user_id,
-                'WindowID': window_id,
-                'JobID': negative_ids,
-                'Split': split_labels[:len(negative_ids)],
-                'Label': 0
-            })
-            training_data_list.append(neg_df)
-
-    total_negatives = city_hits + city_fallbacks
-    print(f'City-based sampling stats:')
-    print(f'  Same-city negatives: {city_hits} ({100*city_hits/max(1,total_negatives):.1f}%)')
-    print(f'  Fallback negatives:   {city_fallbacks} ({100*city_fallbacks/max(1,total_negatives):.1f}%)')
-
-    # ========== SAVE RESULTS ==========
-    print('Concatenating...')
-    training_data = pd.concat(training_data_list, ignore_index=True)
-    print('Shuffling...')
-    training_data = training_data.sample(frac=1, random_state=42).reset_index(drop=True)
-    
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    training_data.to_csv(output_path, index=False)
-    print(f'Saved to {output_path}')
-    
-    print('\n--- Final Dataset Stats ---')
-    print(f'Total Rows: {len(training_data)}')
-    print(training_data['Split'].value_counts())
-    print(f"Label Distribution:\n{training_data['Label'].value_counts()}")
-    return training_data
-\end{minted}
-caption{Data Preparation Code for Two-Tower Job Recommender}
-\label{lst:data_preparation}
-\end{listing}
+    \begin{tabular}{llcccccc}
+        \toprule
+        \textbf{Location} & \textbf{L2} & \textbf{NDCG@1} & \textbf{NDCG@3} & \textbf{NDCG@5} & \textbf{NDCG@10} \\
+        \midrule
+        Included & No  & \textbf{0.8202} & \textbf{0.8525} & \textbf{0.8684} & \textbf{0.8871} \\
+        Excluded & No  & 0.7144 & 0.7561 & 0.7838 & 0.8145 \\
+        Included & Yes & 0.4848 & 0.5617 & 0.6186 & 0.6693 \\
+        Excluded & Yes & 0.4995 & 0.5784 & 0.6315 & 0.6824 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
 
 \section{Prompt for Recruiter LLM}
 \label{app:recruiter_llm_prompt}
