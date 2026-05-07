@@ -34,6 +34,8 @@ Table~\ref{tab:notation} summarises the key symbols used throughout.
         $y \in \{0,1\}$ & Binary ground truth label \\
         $N$ & Number of training examples \\
         $K$ & Cutoff for ranking metrics (e.g.\ Hit@$K$) \\
+        $d_{\text{pca}}$ & Output dimensionality of PCA reduction \\
+        $F$ & Total number of features in the recruiter feature vector \\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -74,6 +76,19 @@ A neural embedding is a learned mapping from a discrete or high-dimensional inpu
 
 \textbf{Pre-trained text embeddings} are used to encode natural language fields such as job titles, descriptions and work history. In this thesis, the Qwen3 Embedding model (0.6B parameters) is used to produce continuous vector representations of text. Further discussed in Chapter~\ref{chap:user_recommendation}).
 
+
+\section{TF-IDF Representations}
+\label{sec:prelim_tfidf}
+
+While neural embeddings capture semantic relationships through learned representations, a simpler and complementary approach is \textbf{Term Frequency–Inverse Document Frequency} (TF-IDF), a classical bag-of-words weighting scheme. Given a corpus of documents, the TF-IDF weight of a term $t$ in document $d$ is:
+
+\begin{equation}
+    \text{TF-IDF}(t, d) = \text{TF}(t, d) \cdot \log \frac{|\mathcal{D}|}{|\{d' \in \mathcal{D} : t \in d'\}|}
+\end{equation}
+
+where $\text{TF}(t, d)$ is the frequency of term $t$ in document $d$ and $|\mathcal{D}|$ is the total number of documents. Terms that appear often in a specific document but rarely across the corpus receive high weights, making them good discriminators.
+
+Each document is represented as a sparse vector of TF-IDF weights over the full vocabulary. The similarity between two such vectors is then measured using cosine similarity, which captures keyword-level overlap between two texts in a computationally efficient manner. Unlike neural embeddings, TF-IDF requires no training and is fully interpretable, making it a useful complementary signal when explicit keyword matching is more informative than semantic proximity.
 
 \section{Large Language Models and Prompting}
 \label{sec:prelim_llm}
