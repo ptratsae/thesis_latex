@@ -74,7 +74,7 @@ where $t_1, t_2, t_3$ are the three most recent job titles in reverse chronologi
 
 \subsubsection{Feature Engineering}
 
-Several domain-specific features are constructed from raw attributes. Years of professional experience is derived from the graduation date as $\text{current\_year} - \text{graduation\_year}$, since elapsed time since graduation is a more informative signal than the raw date. Missing values are imputed with the median. Location fields are standardised by retaining city and state while dropping redundant colums country and zip code as all users are from the same country and zip codes contain the same information as city and state. 
+Several domain-specific features are constructed from raw attributes. Years of professional experience is derived from the graduation date as $\text{current\_year} - \text{graduation\_year}$, since elapsed time since graduation is a more informative signal than the raw date. Missing values are imputed with the median. Location fields are standardised by retaining the most granular identifiers that remain informative at the scale of the data, while dropping redundant or zero-variance columns.  
 
 \subsubsection{Encoding}
 \label{sec:user_embedding}
@@ -82,33 +82,33 @@ Several domain-specific features are constructed from raw attributes. Years of p
 Each feature type is processed according to its nature. Numerical features such as years of experience are standardised using z-score normalisation to ensure scale invariance at the \gls{MLP} input. Categorical features such as education level are label-encoded to integers and fed into learnable embedding layers  rather than the \gls{MLP} directly, so no further normalisation is required. Categorical features that appear in both the user and job feature sets are encoded using a shared vocabulary constructed jointly from both datasets, ensuring that the same value maps to the same integer index in both towers. Embeddings are normalised to ensure comparable similarity scores across the user corpus. The embedding dimension $d_{\text{text}}$ is chosen so that the text signal contributes meaningfully but does not dominate the other features. This choice is discussed in Chapter~\ref{chap:experiments}.
 
 Table~\ref{tab:user_features} summarises the full user feature engineering pipeline.
-
+ 
 \begin{table}[htbp]
     \centering
     \caption{User Feature Engineering Pipeline}
     \label{tab:user_features}
-    \begin{tabular}{|l|l|l|l|l|}
-        \hline
-        \textbf{Category} & \textbf{Raw Feature} & \textbf{Type} & \textbf{Processing} & \textbf{Output} \\
-        \hline
-        \multirow{2}{*}{\textbf{Identifiers}} & UserID & int & --- & UserID \\
-        & WindowID & int & --- & WindowID \\
-        \hline
-        \multirow{2}{*}{\textbf{Location}} & City & categorical & LabelEncoder & int [1, N] \\
-        & State & categorical & LabelEncoder & int [1, N] \\
-        \hline
-        \multirow{3}{*}{\textbf{Education}} & DegreeType & categorical & LabelEncoder & int [1, N] \\
-        & Major & categorical & LabelEncoder & int [1, N] \\
-        & GraduationDate & date & $\rightarrow$ YearsSinceGrad & float (scaled) \\
-        \hline
-        \multirow{5}{*}{\textbf{Work Experience}} & WorkHistoryCount & int & StandardScaler & float (scaled) \\
-        & TotalYearsExperience & int & StandardScaler & float (scaled) \\
-        & CurrentlyEmployed & categorical & LabelEncoder & int [0, 1] \\
-        & ManagedOthers & categorical & LabelEncoder & int [0, 1] \\
-        & ManagedHowMany & int & StandardScaler & float (scaled) \\
-        \hline
-        \textbf{Job History} & Recent\_JobTitle (top 3) & text & Qwen Embedding & $\mathbb{R}^{d_{\text{text}}}$ \\
-        \hline
+    \begin{tabular}{llllp{3.5cm}}
+        \toprule
+        \textbf{Category} & \textbf{Feature} & \textbf{Type} & \textbf{Processing} & \textbf{Output} \\
+        \midrule
+        \multirow{2}{*}{Location}
+            & City  & categorical & LabelEncoder & int $[1, N]$ \\
+            & State / Region & categorical & LabelEncoder & int $[1, N]$ \\
+        \midrule
+        \multirow{3}{*}{Education}
+            & Degree level   & categorical & LabelEncoder & int $[1, N]$ \\
+            & Field of study & categorical & LabelEncoder & int $[1, N]$ \\
+            & Years since graduation & date $\to$ float & StandardScaler & float (scaled) \\
+        \midrule
+        \multirow{5}{*}{Work Experience}
+            & Number of past positions & int & StandardScaler & float (scaled) \\
+            & Total years of experience & int & StandardScaler & float (scaled) \\
+            & Currently employed & binary & LabelEncoder & int $\{0,1\}$ \\
+            & Managed others & binary & LabelEncoder & int $\{0,1\}$ \\
+            & Number managed & int & StandardScaler & float (scaled) \\
+        \midrule
+        Job History & Recent job titles (top $k$) & text & Qwen Embedding & $\mathbb{R}^{d_{\text{text}}}$ \\
+        \bottomrule
     \end{tabular}
 \end{table}
 
@@ -129,20 +129,19 @@ The cleaned job titles are encoded into dense vectors using the Qwen3 Embedding 
  
 \subsection{Negative Sampling}
 \label{sec:user_neg_sampling}
- 
-Because the dataset contains only positive interactions, negative examples must be constructed. Randomly sampled negatives drawn uniformly from the job pool are typically too easy and do not produce useful gradients — the model can trivially separate a nurse from a software engineer without learning anything about genuine preference. Hard negatives are therefore constructed by geographic stratification: for each positive pair, negatives are drawn from a mix of the user's own city, the same state, and other states. This ensures the model is trained to distinguish true job-fit from mere co-location, which is especially important given that geographic signals are informative but should not dominate the learned representations. The specific sampling ratio used in practice is described in Section~\ref{sec:negative_sampling}.
+Because the dataset contains only positive interactions, negative examples must be constructed. Randomly sampled negatives drawn uniformly from the job pool are typically too easy and do not produce useful gradients — the model can trivially separate a nurse from a software engineer without learning anything about genuine preference. Hard negatives are therefore constructed by geographic stratification: for each positive pair, negatives are drawn from a mix of geographically close and distant jobs. This ensures the model is trained to distinguish true job-fit from mere co-location, which is especially important given that geographic signals are informative but should not dominate the learned representations. The specific sampling ratios used in practice are described in Section~\ref{sec:negative_sampling}.
 \subsection{Loss Function}
 
 The model is optimised using Binary Cross-Entropy with Logits loss, which combines a sigmoid activation with binary cross-entropy in a numerically stable form:
 \begin{equation}
 \mathcal{L} = -\frac{1}{N} \sum_{i=1}^{N} \left[ y_i \log(\sigma(\hat{y}_i)) + (1 - y_i) \log(1 - \sigma(\hat{y}_i)) \right]
 \end{equation}
-where $y_i \in \{0, 1\}$ is the ground truth label and $\hat{y}_i = s(\mathbf{e}_u, \mathbf{e}_j)$ is the raw dot product score. The sigmoid $\sigma$ maps the unbounded score to a probability during training. The model is optimised using the Adam optimiser with early stopping based on validation loss to prevent overfitting. Specific hyperparameter values are reported in Section~\ref{sec:exp_user_setting}.
+where $y_i \in \{0, 1\}$ is the ground truth label and $\hat{y}_i = s(\mathbf{e}_u, \mathbf{e}_j)$ is the raw dot product score. The sigmoid $\sigma$ maps the unbounded score to a probability during training. The model is optimised using the Adam optimiser with early stopping based on validation loss to prevent overfitting. Specific hyperparameter values are reported in Section~\ref{sec:exp_user_hyperparameters}.
 
-\subsection{Inference and Post-Processing}
+\subsection{Inference}
 \label{sec:inference_postprocessing}
 At inference time, recommendations are generated efficiently by precomputing all job embeddings once and caching them in memory. For each user, only the user tower forward pass is executed, followed by a single matrix multiplication against the precomputed job matrix. This reduces per-user recommendation time to one matrix multiply regardless of the size of the job pool.
  
 At inference, both raw scores or sigmoid probabilities could be used for ranking. The raw dot product scores are used directly for ranking because they preserve the relative distances in the embedding space, which is more meaningful for nearest-neighbour retrieval. Applying a sigmoid would compress the scores into a narrow range, reducing the model's ability to differentiate between closely ranked items.
  
-Because the model is trained with the 2:1:1 negative sampling strategy (Section~\ref{sec:negative_sampling}), geographic preference is learned directly from the training signal: users are contrasted against jobs from different states during training, so the model internalises state-level location as a genuine compatibility feature. No post-processing boost is applied at inference — same-state jobs surface naturally at the top of the ranking as a consequence of what the model has learned. Recommendations are restricted to jobs from the active evaluation window to avoid surfacing positions that are no longer open.
+Because geographic preference is learned directly from the training signal through the stratified negative sampling strategy (Section~\ref{sec:negative_sampling}), no post-processing boost is applied at inference — jobs in the user's region surface naturally at the top of the ranking as a consequence of what the model has learned. In Section~\ref{sec:exp_user_ablation}, examples of user recommendations are provided to illustrate the model's ability to capture geographic and semantic preferences.
