@@ -61,37 +61,6 @@ Table~\ref{app:tab:full_ablation} reports the complete set of metrics for all fo
     \end{tabular}
 \end{table}
 
-\section{Prompt for Recruiter LLM}
-\label{app:recruiter_llm_prompt}
-\addcontentsline{toc}{section}{Prompt for Recruiter LLM}
-The prompt below was used to instruct the large language model (LLM) in the recruiter assistant application. It provides context about the task, the input format, and the expected output.
-\begin{verbatim}
-Task: You are an HR recruiter. You need to check how good a person fits the job based on user profile and job description (IMPORTANT: Treat each job-user pair independently).
-Assign a fit level:  - "Very Good Fit" : All must-haves covered, and many nice-to-haves covered, with strong reasoning. No deal-breakers.
--"Good Fit" : Most must-haves covered, and some nice-to-haves covered (e.g. job asks for degree but applicant doesn't have it, but he has a lot of experience ), with reasonable reasoning. No major deal-breakers.
--"Poor Fit" : Few must-haves covered, and few nice-to-haves covered, with weak reasoning. Some deal-breakers.
--"Very Poor Fit": Most or all must-haves missing, and no nice-to-haves covered, with poor reasoning. Many deal-breakers.
-
-Return a JSON object with a "results" key containing an array of candidate decisions:
-{{"results": [{{"candidate_id": <id>, "must_haves": "xxx", "nice_to_haves": "xxx", "deal_breakers": "xxx", "reasoning": "xxx", "fit_level": "Good Fit"}}]}}
-
-Extra Notes:
-- Be a bit strict as these jobs have many applicants. Only candidates that truly meet the requirements should be rated as "Very Good Fit" or "Good Fit". If there are any significant gaps in must-haves, it should be reflected in the fit level and reasoning.
-- Be objective and specific in your reasoning. Focus on concrete matches/mismatches between the candidate's profile and the job requirements. Avoid vague statements.
-- Keep the JSON output concise. Fields shouldn't be phrases but just short descriptors, for example must haves "Bachelor's Degree in Computer Science, 5+ years of experience in software development". 
-The reasoning should be very brief (max 3 sentences) but specific to the candidate's profile and the job description.
-- If a feature is empty, missing or NaN in Degree, Major, Experience or History, assume the candidate does not have that feature. For example, if Degree is empty, assume no degree. If History is empty, assume no relevant job history.
-- Assume all applicants are adults (18+), if specific age is missing.
-- Assume availability is not an issue unless explicitly stated.
-- Assume physical ability is not an issue.
-
-Job Description:
-{job_desc}
-
-Candidate Profiles:
-{profiles_text}
-\end{verbatim}
-
 \end{appendices}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

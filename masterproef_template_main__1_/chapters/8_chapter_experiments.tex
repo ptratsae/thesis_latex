@@ -120,7 +120,10 @@ The negative sampling strategy is therefore designed to produce \emph{hard} and 
 \end{itemize}
  
 The 2:1:1 strategy ensures the training distribution is representative of the real inference setting, where the model must rank jobs across the entire country, and resolves this clustering artefact as demonstrated in Section~\ref{sec:exp_user_inference}. 
- 
+
+\subsection{Hyperparameters and Training Settings}
+\label{sec:exp_user_hyperparameters}
+The model is trained for a maximum of 50 epochs with early stopping (patience~= 5) based on validation loss. The Adam optimiser is used with a learning rate of $1e^{-3}$ and a batch size of 1024. The embedding dimension $d$ is set to 64.
 \subsection{Ablation Study}
 \label{sec:exp_user_ablation}
  
@@ -155,7 +158,7 @@ Based on both quantitative and qualitative evidence, the final model \textbf{inc
  
 The final model is trained \textbf{with location features and without L2 normalisation}, as determined by the ablation study in Section~\ref{sec:exp_user_ablation}. The model is trained for a maximum of 50 epochs with early stopping (patience~= 5) and converges at epoch~19. Table~\ref{tab:final_results_user} reports the validation set results at the best checkpoint.
  
-\begin{table}[htbp]
+\begin{table}[H]
     \centering
     \caption{Final model results on the validation set (best checkpoint, location features included, no L2 norm).}
     \label{tab:final_results_user}
@@ -281,27 +284,129 @@ This user is based in Philadelphia, PA, holds a high school diploma and has only
         \bottomrule
     \end{tabular}
 \end{table}
-
-% ============================================================
 \section{Recruiter-Side Recommendation Experiments}
 \label{sec:exp_recruiter}
 % ============================================================
  
 \subsection{Experiment Goal}
 \label{sec:exp_recruiter_goal}
-TODO
+ 
+The recruiter-side experiments address three questions. First, does the \gls{LLM}-based labeling pipeline produce a training signal rich enough to train a lightweight ranker — one that correctly separates qualified from unqualified applicants on jobs it has never seen? Second, which classifier best exploits the engineered feature set described in Section~\ref{sec:recruiter_features}? Third, does the choice of negative construction strategy — \gls{LLM}-evaluated hard negatives versus synthetically sampled non-applicants — have a measurable effect on ranking quality? Success is assessed both quantitatively via AUC-ROC as the primary metric, and qualitatively through a sanity check that inspects model scores on real applicant pools.
+ 
+\subsection{Data Generation}
+\label{sec:exp_recruiter_datagen}
+ 
+Because no ground-truth recruiter feedback exists in the dataset, training labels must be generated synthetically. The method is described in Section~\ref{sec:recruiter_data_gen}; this section provides the implementation details specific to this experiment.
+ 
+\paragraph{Labeling setup}
+Labels are generated using the Qwen3.5 (35B) model served locally via the Ollama API. For computational feasibility, a sample of jobs is drawn from Windows~1--4; for each job, up to 20 applicants are evaluated in a single batched prompt. The \gls{LLM} receives the job description alongside all candidate profiles in the batch and returns a structured JSON response. The final prompt used is:
+\begin{tcolorbox}[colback=blue!5!white, colframe=blue!75!black, title=LLM Prompt for Recruiter-Side Labeling]
+Task: You are an HR recruiter. You need to check how good a person fits the job based on user profile and job description (IMPORTANT: Treat each job-user pair independently).
+            Assign a fit level:  -"Very Good Fit": Meets 100% of Must-Haves AND meets 50% or more of Nice-to-Haves AND has 0 Deal-Breakers.
+                                -"Good Fit": Meets 100% of Must-Haves (OR misses exactly 1 Must-Have but compensates with extensive relevant experience) AND has 0 Deal-Breakers.
+                                -"Poor Fit": Missing 2 or more Must-Haves OR has exactly 1 Deal-Breaker.
+                                -"Very Poor Fit": Missing 3 or more Must-Haves OR has 2 or more Deal-Breakers.
+            
+            Return a JSON object with a "results" key containing an array of candidate decisions:
+            {{"results": [{{"candidate_id": <id>, "must_haves": "xxx", "nice_to_haves": "xxx", "deal_breakers": "xxx", "reasoning": "xxx", "fit_level": "Good Fit"}}]}}
+
+            Extra Notes:
+            - Be strict as these jobs have many applicants. Only candidates that truly meet the requirements should be rated as "Very Good Fit" or "Good Fit". If there are any significant gaps in must-haves, it should be reflected in the fit level and reasoning.
+            - Be objective and specific in your reasoning. Focus on concrete matches/mismatches between the candidate's profile and the job requirements. Avoid vague statements.
+            - Keep the JSON output concise. Fields shouldn't be phrases but just short descriptors, for example must haves "Bachelor's Degree in Computer Science, 5+ years of experience in software development". 
+              The reasoning should be very brief (max 3 sentences) but specific to the candidate's profile and the job description.
+            - If a feature is empty, missing or NaN in Degree, Major, Experience or History, assume the candidate does not have that feature. For example, if Degree is empty, assume no degree. If History is empty, assume no relevant job history.
+            - Assume all applicants are adults (18+), if specific age is missing.
+            - Assume availability is not an issue unless explicitly stated.
+            - Assume physical ability is not an issue.
+
+            Job Description:
+            {job_desc}
+
+            Candidate Profiles:
+            {profiles_text}
+\end{tcolorbox}
+
+This prompt contains explicit rules, notes and output format to ensure consistency. The prompt starts with a clear task definition and a precise fit level rules. This is followed by detailed instructions on the expected output format, including the required JSON structure and specific content for each field. By providing fields for must-haves, nice-to-haves, deal-breakers and reasoning, the prompt encourages the model to reason and explain its decisions rather than just outputting a label. Then extra notes are established to guide the model towards a more conservative and specific evaluation style. These notes were iteratively defined by inspecting model outputs and adjusting the prompt to address common issues. For example some rows have missing values in key features like Degree or Experience, and without explicit instructions the model would often ignore these and assume the candidate had a degree or relevant experience, leading to overly optimistic fit levels. By instructing the model to treat missing values as an absence of that feature, it produces more realistic assessments. Finaly both job descriptions and candidate profiles are included in the prompt. 
+
+An example output for a single candidate is shown below:
+ 
+\begin{listing}[H]
+\begin{minted}{json}
+{
+  "results": [
+    {
+      "candidate_id": 349089,
+      "must_haves": "5+ years software engineering, Python, system design",
+      "nice_to_haves": "AWS experience, team lead background",
+      "deal_breakers": "none",
+      "reasoning": "Candidate has 7 years Python experience and led a 4-person
+                    team. All must-haves met, several nice-to-haves covered.",
+      "fit_level": "Very Good Fit"
+    }
+  ]
+}
+\end{minted}
+\caption{Example LLM JSON output for a single candidate-job evaluation.}
+\label{lst:llm_json_output}
+\end{listing}
+ 
+The structured output format enforces consistency: every response contains an explicit must-haves assessment, a reasoning trace, and a fit level drawn from a fixed four-value vocabulary. Responses that fail JSON parsing or contain unexpected fit level values are discarded. The full prompt is reproduced in Appendix~\ref{app:recruiter_prompt}.
+ 
+\paragraph{Label distribution.}
+The resulting dataset contains \textbf{781} labeled pairs across \textbf{TODO} unique jobs. Table~\ref{tab:recruiter_label_dist} shows the fit level distribution. The positive class (Good and Very Good Fit) accounts for approximately 70\% of pairs, reflecting the natural tendency of actual applicants to have some relevant background. Class weights are applied during training to compensate for this imbalance, with weights set inversely proportional to class frequency.
+ 
+\begin{table}[htbp]
+    \centering
+    \caption{Label distribution of the LLM-generated dataset.}
+    \label{tab:recruiter_label_dist}
+    \begin{tabular}{lrr}
+        \toprule
+        \textbf{Fit Level} & \textbf{Count} & \textbf{Percentage} \\
+        \midrule
+        Very Good Fit & 305 & 39.05\% \\
+        Good Fit      & 238 & 30.47\% \\
+        Poor Fit      & 139 & 17.79\% \\
+        Very Poor Fit &  99 & 12.68\% \\
+        \midrule
+        \textbf{Total positive ($y=1$)} & 543 & 69.52\% \\
+        \textbf{Total negative ($y=0$)} & 238 & 30.48\% \\
+        \textbf{Grand total}            & 781 & 100\% \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+ 
+\paragraph{Validation set}
+A separate held-out small labeled set is generated for the qualitative sanity check targeting a disjoint sample of jobs from Windows~5--6. This set contains only real applicants with their \gls{LLM} labels — no synthetic negatives are added — providing a clean probe of whether the model correctly ranks good fits above poor ones among actual candidates on completely unseen jobs.
  
 \subsection{Experiment Setting}
 \label{sec:exp_recruiter_setting}
-TODO
  
-\subsection{Results}
-\label{sec:exp_recruiter_results}
-TODO
+\paragraph{Data split.}
+To evaluate generalisation to unseen jobs, a group-based split by job identity is used rather than a random instance split. All unique jobs are randomly shuffled and partitioned into 80\% training, 10\% validation, and 10\% test. All candidate-job pairs for a given job are placed in the same partition, ensuring the model is never evaluated on a job seen during training.
  
-\begin{table}[H]
+\paragraph{Negative sampling variants.}
+Two negative construction strategies are compared to isolate the effect of negative type:
+\begin{itemize}
+    \item \textbf{LLM negatives}: Poor and Very Poor Fit applicants as labeled by the \gls{LLM} — hard negatives from the real applicant pool.
+    \item \textbf{Synthetic negatives}: non-applicants sampled randomly from the broader user pool, filtered so that their job history shares no keywords with the job title — easy negatives.
+\end{itemize}
+Both variants use the same positive set and are evaluated against the same held-out test split, with XGBoost as the classifier.
+ 
+\paragraph{Training configuration.}
+Stratified 5-fold cross-validation is used for model selection, preserving the class ratio in each fold. All four candidate classifiers (Logistic Regression, Random Forest, XGBoost, soft-voting ensemble) are evaluated under the same protocol. All features are standardised using parameters estimated on the training fold only to prevent data leakage. The final model is retrained on all data and serialised together with the fitted preprocessing artifacts for inference.
+ 
+\paragraph{Evaluation metrics.}
+Performance is reported using Accuracy, Precision, Recall, F1-score, and AUC-ROC as defined in Section~\ref{sec:prelim_classification_metrics}. AUC-ROC is the primary model selection criterion.
+ 
+\subsection{Model Comparison}
+\label{sec:exp_recruiter_model_comparison}
+ 
+Table~\ref{tab:recruiter_results} reports 5-fold cross-validation results for all four classifiers trained on the \gls{LLM}-negative dataset. XGBoost achieves the highest AUC-ROC and is selected as the final model, confirming the choice described in Section~\ref{sec:recruiter_lightweight}. \textit{TODO: add 1--2 sentences of observation once numbers are available.}
+ 
+\begin{table}[htbp]
     \centering
-    \caption{Recruiter-side model comparison (5-fold cross-validation).}
+    \caption{Recruiter-side model comparison (5-fold cross-validation, LLM negatives).}
     \label{tab:recruiter_results}
     \begin{tabular}{lrrrrr}
         \toprule
@@ -314,6 +419,71 @@ TODO
         \bottomrule
     \end{tabular}
 \end{table}
+ 
+\subsection{Effect of Negative Sampling Strategy}
+\label{sec:exp_recruiter_negatives}
+ 
+Table~\ref{tab:recruiter_neg_comparison} compares XGBoost trained on \gls{LLM} negatives against the same model trained on synthetic negatives, evaluated on the same held-out test set. \textit{TODO: add observation once numbers are available.} This result is consistent with the design rationale in Section~\ref{sec:recruiter_balanced}: a model that must distinguish genuine qualification from surface-level interest learns a more discriminative boundary than one contrasting applicants against random non-participants.
+ 
+\begin{table}[htbp]
+    \centering
+    \caption{Effect of negative sampling strategy on XGBoost performance (held-out test set).}
+    \label{tab:recruiter_neg_comparison}
+    \begin{tabular}{lrrrrr}
+        \toprule
+        \textbf{Negative Type} & \textbf{Accuracy} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} & \textbf{AUC} \\
+        \midrule
+        Synthetic (non-applicants)   & TODO & TODO & TODO & TODO & TODO \\
+        LLM (Poor / Very Poor Fit)   & TODO & TODO & TODO & TODO & TODO \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+ 
+\subsection{Qualitative Sanity Check}
+\label{sec:exp_recruiter_sanity}
+ 
+To validate practical model behaviour, two complementary sanity checks are performed on jobs from the held-out Windows~5--6 validation set.
+ 
+\paragraph{Applicants vs.\ non-applicants.}
+For a sample of randomly selected jobs, the model scores both actual applicants and randomly drawn non-applicants. A well-functioning model should assign higher scores to applicants on average, since candidates who chose to apply have at least some level of self-assessed fit. Table~\ref{tab:recruiter_sanity_random} summarises the result.
+ 
+\begin{table}[htbp]
+    \centering
+    \caption{Sanity check: average suitability scores for applicants vs.\ random non-applicants.}
+    \label{tab:recruiter_sanity_random}
+    \begin{tabular}{lr}
+        \toprule
+        \textbf{Group} & \textbf{Avg.\ Suitability Score} \\
+        \midrule
+        Random non-applicants & TODO \\
+        Actual applicants     & TODO \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+ 
+\paragraph{LLM-labeled applicants.}
+A stricter check uses the held-out validation set from Section~\ref{sec:exp_recruiter_datagen}, which contains \gls{LLM} fit labels for actual applicants on unseen jobs. The model should rank Good and Very Good Fit candidates above Poor and Very Poor Fit candidates within the same applicant pool. Table~\ref{tab:recruiter_sanity_labeled} reports the average scores by fit group alongside threshold-based classification metrics at a decision threshold of 0.5.
+ 
+\begin{table}[htbp]
+    \centering
+    \caption{Labeled sanity check: average suitability scores and classification metrics by fit group (unseen jobs, actual applicants only).}
+    \label{tab:recruiter_sanity_labeled}
+    \begin{tabular}{lr}
+        \toprule
+        \textbf{Metric} & \textbf{Value} \\
+        \midrule
+        Avg.\ score — Good / Very Good Fit & TODO \\
+        Avg.\ score — Poor / Very Poor Fit & TODO \\
+        \midrule
+        Accuracy @ 0.5  & TODO \\
+        Precision       & TODO \\
+        Recall          & TODO \\
+        F1              & TODO \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+ 
+\textit{TODO: add 2--3 sentences of observation once numbers are available, noting whether the model correctly separates the two groups and what this implies for deployment alongside the user-side recommender.}
  
 % ============================================================
 \section{Congestion Balancing Experiments}
