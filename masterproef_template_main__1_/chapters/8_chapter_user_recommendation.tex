@@ -166,6 +166,32 @@ Job titles and descriptions often contain HTML markup, special characters and in
 
 The cleaned job titles are encoded into dense vectors using the Qwen3 Embedding model. The descriptions are not embedded because their contribution is deemed less significant than that of the titles. As with user job history, the embedding dimension is truncated to $d_{\text{text}}$ to balance the contribution of text against other input features. The embeddings from the Qwen model are unit-normalised to ensure comparable similarity scores across the job corpus. These Qwen embeddings capture semantic relationships between job titles enabling the job tower to learn meaningful job-to-job relationships beyond categorical attributes alone.
 
+\paragraph{Text embedding dimension.}
+The Qwen3 model produces 1536-dimensional embeddings by default. Using the full 
+vector would cause the text signal to dominate the input to both towers, since all 
+other features combined contribute far fewer dimensions. The embedding is therefore 
+truncated to $d_{\text{text}} = 100$ at encoding time, which retains the leading principal dimensions of 
+the output space.
+
+Table~\ref{tab:tower_input_dims} shows the resulting input dimension breakdown for 
+each tower. Text accounts for approximately 51\% of the user tower input and 76\% of 
+the job tower input — large enough to carry the semantic signal but not so large as 
+to suppress the structured features.
+
+\begin{table}[htbp]
+    \centering
+    \caption{Input dimension breakdown for each tower after feature encoding.}
+    \label{tab:tower_input_dims}
+    \begin{tabular}{lrrr}
+        \toprule
+        \textbf{Tower} & \textbf{Cat. Embeddings} & \textbf{Numerical} 
+                       & \textbf{Text ($d_{\text{text}}$)} \\
+        \midrule 
+        User & $6 \times 16 + 100$ & $6$ & $196$ \\
+        Job  & $2 \times 16 + 100$ & $2$ & $132$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
 \section{Training}
 \label{sec:user_training}
  

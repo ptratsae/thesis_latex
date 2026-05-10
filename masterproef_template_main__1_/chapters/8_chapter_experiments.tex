@@ -1,8 +1,8 @@
-\chapter{Experiments}
+\chapter{Experiments and Results}
 \label{chap:experiments}
 This chapter describes the experimental evaluation of the systems developed in previous chapters. First, the shared experiment settings are described in Section~\ref{sec:exp_settings} which includes the custom dataset split, dataset statistics, and hardware configuration. Then, experiments are presented for the user-side recommendation system (Section~\ref{sec:exp_user}), the recruiter-side recommendation system (Section~\ref{sec:exp_recruiter}), and the congestion balancing strategies (Section~\ref{sec:exp_congestion}).
 
-\section{Experiment Settings}
+\section{General Experiments Setting}
 \label{sec:exp_settings}
 
 \subsection{Dataset}
@@ -123,7 +123,7 @@ The 2:1:1 strategy ensures the training distribution is representative of the re
 
 \subsection{Hyperparameters and Training Settings}
 \label{sec:exp_user_hyperparameters}
-The model is trained for a maximum of 50 epochs with early stopping (patience~= 5) based on validation loss. The Adam optimiser is used with a learning rate of $1e^{-3}$ and a batch size of 1024. The embedding dimension $d$ is set to 64.
+The model is trained for a maximum of 50 epochs with early stopping (patience~= 5) based on validation loss. The Adam optimiser is used with a learning rate of $10^{-3}$ and a batch size of 1024. The embedding dimension $d$ is set to 64.
 \subsection{Ablation Study}
 \label{sec:exp_user_ablation}
  
@@ -147,7 +147,7 @@ A note on interpreting the ranking metrics: Hit@K, Recall@K and NDCG@K are compu
     \end{tabular}
 \end{table}
  
-Two findings emerge from the results. First, \textbf{L2 normalisation consistently hurts performance} regardless of whether location features are present. Normalising output embeddings to unit norm removes their magnitude, which prevents the model from encoding match confidence in the scale of the dot product. Without normalisation, the magnitude acts as an additional degree of freedom that the model can use to express certainty, benefiting both the loss and the ranking quality. This is a interesting finding considering that cosine similarity is a common practice to calculate embedding similarity \cite{you2025semanticsanglecosinesimilarity}.
+Two findings emerge from the results. First, \textbf{L2 normalisation consistently hurts performance} regardless of whether location features are present. Normalising output embeddings to unit norm removes their magnitude, which prevents the model from encoding match confidence in the scale of the dot product. Without normalisation, the magnitude acts as an additional degree of freedom that the model can use to express certainty, benefiting both the loss and the ranking quality. This is an interesting finding considering that cosine similarity is a common practice to calculate embedding similarity \cite{you2025semanticsanglecosinesimilarity}.
  
 Second, \textbf{including location features improves performance substantially} — \gls{ROC-AUC} rises from 0.8641 to 0.9242. The 2:1:1 strategy exposes the model to geographically diverse negatives during training. This prevents the model from learning city-density patterns and instead allows it to genuinely learn state-level geographic preference as a meaningful signal. The result is that the location-included model not only scores higher offline but also produces geographically sensible recommendations at inference, as confirmed by the qualitative evaluation in Section~\ref{sec:exp_user_inference}.
  
@@ -239,7 +239,7 @@ This user is based in Deer Park, TX, holds a high school diploma and has 18 year
 \end{table}
 
 \paragraph{User 831532 — cold-start robustness with no job history.}
-This user is based in Philadelphia, PA, holds a high school diploma and has only 2 years of recorded experience, with no job history entries in the dataset. This represents a genuine cold-start scenario: the model has no career trajectory to draw on and must rely entirely on profile features. Despite this, the top-10 recommendations are geographically coherent across the PA/NJ/DE tri-state area — the natural labour market for a Philadelphia resident — and semantically consistent with the applied-to jobs, which include residential youth care and community support roles. Notably, one of the three jobs the user actually applied to in Window~7 (Residential Youth Care Workers Needed, Conshohocken PA) appears at rank~7 in the recommendation list, despite being ranked against approximately 40,000 candidates. This result illustrates the value of the two-tower architecture in cold-start conditions: even without job history, the combination of location, education and basic profile features is sufficient to produce meaningful recommendations. A full breakdown of all ablation configurations across all metrics is provided in Table~\ref{app:tab:full_ablation} in the Appendix.
+This user is based in Philadelphia, PA, holds a high school diploma and has only 2 years of recorded experience, with no job history entries in the dataset. This represents a genuine cold-start scenario: the model has no career trajectory to draw on and must rely entirely on profile features. Despite this, the top-10 recommendations are geographically coherent across the PA/NJ/DE tri-state area — the natural labour market for a Philadelphia resident — and semantically consistent with the applied-to jobs, which include residential youth care and community support roles. Notably, one of the three jobs the user actually applied to in Window~7 (Residential Youth Care Workers Needed, Conshohocken PA) appears at rank~7 in the recommendation list, despite being ranked against approximately 40,000 jobs. This result illustrates the value of the two-tower architecture in cold-start conditions: even without job history, the combination of location, education and basic profile features is sufficient to produce meaningful recommendations. A full breakdown of all ablation configurations across all metrics is provided in Table~\ref{app:tab:full_ablation} in the Appendix.
  
 \begin{table}[H]
     \centering
@@ -284,6 +284,41 @@ This user is based in Philadelphia, PA, holds a high school diploma and has only
         \bottomrule
     \end{tabular}
 \end{table}
+
+\subsection{Limitations}
+\label{sec:exp_user_limitations}
+Despite strong quantitative performance and qualitatively sensible recommendations 
+for users with stable career histories, two structural limitations of the current 
+design are worth noting.
+
+\paragraph{Temporally flat job history representation.}
+The job history embedding is produced by encoding the three most recent job titles 
+as a single concatenated string and passing it through the Qwen encoder. This means 
+all three titles contribute equally to the resulting vector, regardless of how recent 
+they are and the duration of their employment. Recent jobs contain more signal about the user's current preferences and are more predictive of their next move, while older jobs may reflect past interests or even noise. The duration of each job is also relevant — a user with a 10-year tenure as a software engineer followed by a 3-month stint in retail likely has different preferences than a user with the opposite pattern. However, the CareerBuilder dataset does not provide employment duration in the user history, making this signal inaccessible to the current model.
+
+A natural extension would be to embed each title independently and compute a weighted 
+sum with recency weights, for example:
+\begin{equation}
+    \mathbf{e}_{\text{history}} = 0.5 \cdot \mathbf{e}_{t_1} 
+                                + 0.3 \cdot \mathbf{e}_{t_2} 
+                                + 0.2 \cdot \mathbf{e}_{t_3}
+\end{equation}
+where $\mathbf{e}_{t_1}$ is the embedding of the most recent title. This would 
+encode both the content and the direction of career movement into the user 
+representation. This limitation was not apparent in the two cases presented in 
+Section~\ref{sec:exp_user_inference}, as both users had coherent and stable 
+career histories. It is expected to surface most clearly in evaluation on users 
+with mixed or transitioning profiles.
+% TODO - add example of a user with a mixed/transitioning profile and how the current design fails to capture it
+
+\paragraph{City and State embedding sparsity.}
+City and state are encoded as categorical features with learned embeddings. Cities and states that appear rarely in Windows~1--4 have fewer training examples and therefore an undertrained embedding. For users located in such cities, the geographic signal 
+is weak and the model compensates by relying more heavily on the job history 
+representation — which then exposes the limitation above. This effect is expected 
+to be most pronounced for users outside major metropolitan areas.
+% TODO - add statistics on city frequency distribution and how many users are affected by this sparsity issue
+
 \section{Recruiter-Side Recommendation Experiments}
 \label{sec:exp_recruiter}
 % ============================================================
@@ -300,32 +335,37 @@ Because no ground-truth recruiter feedback exists in the dataset, training label
  
 \paragraph{Labeling setup}
 Labels are generated using the Qwen3.5 (35B) model served locally via the Ollama API. For computational feasibility, a sample of jobs is drawn from Windows~1--4; for each job, up to 20 applicants are evaluated in a single batched prompt. The \gls{LLM} receives the job description alongside all candidate profiles in the batch and returns a structured JSON response. The final prompt used is:
-\begin{tcolorbox}[colback=blue!5!white, colframe=blue!75!black, title=LLM Prompt for Recruiter-Side Labeling]
-Task: You are an HR recruiter. You need to check how good a person fits the job based on user profile and job description (IMPORTANT: Treat each job-user pair independently).
-            Assign a fit level:  -"Very Good Fit": Meets 100% of Must-Haves AND meets 50% or more of Nice-to-Haves AND has 0 Deal-Breakers.
-                                -"Good Fit": Meets 100% of Must-Haves (OR misses exactly 1 Must-Have but compensates with extensive relevant experience) AND has 0 Deal-Breakers.
-                                -"Poor Fit": Missing 2 or more Must-Haves OR has exactly 1 Deal-Breaker.
-                                -"Very Poor Fit": Missing 3 or more Must-Haves OR has 2 or more Deal-Breakers.
-            
-            Return a JSON object with a "results" key containing an array of candidate decisions:
-            {{"results": [{{"candidate_id": <id>, "must_haves": "xxx", "nice_to_haves": "xxx", "deal_breakers": "xxx", "reasoning": "xxx", "fit_level": "Good Fit"}}]}}
 
-            Extra Notes:
-            - Be strict as these jobs have many applicants. Only candidates that truly meet the requirements should be rated as "Very Good Fit" or "Good Fit". If there are any significant gaps in must-haves, it should be reflected in the fit level and reasoning.
-            - Be objective and specific in your reasoning. Focus on concrete matches/mismatches between the candidate's profile and the job requirements. Avoid vague statements.
-            - Keep the JSON output concise. Fields shouldn't be phrases but just short descriptors, for example must haves "Bachelor's Degree in Computer Science, 5+ years of experience in software development". 
-              The reasoning should be very brief (max 3 sentences) but specific to the candidate's profile and the job description.
-            - If a feature is empty, missing or NaN in Degree, Major, Experience or History, assume the candidate does not have that feature. For example, if Degree is empty, assume no degree. If History is empty, assume no relevant job history.
-            - Assume all applicants are adults (18+), if specific age is missing.
-            - Assume availability is not an issue unless explicitly stated.
-            - Assume physical ability is not an issue.
+{\small
+\begin{verbatim}
+Task: You are an HR recruiter. Evaluate how well each person fits the job
+based on their profile and the job description.
+(IMPORTANT: Treat each job-user pair independently.)
 
-            Job Description:
-            {job_desc}
+Assign a fit level:
+- "Very Good Fit": Meets 100% of Must-Haves AND 50%+ of Nice-to-Haves
+  AND 0 Deal-Breakers.
+- "Good Fit": Meets 100% of Must-Haves (OR misses 1 Must-Have but
+  compensates with extensive relevant experience) AND 0 Deal-Breakers.
+- "Poor Fit": Missing 2+ Must-Haves OR has exactly 1 Deal-Breaker.
+- "Very Poor Fit": Missing 3+ Must-Haves OR has 2+ Deal-Breakers.
 
-            Candidate Profiles:
-            {profiles_text}
-\end{tcolorbox}
+Return a JSON object:
+{"results": [{"candidate_id": <id>, "must_haves": "...",
+  "nice_to_haves": "...", "deal_breakers": "...",
+  "reasoning": "...", "fit_level": "Good Fit"}]}
+
+Notes:
+- Be strict. Only candidates that truly meet requirements get Good Fit.
+- Be objective. Focus on concrete matches/mismatches.
+- If Degree, Major, Experience or History is empty/NaN, assume the
+  candidate does not have that feature.
+- Assume all applicants are 18+, available, and physically able.
+
+Job Description: {job_desc}
+Candidate Profiles: {profiles_text}
+\end{verbatim}
+}
 
 This prompt contains explicit rules, notes and output format to ensure consistency. The prompt starts with a clear task definition and a precise fit level rules. This is followed by detailed instructions on the expected output format, including the required JSON structure and specific content for each field. By providing fields for must-haves, nice-to-haves, deal-breakers and reasoning, the prompt encourages the model to reason and explain its decisions rather than just outputting a label. Then extra notes are established to guide the model towards a more conservative and specific evaluation style. These notes were iteratively defined by inspecting model outputs and adjusting the prompt to address common issues. For example some rows have missing values in key features like Degree or Experience, and without explicit instructions the model would often ignore these and assume the candidate had a degree or relevant experience, leading to overly optimistic fit levels. By instructing the model to treat missing values as an absence of that feature, it produces more realistic assessments. Finaly both job descriptions and candidate profiles are included in the prompt. 
 
@@ -337,12 +377,14 @@ An example output for a single candidate is shown below:
   "results": [
     {
       "candidate_id": 349089,
-      "must_haves": "5+ years software engineering, Python, system design",
-      "nice_to_haves": "AWS experience, team lead background",
-      "deal_breakers": "none",
-      "reasoning": "Candidate has 7 years Python experience and led a 4-person
-                    team. All must-haves met, several nice-to-haves covered.",
-      "fit_level": "Very Good Fit"
+      "must_haves": "Associates degree, 6mo experience/leadership,
+                     valid license, work authorisation",
+      "nice_to_haves": "Bachelors degree, sales/CS background",
+      "deal_breakers": "None identified",
+      "reasoning": "Candidate profile shows degree and experience as
+                    empty. Job requires Associates degree and 6 months
+                    experience. Missing these core requirements.",
+      "fit_level": "Poor Fit"
     }
   ]
 }
@@ -351,7 +393,7 @@ An example output for a single candidate is shown below:
 \label{lst:llm_json_output}
 \end{listing}
  
-The structured output format enforces consistency: every response contains an explicit must-haves assessment, a reasoning trace, and a fit level drawn from a fixed four-value vocabulary. Responses that fail JSON parsing or contain unexpected fit level values are discarded. The full prompt is reproduced in Appendix~\ref{app:recruiter_prompt}.
+The structured output format enforces consistency: every response contains an explicit must-haves assessment, a reasoning trace, and a fit level drawn from a fixed four-value vocabulary. Responses that fail JSON parsing or contain unexpected fit level values are discarded.
  
 \paragraph{Label distribution.}
 The resulting dataset contains \textbf{781} labeled pairs across \textbf{TODO} unique jobs. Table~\ref{tab:recruiter_label_dist} shows the fit level distribution. The positive class (Good and Very Good Fit) accounts for approximately 70\% of pairs, reflecting the natural tendency of actual applicants to have some relevant background. Class weights are applied during training to compensate for this imbalance, with weights set inversely proportional to class frequency.
@@ -397,7 +439,7 @@ Both variants use the same positive set and are evaluated against the same held-
 Stratified 5-fold cross-validation is used for model selection, preserving the class ratio in each fold. All four candidate classifiers (Logistic Regression, Random Forest, XGBoost, soft-voting ensemble) are evaluated under the same protocol. All features are standardised using parameters estimated on the training fold only to prevent data leakage. The final model is retrained on all data and serialised together with the fitted preprocessing artifacts for inference.
  
 \paragraph{Evaluation metrics.}
-Performance is reported using Accuracy, Precision, Recall, F1-score, and AUC-ROC as defined in Section~\ref{sec:prelim_classification_metrics}. AUC-ROC is the primary model selection criterion.
+Performance is reported using Accuracy, Precision, Recall, F1-score, and AUC-ROC as defined in Section~\ref{sec:prelim_metrics}. AUC-ROC is the primary model selection criterion.
  
 \subsection{Model Comparison}
 \label{sec:exp_recruiter_model_comparison}

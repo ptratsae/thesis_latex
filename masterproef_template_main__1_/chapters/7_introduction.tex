@@ -29,6 +29,8 @@ Second, existing systems are unidirectional. They are built around one side of t
 
 Third, the data landscape is deeply asymmetric. Job seeker behaviour --- clicks, views, applications --- is relatively well documented. Recruiter behaviour --- which candidates are actually reviewed, shortlisted or hired --- is largely unobserved due to privacy concerns and the lack of explicit feedback. This asymmetry biases any system trained on available data towards the seeker side, further compounding the unidirectionality problem.
 
+Third, the data landscape is deeply asymmetric. Job seeker behaviour --- clicks, views, applications --- is captured at scale by job platforms and is relatively well documented. Recruiter behaviour, by contrast, is largely invisible: decisions about which candidates are reviewed, shortlisted or ultimately hired are typically made internally off-platform, and are further withheld due to privacy concerns. The result is that any system trained on publicly available data — including the dataset used in this work — sees only one side of the hiring conversation. This structural absence of recruiter signal biases learned models towards seeker preferences by default, further compounding the unidirectionality problem described above.
+
 \section{Research Contributions}
 \label{sec:intro:contributions}
 

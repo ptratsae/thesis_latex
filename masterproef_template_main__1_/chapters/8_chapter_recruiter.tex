@@ -1,11 +1,11 @@
 \chapter{Recruiter-Side Recommendation System}
 \label{chap:recruiter_recommendation}
 
-This chapter describes the recruiter-side recommendation system, which predicts the suitability of a candidate --- someone who has applied to a job --- for a given job posting. It complements the user-side system from Chapter~\ref{chap:user_recommendation}: where the user-side model learns which jobs a seeker is likely to apply to, the recruiter-side model learns which candidates are genuinely qualified for a role. Together, the two scores can be combined to produce recommendations that are relevant to the seeker \emph{and} viable from the recruiter's perspective --- a candidate who scores well on both dimensions represents a strong bilateral match. The interplay between these scores is explored further in Chapter~\ref{chap:conclusion}.
+This chapter describes the recruiter-side recommendation system, which predicts the suitability of a candidate for a given job posting from a recruiter's perspective. It complements the user-side system from Chapter~\ref{chap:user_recommendation}: where the user-side model learns which jobs a seeker is likely to apply to, the recruiter-side model learns which candidates are genuinely qualified for a role. Together, the two scores can be combined to produce recommendations that are relevant to the seeker \emph{and} viable from the recruiter's perspective --- a candidate who scores well on both dimensions represents a strong bilateral match. The interplay between these scores is explored further in Chapter~\ref{chap:congestion_balancing}.
 
 The recruiter system is designed as a lightweight, interpretable model that combines heuristic features based on domain knowledge with semantic features derived from neural embeddings. This hybrid approach balances predictive performance with computational efficiency and explainability. Rather than returning a ranked list of job postings, it assigns a suitability score to each candidate-job pair, which can be used to re-rank or filter a candidate pool for any given opening.
 
-Section~\ref{sec:recruiter_data_gen} motivates and describes the synthetic label generation pipeline. Section~\ref{sec:recruiter_lightweight} describes the model architecture. Section~\ref{sec:recruiter_features} details the feature engineering pipeline. Section~\ref{sec:recruiter_training_proc} outlines the training procedure. Experimental results are reported in Chapter~\ref{chap:experiments}.
+Section~\ref{sec:recruiter_data_gen} motivates and describes the synthetic label generation pipeline. Section~\ref{sec:recruiter_lightweight} describes the model architecture. Section~\ref{sec:recruiter_features} details the feature engineering pipeline. Section~\ref{sec:recruiter_training_proc} outlines the training procedure. Experiments and results are reported in Chapter~\ref{chap:experiments}.
 
 \section{Data Generation and Labeling}
 \label{sec:recruiter_data_gen}
@@ -19,21 +19,27 @@ To address this, an \gls{LLM} is used as a synthetic labeler. The \gls{LLM} is p
 
 The goal of the \gls{LLM} is to act as close as possible to a human recruiter. For each candidate-job pair, the \gls{LLM} is prompted to derive the role's must-haves, nice-to-haves, and deal-breakers directly from the job description and requirements. It then evaluates the candidate against each category using the user's profile. This design lets the criteria emerge from the posting itself rather than from a fixed taxonomy, which is more faithful to how a recruiter would read a job description. The \gls{LLM} is able to reason independently about how good a candidate is for a role using its knowledge of the world and the information provided.  
 
-Based on these evaluations, the \gls{LLM} assigns each pair one of four fit levels: \textit{Very Good Fit}, \textit{Good Fit}, \textit{Poor Fit}, or \textit{Very Poor Fit}. These are converted to binary labels: $y = 1$ for \textit{Very Good Fit} and \textit{Good Fit}; $y = 0$ for \textit{Poor Fit} and \textit{Very Poor Fit}.
+Based on these evaluations, the \gls{LLM} assigns each pair to a fit level In this case there are four levels: \textit{Very Good Fit}, \textit{Good Fit}, \textit{Poor Fit}, or \textit{Very Poor Fit}. These are converted to binary labels: $y = 1$ for \textit{Very Good Fit} and \textit{Good Fit}; $y = 0$ for \textit{Poor Fit} and \textit{Very Poor Fit}.
 
 \subsubsection{Prompt Design}
 
-The prompt was developed iteratively, with each revision guided by inspection of the \gls{LLM}'s outputs on sampled pairs. By asking the \gls{LLM} to reason through each evaluation step, we ensure consistency in its decision-making process. The key design insight is that without structured criteria, the \gls{LLM} applies inconsistent implicit thresholds across independently generated calls. Explicit \gls{CoT} instructions resolve this issue by forcing the model to reason through the same set of criteria for every pair and use explicit rules to convert those criteria into a final fit level. 
+The prompt was developed iteratively, with each revision guided by inspection of the \gls{LLM}'s outputs on sampled pairs. By asking the \gls{LLM} to reason through each evaluation step, we ensure consistency in its decision-making process and gain insights on how the model operates. The key design insight is that without structured criteria, the \gls{LLM} applies inconsistent implicit thresholds across independently generated calls. Explicit \gls{CoT} instructions resolve this issue by forcing the model to reason through the same set of criteria for every pair and use explicit rules to convert those criteria into a final fit level. 
 
-The final prompt instructs the model to identify must-haves, nice-to-haves, and deal-breakers for the role, and then assigns a fit level based on specific rules. During the design of the prompt, rules and extra instructions were added to address common failures (e.g. if a feature is missing, the model should assume it is not present). This was done based on the reasoning of the \gls{LLM} which was outputted together with the must-haves, nice-to-haves, deal-breakers and fitlevel. Crucially, each pair is evaluated independently to prevent cross-contamination of judgments. The full prompt is reproduced in Appendix~\ref{app:recruiter_prompt}.
+The final prompt instructs the model to identify must-haves, nice-to-haves, and deal-breakers for the role, followed by a reasoning step, and then assigns a fit level. During the design of the prompt, rules and extra instructions were added to address common failures (e.g. if a feature is missing, the model should assume it is not present). This was done based on the reasoning of the \gls{LLM}. Crucially, each pair is asked to be evaluated independently to prevent cross-contamination of judgments. The full prompt is explained in detail in Section~\ref{sec:exp_recruiter_datagen} of Chapter~\ref{chap:experiments}.
 
 \subsection{Balanced Dataset Construction}
 \label{sec:recruiter_balanced}
 
+Two different datasets are constructed for training and evaluation. The first one consists of the generated labels for a subsample of the candidate-job pairs, which is used for training and validation using cross-validation. The positives are sampled from pairs that the \gls{LLM} labels as \textit{Good Fit} or \textit{Very Good Fit}, while the negatives are sampled from pairs labeled as \textit{Poor Fit} or \textit{Very Poor Fit}. This dataset trains a recruiter-side which learns to predict the \gls{LLM}'s judgments based on the engineered features. 
+
+Another dataset is constructed by also using the rows for which the \gls{LLM} generated \textit{Good Fit} or \textit{Very Good Fit}  labels, but the negatives are random sampled from the full set of candidate-job pairs. This dataset is used to evaluate the model's ability to distinguish good candidates from the entire pool. This task is easier as the negatives are more likely to be truly unqualified. 
+
+In Section~\ref{sec:exp_recruiter}, both datasets are used for training to compare performance on both only applicants and the full candidate pool. The results show the performance is much higher when the model is trained on the full candidate pool, which is expected as the task is easier. However we use the model trained on the dataset with negatives sampled from the \gls{LLM} labels in Chapter~\ref{chap:congestion_balancing} because this is a closer approximation to a real recruitment scenario where the model needs to distinguish good candidates from a pool of applicants, rather than from the entire candidate base.  
+
 \section{Lightweight Recommender Architecture}
 \label{sec:recruiter_lightweight}
 
-The recruiter-side model is a binary classifier that takes a feature vector $\mathbf{f} \in \mathbb{R}^{F}$ as input and outputs a suitability probability $\hat{y} \in [0,1]$. A lightweight architecture is chosen due to the fact that the generated dataset is small (780 candidate-job pairs).
+The recruiter-side model is a binary classifier that takes a feature vector $\mathbf{f} \in \mathbb{R}^{F}$ as input and outputs a suitability probability $\hat{y} \in [0,1]$. A lightweight architecture is chosen due to the fact that the generated dataset is small (780 candidate-job pairs). A more complex model, such as a two-tower neural network, would be prone to overfitting and would not provide significant performance gains given the limited data.
 
 \subsection{Model Selection}
 
@@ -75,6 +81,13 @@ This feature captures explicit keyword matches --- programming languages, domain
 
 \paragraph{Total Years of Experience} The raw value $e_u$ is included alongside $\delta_{\text{exp}}$, since the experience delta is uninformative when no requirement is stated and an absolute experience level remains a useful stand-alone signal in those cases.
 
+\paragraph{Degree Match} This feature indicates whether the candidate's degree type matches any degree requirements stated in the job posting. The degree requirements are extracted using regex patterns. More specifically, if the user has the degree needed or a higher degree, the feature is set to 1. If the user has no degree but the job requires one, the feature is set to -1. If the user has a degree but the job does not require one, the feature is set to 0.5. If neither the user has a degree nor the job requires one, the feature is set to 0. This feature was added due to the fact that the \gls{LLM} labeler often considers degree requirements as a key criterion, however in the final model this feature is not used as it does not improve performance due to the regex patterns not being able to capture all the different ways degree requirements are stated in the job descriptions. 
+
+\paragraph{Experience Freshness} This feature captures the ratio of the candidate's experience to the years since graduation, which serves as a proxy for how recent and relevant the experience is:
+\begin{equation}
+    \text{experience\_freshness} = \frac{e_u}{\text{current\_year} - \text{graduation\_year} + 1}
+\end{equation}
+However this feature is not used in the final model as it does not improve performance. This is likely because the \gls{LLM} labeler does not consider this criterion as important, and therefore the model does not learn to use it either.
 \subsection{Semantic Features}
 \label{sec:recruiter_semantic}
 
@@ -92,13 +105,11 @@ Semantic features are derived from the neural embeddings introduced in Chapter~\
     \mathbf{m}_{uj} = \left[\mathbf{e}_u \odot \mathbf{e}_j \;\Big|\; |\mathbf{e}_u - \mathbf{e}_j|\right] \in \mathbb{R}^{2d_{\text{text}}}
 \end{equation}
 
-where $\odot$ denotes element-wise multiplication. Since $2d_{\text{text}}$ dimensions are high-dimensional and correlated, \gls{PCA} reduces the interaction vector to $d_{\text{pca}}$ components while preserving the dominant variance:
+where $\odot$ denotes element-wise multiplication. The dot product captures feature-level interactions, while the absolute difference captures distance in the embedding space. Since $2d_{\text{text}}$ dimensions are high-dimensional and correlated, \gls{PCA} reduces the interaction vector to $d_{\text{pca}}$ components while preserving the dominant variance:
 
 \begin{equation}
     \mathbf{p}_{uj} = \text{PCA}_{d_{\text{pca}}}(\mathbf{m}_{uj}) \in \mathbb{R}^{d_{\text{pca}}}
 \end{equation}
-
-The choice of $d_{\text{pca}}$ is discussed in Chapter~\ref{chap:experiments}.
 
 \paragraph{Full Profile Semantic Similarity} To capture holistic profile-level fit beyond job-title embeddings, a structured natural language document is constructed for each candidate and each job:
 
@@ -137,6 +148,8 @@ Table~\ref{tab:recruiter_features} summarises the complete feature set. The tota
         \bottomrule
     \end{tabular}
 \end{table}
+
+
 
 \section{Training Procedure}
 \label{sec:recruiter_training_proc}
