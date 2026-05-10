@@ -15,7 +15,7 @@ The two-tower model consists of two separate neural networks. The user tower pro
 \subsection{User Tower}
 \label{sec:user_tower}
 
-The user tower is a multi-layer feedforward network that transforms the input user feature vector $\mathbf{x}_u$ into a $d$-dimensional embedding $\mathbf{e}_u$. Categorical input features are first passed through learnable embedding layers (see Section~\ref{sec:prelim_embeddings}), producing dense representations for each categorical attribute. These are concatenated with the numerical features to form the full input vector. This vector is then processed true a sequence of fully-connected layers with batch normalisation, ReLU activations and dropout regularisation.
+The user tower is a multi-layer feedforward network that transforms the input user feature vector $\mathbf{x}_u$ into a $d$-dimensional embedding $\mathbf{e}_u$. Categorical input features are first passed through learnable embedding layers (see Section~\ref{sec:prelim_embeddings}), producing dense representations for each categorical attribute. These are concatenated with the numerical features to form the full input vector. This vector is then processed through a sequence of fully-connected layers with batch normalisation, ReLU activations and dropout regularisation.
 
 The layer progression narrows from a wide hidden representation down to the final $d$-dimensional output, acting as a bottleneck that forces the network to learn a compressed and meaningful summary of the user profile. The architecture is detailed in Algorithm~\ref{alg:user_tower}.
 
@@ -38,7 +38,23 @@ The layer progression narrows from a wide hidden representation down to the fina
 \subsection{Job Tower}
 \label{sec:job_tower}
 
-The job tower mirrors the user tower architecture exactly, processing job features $\mathbf{x}_j$ to produce a $d$-dimensional job embedding $\mathbf{e}_j$. The same pattern of categorical embeddings concatenated with numerical features, followed by the bottleneck \gls{MLP}, is applied. The only structural difference is the input dimension, which depends on the number of job-specific features. This symmetry is intentional: it ensures that user and job embeddings live in the same $d$-dimensional space, making the dot product a meaningful similarity measure.
+The job tower mirrors the user tower architecture exactly, processing job features $\mathbf{x}_j$ to produce a $d$-dimensional job embedding $\mathbf{e}_j$. The same pattern of categorical embeddings concatenated with numerical features, followed by the bottleneck \gls{MLP}, is applied. The only structural difference is the input dimension, which depends on the number of job-specific features. This symmetry is intentional: it ensures that user and job embeddings live in the same $d$-dimensional space, making the dot product a meaningful similarity measure. Below is the job tower architecture in Algorithm~\ref{alg:job_tower}.
+
+\begin{algorithm}[H]
+\caption{Job Tower Forward Pass}
+\label{alg:job_tower}
+\begin{algorithmic}[1]
+\Require Categorical features $\mathbf{c}_j$, numerical features $\mathbf{n}_j$
+\For{each categorical feature $c_k$ in $\mathbf{c}_j$}
+    \State $\mathbf{emb}_k \gets \text{Embedding}_{k}(c_k)$
+\EndFor
+\State $\mathbf{x}_j \gets [\mathbf{emb}_1, \ldots, \mathbf{emb}_K, \mathbf{n}_j]$ 
+\State $\mathbf{h}_1 \gets \text{Dropout}(\text{ReLU}(\text{BN}(\mathbf{W}_1 \mathbf{x}_j + \mathbf{b}_1)))$
+\State $\mathbf{h}_2 \gets \text{Dropout}(\text{ReLU}(\text{BN}(\mathbf{W}_2 \mathbf{h}_1 + \mathbf{b}_2)))$
+\State $\mathbf{e}_j \gets \mathbf{W}_3 \mathbf{h}_2 + \mathbf{b}_3$
+\Ensure Job embedding $\mathbf{e}_j \in \mathbb{R}^d$
+\end{algorithmic}
+\end{algorithm}
 
 \subsection{Prediction Layer}
 \label{sec:user_prediction}
@@ -68,7 +84,7 @@ User features are extracted and engineered to form a comprehensive representatio
 
 Raw user features such as demographics, education and location are merged with the user's employment history. The most recent job titles (up to three previous positions) are extracted and concatenated with recency labels to form a single career trajectory string:
 \begin{equation}
-\text{Recent\_JobTitle} = \text{``Latest: } t_1 \text{ | Second: } t_2 \text{ | Third: } t_3\text{''}
+\text{Recent\_JobTitle} = \text{``Current: } t_1 \text{ | Previous: } t_2 \text{ | Earlier: } t_3\text{''}
 \end{equation}
 where $t_1, t_2, t_3$ are the three most recent job titles in reverse chronological order. 
 
@@ -79,11 +95,12 @@ Several domain-specific features are constructed from raw attributes. Years of p
 \subsubsection{Encoding}
 \label{sec:user_embedding}
 
-Each feature type is processed according to its nature. Numerical features such as years of experience are standardised using z-score normalisation to ensure scale invariance at the \gls{MLP} input. Categorical features such as education level are label-encoded to integers and fed into learnable embedding layers  rather than the \gls{MLP} directly, so no further normalisation is required. Categorical features that appear in both the user and job feature sets are encoded using a shared vocabulary constructed jointly from both datasets, ensuring that the same value maps to the same integer index in both towers. Embeddings are normalised to ensure comparable similarity scores across the user corpus. The embedding dimension $d_{\text{text}}$ is chosen so that the text signal contributes meaningfully but does not dominate the other features. This choice is discussed in Chapter~\ref{chap:experiments}.
+Each feature type is processed according to its nature. Numerical features such as years of experience are standardised using z-score normalisation to ensure scale invariance at the \gls{MLP} input. Categorical features such as education level are label-encoded to integers and fed into learnable embedding layers  rather than the \gls{MLP} directly, so no further normalisation is required. Categorical features that appear in both the user and job feature sets are encoded using a shared vocabulary constructed jointly from both datasets, ensuring that the same value maps to the same integer index in both towers. 
+The embedding dimension $d_{\text{text}}$ is chosen so that the text signal contributes meaningfully but does not dominate the other features. This choice is discussed in Chapter~\ref{chap:experiments}.
 
 Table~\ref{tab:user_features} summarises the full user feature engineering pipeline.
  
-\begin{table}[htbp]
+\begin{table}[H]
     \centering
     \caption{User Feature Engineering Pipeline}
     \label{tab:user_features}
@@ -115,14 +132,39 @@ Table~\ref{tab:user_features} summarises the full user feature engineering pipel
 \subsection{Job Feature Processing}
 \label{sec:job_features_processing}
 
-Job features undergo the same encoding and scaling process as user features: numerical attributes are standardised using z-score normalisation, and categorical attributes are label-encoded to integers and passed through learnable embedding layers. As mentioned earlier, columns which appear in both the user and job feature sets are encoded using a shared vocabulary. 
+Job features undergo the same encoding and scaling process as user features: numerical attributes are standardised using z-score normalisation, and categorical attributes are label-encoded to integers and passed through learnable embedding layers. As mentioned earlier, columns which appear in both the user and job feature sets are encoded using a shared vocabulary. A summary of the job feature engineering pipeline is provided in Table~\ref{tab:job_features}.
+
+\begin{table}[H]
+    \centering
+    \caption{Job Feature Engineering Pipeline}
+    \label{tab:job_features}
+    \begin{tabular}{llllp{3.5cm}}
+        \toprule
+        \textbf{Category} & \textbf{Feature} & \textbf{Type} & \textbf{Processing} & \textbf{Output} \\
+        \midrule
+        \multirow{2}{*}{Location}
+            & City    & categorical & Shared LabelEncoder & int $[1, N]$ \\
+            & State   & categorical & Shared LabelEncoder & int $[1, N]$ \\
+        \midrule
+        \multirow{2}{*}{Dropped}
+            & Country & categorical & --- & removed \\
+            & Zip code & categorical & --- & removed \\
+        \midrule
+        Text & Job title & text & Qwen Embedding & $\mathbb{R}^{d_{\text{text}}}$ \\
+        \bottomrule
+    \end{tabular}
+    \begin{tablenotes}
+        \small
+        \item Country and zip code are removed as they are either redundant with City/State or near-zero variance at the scale of the dataset. Job descriptions and requirements are cleaned but not embedded; only the job title is used as the text signal.
+    \end{tablenotes}
+\end{table}
 
 \subsection{Text Cleaning and Embedding}
 \label{sec:text_embedding}
 
-Job titles and descriptions often contain HTML markup, special characters and inconsistent formatting. Text is cleaned by removing HTML tags, lowercasing and stripping whitespace before embedding.
+Job titles and descriptions often contain HTML markup, special characters and inconsistent formatting. Text is cleaned by removing HTML tags, lowercasing and stripping whitespace.
 
-The cleaned job titles are encoded into dense vectors using the Qwen3 Embedding model. As with user job history, the embedding dimension is truncated to $d_{\text{text}}$ to balance the contribution of text against other input features. The embeddings are unit-normalised to ensure comparable similarity scores across the job corpus. These Qwen embeddings capture semantic relationships between job titles enabling the job tower to learn meaningful job-to-job relationships beyond categorical attributes alone.
+The cleaned job titles are encoded into dense vectors using the Qwen3 Embedding model. The descriptions are not embedded because their contribution is deemed less significant than that of the titles. As with user job history, the embedding dimension is truncated to $d_{\text{text}}$ to balance the contribution of text against other input features. The embeddings from the Qwen model are unit-normalised to ensure comparable similarity scores across the job corpus. These Qwen embeddings capture semantic relationships between job titles enabling the job tower to learn meaningful job-to-job relationships beyond categorical attributes alone.
 
 \section{Training}
 \label{sec:user_training}
