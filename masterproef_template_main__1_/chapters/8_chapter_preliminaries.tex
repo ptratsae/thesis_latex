@@ -36,6 +36,25 @@ Table~\ref{tab:notation} summarises the key symbols used throughout.
         $K$ & Cutoff for ranking metrics (e.g.\ Hit@$K$) \\
         $d_{\text{pca}}$ & Output dimensionality of PCA reduction \\
         $F$ & Total number of features in the recruiter feature vector \\
+        \midrule
+        \multicolumn{2}{l}{\textit{Congestion and hybrid balancing}} \\
+        \midrule
+        $c_j$ & Number of applications received by job $j$ \\
+        $\mathbf{c} = (c_1,\ldots,c_J)$ & Vector of application counts over all jobs \\
+        $c_j^{(t)}$ & Applications to job $j$ at simulation step $t$ \\
+        $v_u$ & Number of shortlisting events received by candidate $u$ \\
+        $\mathbf{v} = (v_1,\ldots,v_U)$ & Vector of shortlisting counts over all candidates \\
+        $v_u^{(t)}$ & Shortlisting events for candidate $u$ at simulation step $t$ \\
+        $G(\mathbf{x})$ & Gini coefficient over distribution $\mathbf{x}$ \\
+        $\tau_{\min}, \tau_{\max}$ & Lower and upper zone thresholds (starved / congested) \\
+        $H$ & Hard cap; entities exceeding this are excluded from ranking \\
+        $B,\, P$ & Maximum boost and penalty magnitudes \\
+        $\delta(\cdot)$ & Congestion modification function \\
+        $s_{uj},\, \hat{s}_{uj}$ & Base and modified ranking score for $(u,j)$ pair \\
+        $r_{uj},\, \hat{r}_{uj}$ & Base and modified recruiter score for $(u,j)$ pair \\
+        $p_{\text{TT}}$ & Two-Tower shortlisting probability $\sigma(\hat{y}_{\text{TT}})$ \\
+        $p_{\text{rec}}$ & XGBoost recruiter shortlisting probability \\
+        $\alpha$ & Weighting parameter for bilateral combined score \\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -171,3 +190,51 @@ Ranking metrics evaluate the quality of a top-$K$ ranked list returned for a use
 where IDCG@$K$ is the DCG of the ideal (perfectly ranked) list, used for normalisation to $[0,1]$.
 
 An important caveat applies to all ranking metrics: their values depend heavily on the size of the candidate pool against which ranking is performed. Hit@$K$, Recall@$K$ and NDCG@$K$ computed against a small balanced validation set are considerably more optimistic than the same metrics computed against the full job pool at inference. This distinction is discussed further in Chapter~\ref{chap:experiments}, where the implications for interpreting training-time metrics are made explicit. AUC-ROC is less sensitive to this effect and is therefore used as the primary early stopping criterion.
+
+\subsection{Fairness Metrics}
+\label{sec:prelim_fairness}
+
+Beyond relevance-based metrics, this thesis evaluates recommendation systems
+with respect to market fairness — that is, how equitably they distribute
+attention across jobs and candidates. The primary fairness metric used is the
+\textbf{Gini coefficient}, adapted from income inequality measurement to
+quantify concentration in a distribution of counts.
+
+Given a non-negative count vector $\mathbf{x} = (x_1, \ldots, x_n)$, the Gini
+coefficient is defined as:
+\begin{equation}
+    G(\mathbf{x}) = \frac{n + 1 - 2\,\displaystyle\sum_{i=1}^{n}
+    x_{(i)}\,\big/\!\sum_{i=1}^{n} x_i}{n},
+    \label{eq:gini}
+\end{equation}
+where $x_{(1)} \leq x_{(2)} \leq \cdots \leq x_{(n)}$ is the sorted sequence.
+The vector $\mathbf{x}$ must include all entities, even those with a count of
+zero. A Gini of 0 represents perfect equality (every entity receives the same
+count); a Gini of 1 represents complete concentration (one entity receives
+everything). In a perfectly fair job market, both the distribution of
+applications across jobs and the distribution of shortlisting events across
+candidates would have a Gini of 0.
+
+\subsection{Congestion Zones}
+\label{sec:prelim_zones}
+
+To complement the Gini coefficient with an interpretable categorical measure,
+entities (jobs or candidates) are partitioned into three zones based on their
+count relative to two thresholds $\tau_{\min}$ and $\tau_{\max}$:
+
+\begin{itemize}
+    \item \textbf{Starved}: count $< \tau_{\min}$ — the entity receives
+    insufficient attention and risks being overlooked entirely.
+    \item \textbf{Safe}: $\tau_{\min} \leq$ count $\leq \tau_{\max}$ — the
+    entity receives a healthy, manageable level of attention.
+    \item \textbf{Congested}: count $> \tau_{\max}$ — the entity receives
+    more attention than it can reasonably handle, creating noise and
+    inefficiency.
+\end{itemize}
+
+The thresholds are set empirically from the data distribution: $\tau_{\min}$ is
+set to the median count and $\tau_{\max}$ to the 90th percentile, ensuring the
+safe zone captures the typical experience while flagging genuine outliers on
+both ends. Separate thresholds are used for the job-side and candidate-side
+distributions, as their natural scales differ. The specific values used in all
+congestion experiments are reported in Chapter~\ref{chap:congestion_balancing}.
