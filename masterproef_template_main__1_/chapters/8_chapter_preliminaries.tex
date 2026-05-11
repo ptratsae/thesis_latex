@@ -64,11 +64,11 @@ Table~\ref{tab:notation} summarises the key symbols used throughout.
 
 A \gls{RS} is a function that, given a user $u$, returns a ranked list of items from a catalogue, in this case jobs. The core challenge is predicting which items a user will find relevant before they have interacted with them. Three broad approaches exist in the literature.
 
-\textbf{Collaborative filtering} cite{glauber2019collaborativefilteringvscontentbased} exploits the collective behaviour of all users: if two users have historically applied to similar jobs, they are likely to find similar future jobs relevant. Pure collaborative filtering does not require any item or user features --- only the interaction matrix --- but it suffers from the cold-start problem: new users or new items with no interaction history cannot be represented. 
+\textbf{Collaborative filtering} \cite{glauber2019collaborativefilteringvscontentbased} exploits the collective behaviour of all users: if two users have historically applied to similar jobs, they are likely to find similar future jobs relevant. Pure collaborative filtering does not require any item or user features --- only the interaction matrix --- but it suffers from the cold-start problem: new users or new items with no interaction history cannot be represented. 
 
 \textbf{Content-based filtering} \cite{glauber2019collaborativefilteringvscontentbased} instead represents each user and item by their features and learns to match them directly. A new user can immediately receive recommendations based on their profile, bypassing the cold-start problem, but the system is limited to surface-level feature similarity and cannot discover preferences the user has not yet expressed.
 
-\textbf{Hybrid systems} combine both signals, typically by learning a joint representation that incorporates both interaction history and feature information cite{li2018hybridrecommendationmethodbased}. The two-tower neural architecture used in this thesis (Chapter~\ref{chap:user_recommendation}) is a state-of-the-art hybrid approach: it operates on user and job features, but the training objective is defined over observed application interactions.
+\textbf{Hybrid systems} combine both signals, typically by learning a joint representation that incorporates both interaction history and feature information \cite{li2018hybridrecommendationmethodbased}. The two-tower neural architecture used in this thesis (Chapter~\ref{chap:user_recommendation}) is a state-of-the-art hybrid approach: it operates on user and job features, but the training objective is defined over observed application interactions.
 
 \section{Two-Sided Markets and Congestion}
 \label{sec:prelim_twosided}
