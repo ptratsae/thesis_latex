@@ -1,31 +1,300 @@
 \chapter{Market Congestion and Hybrid Balancing}
 \label{chap:congestion_balancing}
-Now that both user-side (Chapter \ref{chap:user_recommendation}) and job-side (Chapter \ref{chap:recruiter_recommendation}) recommender systems have been build. The next step is analyzing the congestion created due to recommendation systems and mitigating it for both sides. In this chapter, we first analyze and mitigate both congestions separately, and then combine both mitigation strategies into a hybrid strategy that balances the market for both sides.
-As mentioned before, the strategies will be tested on window 7. Windows 1-6 will be used as past data and we will use those results to mitigate the congestion in window 7, as if we were in a real-time setting. The results of window 7 will then be used to evaluate the effectiveness of the mitigation strategies.
-\section{Job-Side Congestion Analysis}
-\label{sec:job_congestion}
-Job-side congestion occurs when a large number of users are recommended the same job, leading to an overwhelming number of applications for that job. This can result in a poor user experience, as users may feel that they have no chance of being selected for the job, and it can also lead to inefficiencies for employers who have to sift through a large number of applications. The reason for congestion on the job side is that the recommender system may be recommending the same popular jobs to many users, especially if those jobs have high relevance scores for a large portion of the user base. This can create a feedback loop where popular jobs become even more popular, while less popular jobs are overlooked.
 
-\subsection{Job-Side Congestion in our dataset}
+Now that both the user-side recommendation system
+(Chapter~\ref{chap:user_recommendation}) and the recruiter-side recommendation
+system (Chapter~\ref{chap:recruiter_recommendation}) have been developed, the
+next step is to mitigate the congestion that emerges as a consequence of
+recommendation at scale. As introduced in Section~\ref{sec:prelim_twosided},
+two distinct forms arise: job-side congestion, in which traffic concentrates on
+a small subset of job postings, and user-side congestion, in which recruiter
+attention concentrates on a small subset of candidates. Both forms are first
+addressed in isolation using the Gini-based measurement framework and
+market-maker intervention strategies defined in
+Sections~\ref{sec:prelim_fairness} and~\ref{sec:prelim_zones}. The two
+strategies are then combined into a dual-sided hybrid that balances the market
+simultaneously. Experimental evaluation is deferred to
+Chapter~\ref{chap:experiments}.
+
+% ============================================================
+\section{Job-Side Congestion}
+\label{sec:job_congestion}
+% ============================================================
+
+\subsection{Job-Side Congestion in the Dataset}
 \label{sec:job_congestion_dataset}
 
-\section{User-Side Congestion Analysis}
+Job-side congestion is measured over the distribution of applications per job
+posting, using the Gini coefficient $G(\mathbf{c})$ defined in
+Equation~\ref{eq:gini} and the safe/starved/congested zone classification from
+Section~\ref{sec:prelim_zones}. The zone boundaries are set to the median and
+90th percentile of the empirical application-count distribution in Window~7,
+yielding $\tau_{\min}^{\text{job}} = 2$ and $\tau_{\max}^{\text{job}} = 10$.
+
+Applying the historical Window~7 application records to this framework reveals a
+highly skewed distribution. Over 80\% of active job postings receive fewer than
+two applications, while a small fraction attract tens or hundreds. The Gini
+coefficient of the historical distribution is 0.8575, confirming extreme
+concentration. This baseline reflects the natural self-selection behaviour of job
+seekers: certain postings are intrinsically more appealing by title, location, or
+employer brand, and attract disproportionate organic interest. A recommender
+system operating without congestion awareness risks amplifying this imbalance
+further, as the experimental results in Section~\ref{sec:exp_job_congestion}
+demonstrate.
+
+\subsection{Market-Maker Intervention}
+\label{sec:job_congestion_intervention}
+
+To redistribute application traffic more equitably, a market-maker modification
+is applied to the job ranking score during the recommendation phase. At the
+moment user $u$ is being processed, let $c_j^{(t)}$ denote the number of
+applications job $j$ has already received from previously processed users in the
+current simulation run. The modified ranking score for the $(u, j)$ pair is:
+\begin{equation}
+    \hat{s}_{uj} = s_{uj} + \delta\!\left(c_j^{(t)}\right),
+\end{equation}
+where $s_{uj}$ is the base relevance score and $\delta(\cdot)$ is a congestion
+modification function. Jobs within the safe zone receive no modification
+($\delta = 0$). Starved jobs receive a positive boost to increase their
+visibility. Congested jobs receive a negative penalty to reduce further
+applications. Jobs exceeding a hard cap $H^{\text{job}}$ are removed from the
+ranking entirely. Three functional forms for $\delta$ are considered.
+
+\paragraph{Linear modification.}
+The penalty grows at a constant rate per unit of congestion beyond the safe
+zone:
+\begin{equation}
+    \delta_{\text{lin}}(c) = \begin{cases}
+        \min\!\bigl(\gamma_b \cdot (\tau_{\min} - c),\; B\bigr) & c < \tau_{\min}, \\
+        0 & \tau_{\min} \leq c \leq \tau_{\max}, \\
+        \max\!\bigl(-\gamma_p \cdot (c - \tau_{\max}),\; -P\bigr) & c > \tau_{\max},
+    \end{cases}
+\end{equation}
+where $B$ and $P$ are the maximum boost and penalty magnitudes respectively,
+and $\gamma_b$, $\gamma_p$ are the rates per unit of deviation from the safe
+zone.
+
+\paragraph{Quadratic modification.}
+The penalty grows quadratically, starting slowly for mildly congested jobs and
+accelerating as congestion increases:
+\begin{equation}
+    \delta_{\text{quad}}(c) = \begin{cases}
+        \min\!\bigl(\kappa_b \cdot (\tau_{\min} - c)^2,\; B\bigr) & c < \tau_{\min}, \\
+        0 & \tau_{\min} \leq c \leq \tau_{\max}, \\
+        \max\!\bigl(-\kappa_p \cdot (c - \tau_{\max})^2,\; -P\bigr) & c > \tau_{\max},
+    \end{cases}
+\end{equation}
+where $\kappa_b$ and $\kappa_p$ are scaling parameters.
+
+\paragraph{Sigmoid modification.}
+A smooth S-curve naturally bounds the modification within $[-P, B]$ without
+requiring explicit clamping:
+\begin{equation}
+    \delta_{\text{sig}}(c) = \begin{cases}
+        B \cdot \!\left(\dfrac{2}{1 + e^{-k(\tau_{\min} - c)}} - 1\right)
+            & c < \tau_{\min}, \\[6pt]
+        0 & \tau_{\min} \leq c \leq \tau_{\max}, \\[6pt]
+        -P \cdot \!\left(\dfrac{2}{1 + e^{-k(c - \tau_{\max})}} - 1\right)
+            & c > \tau_{\max},
+    \end{cases}
+\end{equation}
+where $k$ controls the steepness of the curve.
+
+All three functions share the same boundary values ($B$, $P$, $H^{\text{job}}$)
+but differ in how quickly the modification grows between the safe zone and the
+hard cap. The linear form reaches its maximum penalty after a fixed number of
+applications beyond $\tau_{\max}^{\text{job}}$. The quadratic form is lenient on
+moderate congestion but aggressive once jobs are heavily over-applied. The
+sigmoid form provides a smooth transition that saturates gradually. The parameter
+values used throughout all experiments are listed in
+Table~\ref{tab:modification_params_job}.
+
+\begin{table}[htbp]
+    \centering
+    \caption{Market-maker parameter values for job-side congestion mitigation.
+    Base scores are sigmoid-transformed Two-Tower logits in $[0, 1]$, so the
+    boost and penalty magnitudes are on the same probability scale.}
+    \label{tab:modification_params_job}
+    \begin{tabular}{lrl}
+        \toprule
+        \textbf{Parameter} & \textbf{Value} & \textbf{Description} \\
+        \midrule
+        $\tau_{\min}^{\text{job}}$ & 2     & Starved threshold (applications) \\
+        $\tau_{\max}^{\text{job}}$ & 10    & Congested threshold (applications) \\
+        $H^{\text{job}}$           & 50    & Hard cap (applications) \\
+        $B$                        & 0.25  & Maximum boost magnitude \\
+        $P$                        & 0.25  & Maximum penalty magnitude \\
+        $\gamma_p$ (linear)        & 0.025 & Penalty rate per application \\
+        $\kappa_p$ (quadratic)     & 0.0025 & Quadratic penalty scale \\
+        $k$ (sigmoid)              & 0.15  & Sigmoid steepness \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+% ============================================================
+\section{User-Side Congestion}
 \label{sec:user_congestion}
+% ============================================================
 
-\section{Hybrid Strategy}
+\subsection{User-Side Congestion in the Dataset}
+\label{sec:user_congestion_dataset}
+
+User-side congestion is measured over the distribution of shortlisting events
+per candidate, using the Gini coefficient $G(\mathbf{v})$ and the zone
+classification from Section~\ref{sec:prelim_zones}. The thresholds are set to
+$\tau_{\min}^{\text{cand}} = 1$ and $\tau_{\max}^{\text{cand}} = 5$,
+corresponding to the recruiter's per-job screen size of top-5.
+
+Simulating recruiter shortlisting on the historical Window~7 application pool —
+scoring each applicant with the XGBoost recruiter model and selecting the top-5
+per job — reveals a substantially unequal distribution of attention. In the
+free-market setting, 15.8\% of candidates receive zero shortlisting events
+despite having applied to at least one job, while 9.1\% are shortlisted across
+more than five jobs simultaneously. The Gini coefficient is 0.5393. This
+baseline reflects two interacting forces: the natural skew in candidate quality
+as assessed by the recruiter model, and the concentration of applications on
+popular postings that brings the same strong candidates into contact with many
+recruiters simultaneously. The experimental results in
+Section~\ref{sec:exp_user_congestion} evaluate the effectiveness of the
+market-maker strategies against this baseline.
+
+\subsection{Market-Maker Intervention}
+\label{sec:user_congestion_intervention}
+
+The same three functional forms applied to job-side congestion are adapted for
+the candidate side. At the moment job $j$'s inbox is being processed, let
+$v_u^{(t)}$ denote the number of times candidate $u$ has already been
+shortlisted in the current simulation run. The modified recruiter ranking score
+is:
+\begin{equation}
+    \hat{r}_{uj} = r_{uj} + \delta_{\text{cand}}\!\left(v_u^{(t)}\right),
+\end{equation}
+where $r_{uj}$ is the recruiter model's base suitability probability and
+$\delta_{\text{cand}}(\cdot)$ uses the same functional forms as
+Section~\ref{sec:job_congestion_intervention} but parameterised with
+candidate-side thresholds. The top-$k$ candidates by $\hat{r}_{uj}$ are
+shortlisted. As more job inboxes are processed, candidates who have been
+shortlisted frequently accumulate negative modifications, naturally redirecting
+attention toward candidates who have not yet been surfaced. The candidate-side
+parameter values are listed in Table~\ref{tab:modification_params_cand}.
+
+\begin{table}[htbp]
+    \centering
+    \caption{Market-maker parameter values for user-side congestion mitigation.
+    Base scores are XGBoost shortlisting probabilities in $[0, 1]$.}
+    \label{tab:modification_params_cand}
+    \begin{tabular}{lrl}
+        \toprule
+        \textbf{Parameter} & \textbf{Value} & \textbf{Description} \\
+        \midrule
+        $\tau_{\min}^{\text{cand}}$ & 1     & Starved threshold (shortlists) \\
+        $\tau_{\max}^{\text{cand}}$ & 5     & Congested threshold (shortlists) \\
+        $H^{\text{cand}}$           & 10    & Hard cap (shortlists) \\
+        $B$                         & 0.15  & Maximum boost magnitude \\
+        $P$                         & 0.25  & Maximum penalty magnitude \\
+        $\gamma_p$ (linear)         & 0.015 & Penalty rate per shortlist \\
+        $\kappa_p$ (quadratic)      & 0.0015 & Quadratic penalty scale \\
+        $k$ (sigmoid)               & 0.15  & Sigmoid steepness \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+% ============================================================
+\section{Dual-Sided Hybrid Strategy}
 \label{sec:hybrid_strategy}
+% ============================================================
 
-\subsection{Part A: Reducing Job Congestion}
+The job-side and user-side mitigations described above address each form of
+congestion in isolation, treating a single model's scores as the sole ranking
+signal. A more principled approach recognises that both forms of congestion
+share a common root: the scoring function considers only one side of the market
+at a time. The Two-Tower model reflects user preferences but is blind to whether
+the candidate is actually competitive for the role. The recruiter model reflects
+employer preferences but plays no role in shaping which users apply in the first
+place. The dual-sided hybrid strategy addresses both congestions simultaneously
+by combining both signals into a single bilateral score, and applies the
+market-maker modification to the appropriate component on each side.
+
+\subsection{Part A: Reducing Job Congestion with Bilateral Scoring}
 \label{sec:hybrid_job_congestion}
 
-Redirecting users to more starving jobs.
+In the hybrid strategy, the score used to rank jobs for each user incorporates
+both the user-side relevance signal and the recruiter-side suitability signal
+before the job-side market-maker modification is applied. The Two-Tower logit
+$\hat{y}_{\text{TT}}$ is transformed to a probability $p_{\text{TT}} =
+\sigma(\hat{y}_{\text{TT}}) \in [0,1]$, and the XGBoost recruiter model
+produces a shortlisting probability $p_{\text{rec}} \in [0,1]$. The combined
+ranking score for user $u$ on job $j$ is:
+\begin{equation}
+    s_{uj} = \alpha \cdot \bigl(p_{\text{TT}} +
+    \delta_{\text{job}}\!\left(c_j^{(t)}\right)\bigr)
+    + (1 - \alpha) \cdot p_{\text{rec}},
+    \label{eq:combined_score}
+\end{equation}
+where $\delta_{\text{job}}(\cdot)$ is the job congestion modification from
+Section~\ref{sec:job_congestion_intervention} and $\alpha \in [0,1]$ is a
+weighting parameter. Both signals are on the same $[0,1]$ probability scale,
+making the weighted average well-defined and interpretable.
 
-\subsection{Part B: Reducing User Congestion}
+The job congestion penalty is applied inside the Two-Tower component only. This
+is by design: job overflow is driven by users applying to popular jobs from
+their own perspective, so the correction acts on the user-side signal. The
+recruiter probability is left unmodified, as candidate fit is independent of how
+many other users are applying to the same job. After scoring, each user applies
+to their top-$k$ jobs by $s_{uj}$, simulating the real-world process in which
+users engage with a ranked recommendation list.
+
+A notable emergent property of Equation~\ref{eq:combined_score} is that it
+reduces job congestion even without an explicit penalty ($\delta_{\text{job}} =
+0$). Popular jobs attract many users because they score highly on the Two-Tower
+model; however, among those users, only a subset are genuinely competitive
+candidates as assessed by the recruiter model. For users with low recruiter
+suitability, the combined score is lower than the Two-Tower score alone,
+promoting other jobs in their ranking. The congestion reduction is therefore a
+natural consequence of bilateral quality filtering, prior to and independent of
+the market-maker mechanism.
+
+\subsection{Part B: Reducing User Congestion via Recruiter Shortlisting}
 \label{sec:hybrid_user_congestion}
 
-Solution to be found.
+Given the application pool produced by Part~A, the recruiter evaluates each
+job's inbox and shortlists the top-$k$ candidates. The candidate-level
+market-maker modification from Section~\ref{sec:user_congestion_intervention}
+is applied at this stage:
+\begin{equation}
+    \hat{r}_{uj} = p_{\text{rec}} +
+    \delta_{\text{cand}}\!\left(v_u^{(t)}\right).
+\end{equation}
+As the simulation progresses through more job inboxes, candidates who have been
+shortlisted frequently accumulate penalties, naturally redistributing
+shortlisting opportunities toward candidates who have not yet been surfaced.
 
-\subsection{Part C: Combining into Balanced Market Equilibrium}
+Candidate congestion is also reduced implicitly by the application pool from
+Part~A. Because the combined score filters out applications where the candidate
+has low recruiter suitability, job inboxes are smaller and more competitive.
+This creates more diverse shortlists in which the recruiter's top-$k$ selection
+reaches a wider range of candidates than it would from a larger, lower-quality
+applicant pool.
+
+\subsection{Part C: Combined Market Equilibrium}
 \label{sec:hybrid_balance}
 
-Combining both into a balanced market equilibrium.
+The full dual-sided hybrid strategy operates as a sequential two-phase pipeline.
+
+\textbf{Phase 1 — Job Recommendation.} For each user, jobs are ranked using the
+combined score from Equation~\ref{eq:combined_score}, with the job congestion
+modification active. The user applies to their top-$k$ jobs, where $k$ matches
+their historical application count. The output is a set of (user, job)
+application pairs and a distribution of applications per job.
+
+\textbf{Phase 2 — Recruiter Shortlisting.} The job inboxes produced by Phase~1
+are processed sequentially. For each inbox, applicants are ranked by the
+modified recruiter score $\hat{r}_{uj}$ and the top-5 candidates are
+shortlisted. The output is a distribution of shortlisting events per candidate.
+
+Both phases use the same market-maker strategy within a given simulation run:
+if the linear modification is active for job congestion in Phase~1, the linear
+modification is also active for candidate congestion in Phase~2. The weighting
+parameter $\alpha = 0.5$ is used throughout, giving equal weight to both models.
+The experimental validation of this pipeline is presented in
+Section~\ref{sec:exp_hybrid_results}.
