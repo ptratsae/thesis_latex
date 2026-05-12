@@ -21,7 +21,7 @@
 *.toc
 *.xdv
 main.pdf
-
+*.png
 
 # Minted cache
 _minted/
