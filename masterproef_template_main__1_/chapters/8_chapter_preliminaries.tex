@@ -3,8 +3,10 @@
 
 This chapter introduces the background knowledge, notation and evaluation metrics used throughout the thesis. The goal is to make the subsequent method chapters self-contained: a reader familiar with machine learning but not with recommender systems or two-sided markets should be able to follow the technical content without consulting external references.
 
+The chapter is organised as follows. Section~\ref{sec:prelim_notation} establishes notation. Section~\ref{sec:prelim_rs_background} covers concepts specific to recommender systems, including a taxonomy of filtering approaches and the two-sided market setting that motivates this work. Section~\ref{sec:prelim_ml_background} reviews the general machine learning techniques employed across the thesis. Section~\ref{sec:prelim_metrics} defines the evaluation metrics used in the experiments.
+
 \section{Notation}
-\label{sec:notation}
+\label{sec:prelim_notation}
 
 The following notation is used consistently across all chapters. Let $\mathcal{U}$ denote the set of all users (job seekers) and $\mathcal{J}$ denote the set of all jobs. An individual user is denoted $u \in \mathcal{U}$ and an individual job $j \in \mathcal{J}$. The set of jobs that user $u$ has applied to is written $\mathcal{J}^{+}_u \subseteq \mathcal{J}$. The set of jobs that the user $u$ didn't apply to are written as $\mathcal{J}^{-}_u \subseteq \mathcal{J}$ and defined as $\mathcal{J}^{-}_u = \mathcal{J} \setminus \mathcal{J}^{+}_u$.
 
@@ -59,18 +61,23 @@ Table~\ref{tab:notation} summarises the key symbols used throughout.
 %     \end{tabular}
 % \end{table}
 
-\section{Recommender Systems}
+\section{Recommender Systems Background}
+\label{sec:prelim_rs_background}
+
+This section introduces the concepts specific to recommender systems that underpin the thesis: a taxonomy of filtering approaches, and the two-sided market dynamics that shape the job recommendation problem.
+
+\subsection{Recommender Systems}
 \label{sec:prelim_rs}
 
 A \gls{RS} is a function that, given a user $u$, returns a ranked list of items from a catalogue, in this case jobs. The core challenge is predicting which items a user will find relevant before they have interacted with them. Three broad approaches exist in the literature.
 
-\textbf{Collaborative filtering} \cite{glauber2019collaborativefilteringvscontentbased} exploits the collective behaviour of all users: if two users have historically applied to similar jobs, they are likely to find similar future jobs relevant. Pure collaborative filtering does not require any item or user features --- only the interaction matrix --- but it suffers from the cold-start problem: new users or new items with no interaction history cannot be represented. 
+\textbf{Collaborative filtering} \cite{glauber2019collaborativefilteringvscontentbased} exploits the collective behaviour of all users: if two users have historically applied to similar jobs, they are likely to find similar future jobs relevant. Pure collaborative filtering does not require any item or user features --- only the interaction matrix --- but it suffers from the cold-start problem: new users or new items with no interaction history cannot be represented \cite{nadimi2014coldstartproblem}. 
 
 \textbf{Content-based filtering} \cite{glauber2019collaborativefilteringvscontentbased} instead represents each user and item by their features and learns to match them directly. A new user can immediately receive recommendations based on their profile, bypassing the cold-start problem, but the system is limited to surface-level feature similarity and cannot discover preferences the user has not yet expressed.
 
 \textbf{Hybrid systems} combine both signals, typically by learning a joint representation that incorporates both interaction history and feature information \cite{li2018hybridrecommendationmethodbased}. The two-tower neural architecture used in this thesis (Chapter~\ref{chap:user_recommendation}) is a state-of-the-art hybrid approach: it operates on user and job features, but the training objective is defined over observed application interactions.
 
-\section{Two-Sided Markets and Congestion}
+\subsection{Two-Sided Markets and Congestion}
 \label{sec:prelim_twosided}
 
 A two-sided market is a platform that serves two distinct groups of participants whose value derives from interacting with each other \cite{mashayekhi2023challengebasedsurveyerecruitmentrecommendation}. The job market is a canonical example: job seekers derive value from being matched to a suitable employer, and recruiters derive value from being matched to a suitable candidate. Unlike a one-sided market such as video streaming, where the same item can be consumed by arbitrarily many users simultaneously, the job market operates under \emph{capacity constraints}: each position can be filled by at most one candidate.
@@ -86,7 +93,12 @@ Two concrete manifestations of congestion are studied in this thesis:
 
 A key goal of this thesis is to propose strategies that reduce both forms of congestion while preserving recommendation relevance for individual users.
 
-\section{Neural Embeddings}
+\section{Machine Learning Background}
+\label{sec:prelim_ml_background}
+
+This section reviews the general machine learning techniques employed in the thesis: the representational tools used to encode user and item features, the lightweight models used for recruiter-side prediction, and the language model prompting strategy used to generate synthetic training labels.
+
+\subsection{Neural Embeddings}
 \label{sec:prelim_embeddings}
 
 A neural embedding is a learned mapping from a discrete or high-dimensional input to a dense, low-dimensional vector. Embeddings are the core representational tool used throughout this thesis. Two types appear:
@@ -95,7 +107,7 @@ A neural embedding is a learned mapping from a discrete or high-dimensional inpu
 
 \textbf{Pre-trained text embeddings} are used to encode natural language fields such as job titles, descriptions and work history. In this thesis, the Qwen3 Embedding model (0.6B parameters) is used to produce continuous vector representations of text. Further discussed in Chapter~\ref{chap:user_recommendation}).
 
-\section{Lightweight Machine Learning Models}
+\subsection{Lightweight Machine Learning Models}
 \label{sec:prelim_lightweight}
 % Need a very small section about Logistic Regression, Random Forest, XGB and Voting Classifier
 
@@ -105,7 +117,7 @@ In addition to the neural architecture used for user-side recommendation, this t
 \textbf{XGBoost} is a gradient boosting framework that builds an ensemble of weak learners (typically decision trees) in a stage-wise manner, optimising a differentiable loss function. It is known for its high performance on structured data and is used here as a strong baseline for recruiter-side recommendation.
 \textbf{Voting Classifier} is an ensemble method that combines the predictions of multiple models (in this case, Logistic Regression, Random Forest and XGBoost) by majority voting. This approach can improve robustness and generalisation by leveraging the strengths of different algorithms.
 
-\section{TF-IDF Representations}
+\subsection{TF-IDF Representations}
 \label{sec:prelim_tfidf}
 
 While neural embeddings capture semantic relationships through learned representations, a simpler and complementary approach is \textbf{Term Frequency–Inverse Document Frequency} (TF-IDF), a classical bag-of-words weighting scheme. Given a corpus of documents, the TF-IDF weight of a term $t$ in document $d$ is:
@@ -118,17 +130,17 @@ where $\text{TF}(t, d)$ is the frequency of term $t$ in document $d$ and $|\math
 
 Each document is represented as a sparse vector of TF-IDF weights over the full vocabulary. The similarity between two such vectors is then measured using cosine similarity, which captures keyword-level overlap between two texts in a computationally efficient manner. Unlike neural embeddings, TF-IDF requires no training and is fully interpretable, making it a useful complementary signal when explicit keyword matching is more informative than semantic proximity.
 
-\section{Large Language Models and Prompting}
+\subsection{Large Language Models and Prompting}
 \label{sec:prelim_llm}
  
 A Large Language Model (LLM) is a neural network trained on large amounts of text to predict the probability of the next token in a sequence. Through this objective, \gls{LLM} acquire generalised knowledge about language, facts and reasoning patterns. At inference time, an \gls{LLM} takes a natural language \emph{prompt} as input and generates a continuation --- making it usable as a reasoner without any task-specific retraining.
  
 In this thesis, an \gls{LLM} is used not as a recommender system in itself, but as a \textbf{label generator}. Because no ground-truth recruiter feedback exists in the available dataset, an \gls{LLM} is prompted to act as a recruiter and evaluate candidate-job fit using different features and assign a binary label to each pair. The quality of these synthetic labels determines the quality of the recruiter-side model trained on them, making the prompting strategy a critical design choice.
  
-\subsection{Naive Prompting and Its Limitations}
+\subsubsection{Naive Prompting and Its Limitations}
  
 A naive prompt instructs the model to perform a task in a single step: for example, \emph{``Given this candidate profile and job description, is this a good fit? Answer yes or no.''}. In practice, this approach produces inconsistent outputs for structured evaluation tasks. The model may apply different implicit criteria across examples as each prompt is independently generated when making different calls to the model. This leads to incosistent labels and noise, which consequently degrades the performance of models trained on the labeled data.
-\subsection{Chain-of-Thought Prompting}
+\subsubsection{Chain-of-Thought Prompting}
 \label{sec:prelim_cot}
  
 Chain-of-Thought (CoT) prompting addresses this issue by explicitly instructing the model to reason step by step before arriving at a conclusion \cite{wei2023chainofthoughtpromptingelicitsreasoning}. Rather than asking for a direct answer, the prompt structures the reasoning process which guides the \gls{LLM} to build up its answer from explicit intermediate steps.
