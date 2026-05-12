@@ -11,53 +11,53 @@ The following notation is used consistently across all chapters. Let $\mathcal{U
 Each user $u$ is associated with a feature vector $\mathbf{x}_u \in \mathbb{R}^{d_u}$ and each job $j$ with a feature vector $\mathbf{x}_j \in \mathbb{R}^{d_j}$, where $d_u$ and $d_j$ are the respective input dimensionalities. A recommendation model maps these features to dense embedding vectors $\mathbf{e}_u \in \mathbb{R}^{d}$ and $\mathbf{e}_j \in \mathbb{R}^{d}$ in a shared $d$-dimensional space. The compatibility score between a user and a job is then a function $s : \mathbb{R}^d \times \mathbb{R}^d \rightarrow \mathbb{R}$, typically the dot product $s(\mathbf{e}_u, \mathbf{e}_j) = \mathbf{e}_u \cdot \mathbf{e}_j$.
 
 Table~\ref{tab:notation} summarises the key symbols used throughout.
-
-\begin{table}[H]
-    \centering
-    \caption{Summary of notation used throughout the thesis.}
-    \label{tab:notation}
-    \begin{tabular}{cl}
-        \toprule
-        \textbf{Symbol} & \textbf{Meaning} \\
-        \midrule
-        $\mathcal{U}$ & Set of all users (job seekers) \\
-        $\mathcal{J}$ & Set of all jobs \\
-        $u, j$ & Individual user and job \\
-        $\mathcal{J}^{+}_u$ & Jobs applied to by user $u$ (positive interactions) \\
-        $\mathbf{x}_u, \mathbf{x}_j$ & Raw feature vectors for user and job \\
-        $\mathbf{e}_u, \mathbf{e}_j$ & Learned embedding vectors for user and job \\
-        $d$ & Embedding dimension (shared between towers) \\
-        $d_u, d_j$ & Input feature dimensionalities for user and job \\
-        $d_{\text{text}}$ & Dimensionality of text embeddings \\
-        $s(\mathbf{e}_u, \mathbf{e}_j)$ & Compatibility score between user $u$ and job $j$ \\
-        $\hat{y}$ & Predicted score or probability \\
-        $y \in \{0,1\}$ & Binary ground truth label \\
-        $N$ & Number of training examples \\
-        $K$ & Cutoff for ranking metrics (e.g.\ Hit@$K$) \\
-        $d_{\text{pca}}$ & Output dimensionality of PCA reduction \\
-        $F$ & Total number of features in the recruiter feature vector \\
-        \midrule
-        \multicolumn{2}{l}{\textit{Congestion and hybrid balancing}} \\
-        \midrule
-        $c_j$ & Number of applications received by job $j$ \\
-        $\mathbf{c} = (c_1,\ldots,c_J)$ & Vector of application counts over all jobs \\
-        $c_j^{(t)}$ & Applications to job $j$ at simulation step $t$ \\
-        $v_u$ & Number of shortlisting events received by candidate $u$ \\
-        $\mathbf{v} = (v_1,\ldots,v_U)$ & Vector of shortlisting counts over all candidates \\
-        $v_u^{(t)}$ & Shortlisting events for candidate $u$ at simulation step $t$ \\
-        $G(\mathbf{x})$ & Gini coefficient over distribution $\mathbf{x}$ \\
-        $\tau_{\min}, \tau_{\max}$ & Lower and upper zone thresholds (starved / congested) \\
-        $H$ & Hard cap; entities exceeding this are excluded from ranking \\
-        $B,\, P$ & Maximum boost and penalty magnitudes \\
-        $\delta(\cdot)$ & Congestion modification function \\
-        $s_{uj},\, \hat{s}_{uj}$ & Base and modified ranking score for $(u,j)$ pair \\
-        $r_{uj},\, \hat{r}_{uj}$ & Base and modified recruiter score for $(u,j)$ pair \\
-        $p_{\text{TT}}$ & Two-Tower shortlisting probability $\sigma(\hat{y}_{\text{TT}})$ \\
-        $p_{\text{rec}}$ & XGBoost recruiter shortlisting probability \\
-        $\alpha$ & Weighting parameter for bilateral combined score \\
-        \bottomrule
-    \end{tabular}
-\end{table}
+% TO DO FIX COMPILING ISSUE WITH TABLE
+% \begin{table}[H]
+%     \centering
+%     \caption{Summary of notation used throughout the thesis.}
+%     \label{tab:notation}
+%     \begin{tabular}{cl}
+%         \toprule
+%         \textbf{Symbol} & \textbf{Meaning} \\
+%         \midrule
+%         $\mathcal{U}$ & Set of all users (job seekers) \\
+%         $\mathcal{J}$ & Set of all jobs \\
+%         $u, j$ & Individual user and job \\
+%         $\mathcal{J}^{+}_u$ & Jobs applied to by user $u$ (positive interactions) \\
+%         $\mathbf{x}_u, \mathbf{x}_j$ & Raw feature vectors for user and job \\
+%         $\mathbf{e}_u, \mathbf{e}_j$ & Learned embedding vectors for user and job \\
+%         $d$ & Embedding dimension (shared between towers) \\
+%         $d_u, d_j$ & Input feature dimensionalities for user and job \\
+%         $d_{\text{text}}$ & Dimensionality of text embeddings \\
+%         $s(\mathbf{e}_u, \mathbf{e}_j)$ & Compatibility score between user $u$ and job $j$ \\
+%         $\hat{y}$ & Predicted score or probability \\
+%         $y \in \{0,1\}$ & Binary ground truth label \\
+%         $N$ & Number of training examples \\
+%         $K$ & Cutoff for ranking metrics (e.g.\ Hit@$K$) \\
+%         $d_{\text{pca}}$ & Output dimensionality of PCA reduction \\
+%         $F$ & Total number of features in the recruiter feature vector \\
+%         \midrule
+%         \multicolumn{2}{l}{\textit{Congestion and hybrid balancing}} \\
+%         \midrule
+%         $c_j$ & Number of applications received by job $j$ \\
+%         $\mathbf{c} = (c_1,\ldots,c_J)$ & Vector of application counts over all jobs \\
+%         $c_j^{(t)}$ & Applications to job $j$ at simulation step $t$ \\
+%         $v_u$ & Number of shortlisting events received by candidate $u$ \\
+%         $\mathbf{v} = (v_1,\ldots,v_U)$ & Vector of shortlisting counts over all candidates \\
+%         $v_u^{(t)}$ & Shortlisting events for candidate $u$ at simulation step $t$ \\
+%         $G(\mathbf{x})$ & Gini coefficient over distribution $\mathbf{x}$ \\
+%         $\tau_{\min}, \tau_{\max}$ & Lower and upper zone thresholds (starved / congested) \\
+%         $H$ & Hard cap; entities exceeding this are excluded from ranking \\
+%         $B,\, P$ & Maximum boost and penalty magnitudes \\
+%         $\delta(\cdot)$ & Congestion modification function \\
+%         $s_{uj},\, \hat{s}_{uj}$ & Base and modified ranking score for $(u,j)$ pair \\
+%         $r_{uj},\, \hat{r}_{uj}$ & Base and modified recruiter score for $(u,j)$ pair \\
+%         $p_{\text{TT}}$ & Two-Tower shortlisting probability $\sigma(\hat{y}_{\text{TT}})$ \\
+%         $p_{\text{rec}}$ & XGBoost recruiter shortlisting probability \\
+%         $\alpha$ & Weighting parameter for bilateral combined score \\
+%         \bottomrule
+%     \end{tabular}
+% \end{table}
 
 \section{Recommender Systems}
 \label{sec:prelim_rs}
