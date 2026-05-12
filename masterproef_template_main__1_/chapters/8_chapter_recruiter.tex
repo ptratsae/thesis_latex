@@ -1,9 +1,9 @@
 \chapter{Recruiter-Side Recommendation System}
 \label{chap:recruiter_recommendation}
 
-This chapter describes the recruiter-side recommendation system, which predicts the suitability of a candidate for a given job posting from a recruiter's perspective. It complements the user-side system from Chapter~\ref{chap:user_recommendation}: where the user-side model learns which jobs a seeker is likely to apply to, the recruiter-side model learns which candidates are genuinely qualified for a role. Together, the two scores can be combined to produce recommendations that are relevant to the seeker \emph{and} viable from the recruiter's perspective --- a candidate who scores well on both dimensions represents a strong bilateral match. The interplay between these scores is explored further in Chapter~\ref{chap:congestion_balancing}.
+This chapter describes the recruiter-side recommendation system, which predicts the suitability of a candidate for a given job posting from a recruiter's perspective. It complements the user-side system described in Chapter~\ref{chap:user_recommendation}: where the user-side model learns which jobs a seeker is likely to apply to, the recruiter-side model learns which candidates are genuinely qualified for a role. Together, the two scores can be combined to produce recommendations that are relevant to the seeker \emph{and} viable from the recruiter's perspective --- a candidate who scores well on both dimensions represents a strong bilateral match. The interplay between these scores is explored further in Chapter~\ref{chap:congestion_balancing}.
 
-The recruiter system is designed as a lightweight, interpretable model that combines heuristic features based on domain knowledge with semantic features derived from neural embeddings. This hybrid approach balances predictive performance with computational efficiency and explainability. Rather than returning a ranked list of job postings, it assigns a suitability score to each candidate-job pair, which can be used to re-rank or filter a candidate pool for any given opening.
+The recruiter system is designed as a lightweight, interpretable model that combines heuristic features based on domain knowledge with semantic features derived from neural embeddings. This hybrid approach balances predictive performance with computational efficiency and explainability. While the model is not a recomender in the traditional sense (it does not directly produce ranked lists), it serves as a critical component in the overall recommendation pipeline by providing a suitability score that can be used to filter and rank candidates from the recruiter's perspective for the user-side recommendations.
 
 Section~\ref{sec:recruiter_data_gen} motivates and describes the synthetic label generation pipeline. Section~\ref{sec:recruiter_lightweight} describes the model architecture. Section~\ref{sec:recruiter_features} details the feature engineering pipeline. Section~\ref{sec:recruiter_training_proc} outlines the training procedure. Experiments and results are reported in Chapter~\ref{chap:experiments}.
 
@@ -17,35 +17,31 @@ To address this, an \gls{LLM} is used as a synthetic labeler. The \gls{LLM} is p
 \subsection{LLM-Based Label Generation}
 \label{sec:recruiter_llm}
 
-The goal of the \gls{LLM} is to act as close as possible to a human recruiter. For each candidate-job pair, the \gls{LLM} is prompted to derive the role's must-haves, nice-to-haves, and deal-breakers directly from the job description and requirements. It then evaluates the candidate against each category using the user's profile. This design lets the criteria emerge from the posting itself rather than from a fixed taxonomy, which is more faithful to how a recruiter would read a job description. The \gls{LLM} is able to reason independently about how good a candidate is for a role using its knowledge of the world and the information provided.  
+For each candidate--job pair, the \gls{LLM} is prompted to derive a role's must-haves, nice-to-haves, and deal-breakers directly from the job description, and then to evaluate the candidate profile against those criteria. Letting the criteria emerge from the posting itself, rather than from a fixed taxonomy, more closely mirrors how a recruiter reads a job description.
 
-Based on these evaluations, the \gls{LLM} assigns each pair to a fit level In this case there are four levels: \textit{Very Good Fit}, \textit{Good Fit}, \textit{Poor Fit}, or \textit{Very Poor Fit}. These are converted to binary labels: $y = 1$ for \textit{Very Good Fit} and \textit{Good Fit}; $y = 0$ for \textit{Poor Fit} and \textit{Very Poor Fit}.
+Based on this evaluation, the \gls{LLM} assigns each pair one of four fit levels: \textit{Very Good Fit}, \textit{Good Fit}, \textit{Poor Fit}, or \textit{Very Poor Fit}. These are mapped to binary labels: $y = 1$ for the two positive classes and $y = 0$ for the two negative classes.
 
-\subsubsection{Prompt Design}
-
-The prompt was developed iteratively, with each revision guided by inspection of the \gls{LLM}'s outputs on sampled pairs. By asking the \gls{LLM} to reason through each evaluation step, we ensure consistency in its decision-making process and gain insights on how the model operates. The key design insight is that without structured criteria, the \gls{LLM} applies inconsistent implicit thresholds across independently generated calls. Explicit \gls{CoT} instructions resolve this issue by forcing the model to reason through the same set of criteria for every pair and use explicit rules to convert those criteria into a final fit level. 
-
-The final prompt instructs the model to identify must-haves, nice-to-haves, and deal-breakers for the role, followed by a reasoning step, and then assigns a fit level. During the design of the prompt, rules and extra instructions were added to address common failures (e.g. if a feature is missing, the model should assume it is not present). This was done based on the reasoning of the \gls{LLM}. Crucially, each pair is asked to be evaluated independently to prevent cross-contamination of judgments. The full prompt is explained in detail in Section~\ref{sec:exp_recruiter_datagen} of Chapter~\ref{chap:experiments}.
-
+\paragraph{Prompt design.}
+The prompt is developed iteratively, with each revision guided by inspection of outputs on sampled pairs. The key insight driving the design is that without structured criteria, the \gls{LLM} applies inconsistent implicit thresholds across independent calls. Explicit \gls{CoT} instructions resolve this by forcing the model to reason through the same criteria for every pair before assigning a fit level and explicit rules for evaluation make sure the model is consistent. The output is returned in JSON format. The full prompt is detailed in Section~\ref{sec:exp_recruiter_datagen}.
 \subsection{Balanced Dataset Construction}
 \label{sec:recruiter_balanced}
 
-Two different datasets are constructed for training and evaluation. The first one consists of the generated labels for a subsample of the candidate-job pairs, which is used for training and validation using cross-validation. The positives are sampled from pairs that the \gls{LLM} labels as \textit{Good Fit} or \textit{Very Good Fit}, while the negatives are sampled from pairs labeled as \textit{Poor Fit} or \textit{Very Poor Fit}. This dataset trains a recruiter-side which learns to predict the \gls{LLM}'s judgments based on the engineered features. 
+Two different datasets are constructed for training and evaluation. The first one consists of the generated labels for a subsample of the candidate-job pairs, which is used for training and validation using cross-validation. The positives are sampled from pairs that the \gls{LLM} labels as \textit{Good Fit} or \textit{Very Good Fit}, while the negatives are sampled from pairs labeled as \textit{Poor Fit} or \textit{Very Poor Fit}. This dataset trains a recruiter-side which learns to predict the \gls{LLM}'s judgments based on the engineered features. This distinction is the most challenging task, as the model needs to learn to distinguish good candidates from bad candidates among the pool of applicants, which is a more realistic scenario for recruitment. 
 
-Another dataset is constructed by also using the rows for which the \gls{LLM} generated \textit{Good Fit} or \textit{Very Good Fit}  labels, but the negatives are random sampled from the full set of candidate-job pairs. This dataset is used to evaluate the model's ability to distinguish good candidates from the entire pool. This task is easier as the negatives are more likely to be truly unqualified. 
+Another dataset is constructed by also using the rows for which the \gls{LLM} generated \textit{Good Fit} or \textit{Very Good Fit}  labels, but the negatives are random sampled from the full set of candidate-job pairs. This dataset is used to evaluate the model's ability to distinguish good candidates from the entire pool. This task is easier as the negatives are more likely to be truly unqualified.  
 
-In Section~\ref{sec:exp_recruiter}, both datasets are used for training to compare performance on both only applicants and the full candidate pool. The results show the performance is much higher when the model is trained on the full candidate pool, which is expected as the task is easier. However we use the model trained on the dataset with negatives sampled from the \gls{LLM} labels in Chapter~\ref{chap:congestion_balancing} because this is a closer approximation to a real recruitment scenario where the model needs to distinguish good candidates from a pool of applicants, rather than from the entire candidate base.  
+In Section~\ref{sec:exp_recruiter}, both datasets are used for training to compare performance on both only applicants and the full candidate pool. The results show the performance is higher when the model is trained on the full candidate pool, which is expected as the task is easier. However we use the model trained on the dataset with negatives sampled from the \gls{LLM} labels in Chapter~\ref{chap:congestion_balancing} because this is a closer approximation to a real recruitment scenario where the model needs to distinguish good candidates from a pool of applicants, rather than from the entire candidate base.  
 
 \section{Lightweight Recommender Architecture}
 \label{sec:recruiter_lightweight}
 
-The recruiter-side model is a binary classifier that takes a feature vector $\mathbf{f} \in \mathbb{R}^{F}$ as input and outputs a suitability probability $\hat{y} \in [0,1]$. A lightweight architecture is chosen due to the fact that the generated dataset is small (780 candidate-job pairs). A more complex model, such as a two-tower neural network, would be prone to overfitting and would not provide significant performance gains given the limited data.
+The recruiter-side model is a binary classifier that takes a feature vector $\mathbf{f} \in \mathbb{R}^{F}$ as input and outputs a suitability probability $\hat{y} \in [0,1]$. A lightweight architecture is chosen due to the fact that generating the dataset is time-consuming and the available data is limited. A more complex model, such as a two-tower neural network, would be prone to overfitting and would not provide significant performance gains given the limited data.
 
 \subsection{Model Selection}
 
 Several classifiers are considered as candidates: Logistic Regression, Random Forest, XGBoost, and a soft-voting ensemble of all three. Each is evaluated under the same group-based cross-validation protocol to ensure a fair comparison. The experimental comparison is reported in Chapter~\ref{chap:experiments}; based on those results, \textbf{XGBoost} is selected as the final model.
 
-XGBoost is a gradient-boosted decision tree ensemble that builds an additive sequence of shallow trees, each correcting the residual errors of the previous one. The predicted probability for a pair is:
+XGBoost is a gradient-boosted decision tree ensemble that builds an additive sequence of shallow trees \cite{Chen_2016}, each correcting the residual errors of the previous one. The predicted probability for a pair is:
 
 \begin{equation}
     \hat{y} = \sigma\!\left(\sum_{k=1}^{T} f_k(\mathbf{f})\right)
@@ -69,7 +65,7 @@ Heuristic features are based on explicit pattern matching and are fully interpre
     \delta_{\text{exp}} = e_u - e_j^{\text{req}}
 \end{equation}
 
-where $e_u$ is the candidate's total years of experience and $e_j^{\text{req}}$ is extracted from the job requirements text using a regex pattern that identifies phrases such as \textit{``5+ years of experience''} or \textit{``minimum 3 years required''}. When no requirement is stated, $\delta_{\text{exp}}$ is set to 0. A positive value indicates the candidate meets or exceeds the requirement; a negative value indicates a shortfall.
+where $e_u$ is the candidate's total years of experience and $e_j^{\text{req}}$ is extracted from the job requirements text using a regex pattern that identifies phrases such as \textit{``5+ years of experience''} or \textit{``minimum 3 years required''}. When no requirement is stated or found, $\delta_{\text{exp}}$ is set to 0. A positive value indicates the candidate meets or exceeds the requirement; a negative value indicates a shortfall.
 
 \paragraph{TF-IDF Keyword Overlap} Using the \gls{TF-IDF} representation introduced in Section~\ref{sec:prelim_tfidf}, keyword-level overlap between the candidate profile and the job posting is computed. A vectorizer is fit on all job postings in the training set; each candidate is represented by a document constructed from their job history and degree type. The cosine similarity between the two TF-IDF vectors yields:
 
@@ -79,7 +75,7 @@ where $e_u$ is the candidate's total years of experience and $e_j^{\text{req}}$ 
 
 This feature captures explicit keyword matches --- programming languages, domain terms, tool names --- that are often decisive in recruiter decisions but may not be captured by embedding-based similarity alone. It is used to complement the semantic features.
 
-\paragraph{Total Years of Experience} The raw value $e_u$ is included alongside $\delta_{\text{exp}}$, since the experience delta is uninformative when no requirement is stated and an absolute experience level remains a useful stand-alone signal in those cases.
+\paragraph{Total Years of Experience} The raw value $e_u$ is included alongside $\delta_{\text{exp}}$, since the experience delta is uninformative when no requirement is stated and an absolute experience level remains a useful stand-alone signal in those cases. This feature is part of the dataset, meaning no regex extraction is needed which makes it more reliable than the experience delta feature.
 
 \paragraph{Degree Match} This feature indicates whether the candidate's degree type matches any degree requirements stated in the job posting. The degree requirements are extracted using regex patterns. More specifically, if the user has the degree needed or a higher degree, the feature is set to 1. If the user has no degree but the job requires one, the feature is set to -1. If the user has a degree but the job does not require one, the feature is set to 0.5. If neither the user has a degree nor the job requires one, the feature is set to 0. This feature was added due to the fact that the \gls{LLM} labeler often considers degree requirements as a key criterion, however in the final model this feature is not used as it does not improve performance due to the regex patterns not being able to capture all the different ways degree requirements are stated in the job descriptions. 
 
@@ -142,9 +138,12 @@ Table~\ref{tab:recruiter_features} summarises the complete feature set. The tota
         $e_u$ & Heuristic & Candidate's total years of recorded experience \\
         $\delta_{\text{exp}}$ & Heuristic & Gap between candidate and required experience \\
         tfidf\_overlap & Heuristic & TF-IDF cosine similarity between candidate and job text \\
+        Degree Match & Heuristic & Binary indicator for degree match \\
+        Experience Freshness & Heuristic & Normalised time since last experience update \\
         cosine\_sim & Semantic & Qwen3 embedding cosine similarity \\
         full\_profile\_cosine\_sim & Semantic & MiniLM full-profile cosine similarity \\
         $\mathbf{p}_{uj}$ & Semantic & $d_{\text{pca}}$ PCA components of the embedding interaction matrix \\
+        % Add Degree Match and Experience Freshness but say (not used in final model) in the description
         \bottomrule
     \end{tabular}
 \end{table}
@@ -154,6 +153,11 @@ Table~\ref{tab:recruiter_features} summarises the complete feature set. The tota
 \section{Training Procedure}
 \label{sec:recruiter_training_proc}
 
-All features are standardised to zero mean and unit variance using parameters estimated on the training set only, to prevent data leakage into the scaler. The model is trained using binary cross-entropy loss with L2 regularisation. The data split strategy, cross-validation protocol, and model comparison results are described in Chapter~\ref{chap:experiments}.
+\paragraph{Data partitioning.}
+The dataset is partitioned at the job level: all pairs belonging to a given job are assigned exclusively to one split, so the model never observes the same job during both training and evaluation. Jobs are randomly assigned to a training set (70\%), a validation set (10\%), and a held-out test set (20\%), which is withheld until final evaluation.
 
-The trained model is serialised together with the fitted TF-IDF vectorizer, PCA transformer, and feature scaler, so that inference replicates the exact same feature extraction pipeline. At inference time, the model produces a suitability score for any candidate-job pair. This score is later combined with the user-side relevance score in Chapter~\ref{chap:congestion_balancing} to produce bilateral recommendations that serve both sides of the market.
+\paragraph{Cross-validation.}
+Model selection is carried out by 5-fold group cross-validation on the combined training and validation data, again grouped by job so that no job appears in both the fold training and fold evaluation portions. Within each fold, the TF-IDF vectorizer, PCA transformer, and feature scaler are each fitted exclusively on the fold's training portion and applied to the fold's evaluation portion, keeping cross-validation estimates free of leakage. Cross-validation results and model comparison are reported in Chapter~\ref{chap:experiments}.
+
+\paragraph{Final model.}
+As mentioned before, based on cross-validation results, XGBoost is selected and retrained on the full training and validation set. The TF-IDF vectorizer, PCA transformer, and feature scaler are refitted on this set; all features are standardised to zero mean and unit variance before training. The trained model and all fitted transformers are serialised together so that inference replicates the exact same feature extraction pipeline. Final performance on the held-out test set is reported in Chapter~\ref{chap:experiments}.
