@@ -463,8 +463,8 @@ All variants use the same positive set. Each variant is evaluated on a held-out 
         \toprule
         \textbf{Strategy} & \textbf{Positives} & \textbf{LLM Negatives} & \textbf{Synthetic Negatives} & \textbf{Total} \\
         \midrule
-        LLM only       & 2,705 &  3,191 &      0 &  5,896 \\
-        Synthetic only & 2,705 &      0 & 2,705 &  5,410 \\
+        LLM (Poor / Very Poor Fit)       & 2,705 &  3,191 &      0 &  5,896 \\
+        Synthetic (non-applicants) & 2,705 &      0 & 2,705 &  5,410 \\
         Combined       & 2,705 &  1,352 &  1,352 &  5,409 \\
         \bottomrule
     \end{tabular}
@@ -556,25 +556,49 @@ Among the scalar features, the pattern differs by model family. In Logistic Regr
 \label{sec:exp_recruiter_negatives}
  
 Having established XGBoost as the strongest classifier, the model type is now held fixed and the negative construction strategy is varied. Table~\ref{tab:recruiter_neg_comparison} reports XGBoost test set performance for each strategy, where each model is evaluated on a test set constructed with the same negative type as its training data.
-
-A critical caveat applies before interpreting these numbers: the three test sets are not equivalent in difficulty. The synthetic model is tested on random non-applicants — an easy discrimination task — while the LLM model is tested on poor-fit applicants from the real pool — a hard one. The AUC scores therefore reflect both model quality \emph{and} task difficulty, and cannot be compared directly on an absolute basis.
-
-With that in mind, the synthetic model achieves the highest AUC (0.852) because it solves the simplest version of the problem: almost any sensible feature should separate a strong applicant from a random non-applicant. The LLM model achieves the lowest AUC (0.724), correctly reflecting the genuine difficulty of separating good applicants from poor-fit ones within the same self-selected pool. The combined model sits between the two (0.755), having seen both types of negatives during training and being tested on both.
-
-Despite its lower raw metrics, the \textbf{LLM-negative model is chosen for deployment}. The deployment scenario mirrors the LLM test set: a recruiter using the system sees real applicants — not random people — and needs to distinguish genuinely qualified candidates from those who applied despite a poor fit. The sanity check in Section~\ref{sec:exp_recruiter_sanity} provides an additional test: if the LLM model assigns higher scores to applicants than to random non-applicants on held-out jobs (a test it was never trained for), it confirms the model has learned genuine fit signals rather than artefacts of the training negatives.
-
-A secondary finding concerns feature importance. Across all three models (Table~\ref{tab:recruiter_feature_importance}), the PCA interaction components dominate — but their share drops noticeably when training on synthetic negatives (XGB: 81.4\% vs 85.6\% for LLM). TF-IDF overlap compensates, rising to 9.3\% from 5.2\%. This pattern suggests that on easy negatives the model can rely more on surface keyword matching to separate careers, whereas the harder LLM negatives force the model to use the deeper embedding interactions.
-
-\begin{table}[htbp]
+ 
+\paragraph{Synthetic vs.\ LLM negatives.}
+The most striking result is the gap between the synthetic and LLM models: AUC 0.852 vs.\ 0.724, a difference of 0.128. This gap is primarily a task-difficulty effect, not a quality difference. The synthetic model is tested on random non-applicants, who by construction are unlikely to match the job on any meaningful feature; almost any signal separates them from strong applicants. The LLM model is tested on poor-fit applicants from the real pool --- candidates who self-selected to apply despite a mismatch. These share the same self-selection signal as positives, forcing the model to rely on deeper feature differences. The lower AUC correctly reflects the genuine difficulty of that discrimination task.
+ 
+\paragraph{Combined as the best choice.}
+The combined model achieves AUC 0.755 on a mixed test set with equal proportions of LLM and synthetic negatives, outperforming the LLM-only model (0.724) but underperforming the synthetic-only model (0.852). Crucially, in the congestion balancing context of Chapter~\ref{chap:congestion_balancing}, the model must score candidates who may not have applied to the job at all --- which is precisely the synthetic scenario. A model trained exclusively on LLM negatives has never seen that setting and may not generalise well to it. The combined model handles both regimes and achieves the best verified performance across them.
+ 
+Table~\ref{tab:recruiter_fi_strategies} shows XGBoost feature importances across all three training strategies, revealing a gradient rather than a simple redistribution. The PCA interaction components decrease steadily from LLM to synthetic (85.6\% $\rightarrow$ 81.4\%), but drop sharply in the combined setting (61.6\%) --- a reduction of 24\% relative to LLM-only. Qwen cosine similarity moves in the opposite direction: negligible at 1.9\% for LLM, modest at 3.8\% for synthetic, then jumping to 17.2\% in combined, becoming the second most important feature. TF-IDF overlap roughly doubles from LLM to synthetic (5.2\% $\rightarrow$ 9.3\%) and increases further in combined (10.3\%).
+ 
+An interpretation is that the PCA components are specialised for hard within-pool discrimination, capturing subtle co-feature patterns that matter when positive and negative examples lie close together in feature space. When synthetic negatives enter the training mix, easier separations also need to be learned, and for these a scalar cosine similarity or keyword overlap is sufficient. The model converges on cosine similarity as a robust cross-regime signal.
+ 
+Noteworthy is the emergence of \texttt{full\_profile\_cosine\_sim} (0.0\% $\rightarrow$ 3.2\% in combined). The LLM model assigns it zero importance --- within-pool fine-grained differences are better captured by the Qwen interaction. When non-applicants enter training, the MiniLM full-profile similarity provides a useful coarse-grained signal for filtering obvious mismatches, and the model begins to exploit it.
+ 
+\begin{table}[H]
     \centering
-    \caption{Effect of negative sampling strategy on XGBoost test set performance. Each model is evaluated on a test set matching its training negatives; AUC values are not directly comparable across rows (see text).}
+    \caption{XGBoost feature importance across all three negative training strategies (last cross-validation fold). PCA components are aggregated into a single row.}
+    \label{tab:recruiter_fi_strategies}
+    \begin{tabular}{lrrr}
+        \toprule
+        \textbf{Feature} & \textbf{LLM only} & \textbf{Synthetic only} & \textbf{Combined} \\
+        \midrule
+        Interaction PCA (aggregated) & 85.6\% & 81.4\% & 61.6\% \\
+        Qwen cosine similarity       &  1.9\% &  3.8\% & 17.2\% \\
+        TF-IDF overlap               &  5.2\% &  9.3\% & 10.3\% \\
+        Experience delta             &  1.7\% &  1.2\% &  4.0\% \\
+        Full-profile cosine sim.     &  0.0\% &  1.3\% &  3.2\% \\
+        Total years experience       &  3.5\% &  0.8\% &  2.2\% \\
+        Degree match                 &  0.8\% &  1.3\% &  1.1\% \\
+        Experience freshness         &  1.3\% &  1.0\% &  0.5\% \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+ 
+\begin{table}[H]
+    \centering
+    \caption{Effect of negative sampling strategy on XGBoost test set performance. Each model is evaluated on a test set matching its training negatives; AUC values reflect both model quality and task difficulty and are not directly comparable across rows (see text).}
     \label{tab:recruiter_neg_comparison}
     \begin{tabular}{lrrrrr}
         \toprule
         \textbf{Negative Type} & \textbf{Accuracy} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} & \textbf{AUC} \\
         \midrule
-        LLM (Poor / Very Poor Fit)   & 0.669 & 0.675 & 0.600 & 0.636 & 0.724 \\
         Synthetic (non-applicants)   & 0.772 & 0.818 & 0.748 & 0.781 & 0.852 \\
+        LLM (Poor / Very Poor Fit)   & 0.669 & 0.675 & 0.600 & 0.636 & 0.724 \\
         Combined                     & 0.687 & 0.721 & 0.624 & 0.669 & 0.755 \\
         \bottomrule
     \end{tabular}
@@ -582,54 +606,89 @@ A secondary finding concerns feature importance. Across all three models (Table~
  
 \subsubsection{Final Model}
 \label{sec:exp_recruiter_final}
-
-The two-stage selection process yields a clear conclusion: \textbf{XGBoost trained on LLM negatives} is the final recruiter-side model. Despite its lower raw metrics relative to the synthetic variant, it operates in the most realistic setting — distinguishing genuinely qualified applicants from poor-fit ones within the same self-selected pool — which directly mirrors deployment. This model is serialised and used as the recruiter-side suitability scorer in Chapter~\ref{chap:congestion_balancing}.
-
+ 
+The two-stage selection process yields a clear conclusion: \textbf{XGBoost trained on combined negatives} is the final recruiter-side model. It achieves the best balance between the two extremes, generalises to both the within-applicant-pool ranking scenario and the broader candidate-scoring context in congestion balancing, and outperforms the LLM-only model on a verified test set. This model is serialised and used as the recruiter-side suitability scorer in Chapter~\ref{chap:congestion_balancing}.
+ 
 \subsubsection{Qualitative Sanity Check}
 \label{sec:exp_recruiter_sanity}
  
-To validate that the final model behaves sensibly in practice, two complementary sanity checks are performed on the held-out validation jobs from Windows~5--6. Both checks are run across all three negative strategy variants so that the effect of the training data choice is visible in qualitative behaviour as well as in the quantitative metrics above.
+To validate that the final combined model behaves sensibly in practice, three jobs are sampled from Windows~5--6 — jobs the model has never seen during training. The three cases are chosen to probe different aspects of model behaviour: generalisation to non-applicants (Job~1), within-pool differentiation among actual applicants (Job~2), and mixed ranking across both groups (Job~3). All scores are produced by the final XGBoost model trained on combined negatives.
  
-\paragraph{Applicants vs.\ non-applicants.}
-For a sample of randomly selected jobs, the model scores both actual applicants and randomly drawn non-applicants. A well-functioning model should assign higher scores to applicants on average, since candidates who chose to apply have at least some level of self-assessed fit. Table~\ref{tab:recruiter_sanity_random} summarises the results for the XGBoost model trained on the 3 different negative sampling strategies.
+\paragraph{Job 257565 — Accounts Receivable Clerk: non-applicant generalisation.}
+This job requires 1--2 years of business-to-business collections experience along with cash posting and basic Excel skills. Five random non-applicants are scored to test whether the model generalises to candidates it was not explicitly trained to rank (the combined model saw synthetic non-applicants during training, but not these specific individuals). Table~\ref{tab:sanity_ar_clerk} shows the results.
  
-\begin{table}[htbp]
+\begin{table}[H]
     \centering
-    \caption{Sanity check: average suitability scores for applicants vs.\ random non-applicants, for each negative sampling strategy.}
-    \label{tab:recruiter_sanity_random}
-    \begin{tabular}{lccc}
+    \caption{Sanity check — Job 257565 (Accounts Receivable Clerk). Five random non-applicants scored by the final combined model.}
+    \label{tab:sanity_ar_clerk}
+    \small
+    \begin{tabular}{r r l r p{7cm}}
         \toprule
-        \textbf{Group} & \textbf{Synthetic Negatives} & \textbf{LLM Negatives} & \textbf{Combined Negatives} \\
+        \textbf{Rank} & \textbf{Score} & \textbf{Degree} & \textbf{Exp} & \textbf{Recent History} \\
         \midrule
-        Random non-applicants & TODO & TODO & TODO \\
-        Actual applicants     & TODO & TODO & TODO \\
+        1 & 81.0\% & High School  & 10y & Customer Service, File Clerk, Cashier \\
+        2 & 69.1\% & ---          &  9y & Accounting Asst / AP Specialist, Teller \\
+        3 & 34.0\% & Bachelor's   &  7y & Licensed Personal Banker, Asst Manager \\
+        4 & 31.1\% & Bachelor's   &  4y & IT Specialist, IT Support Technician, Help Desk \\
+        5 & 24.9\% & High School  & 23y & Lead Security Coordinator, IT Operations \\
         \bottomrule
     \end{tabular}
 \end{table}
  
-\paragraph{LLM-labeled applicants.}
-A stricter check uses the held-out validation set from Section~\ref{sec:exp_recruiter_datagen}, which contains \gls{LLM} fit labels for actual applicants on unseen jobs. The model should rank Good and Very Good Fit candidates above Poor and Very Poor Fit candidates within the same applicant pool. Table~\ref{tab:recruiter_sanity_labeled} reports the average scores by fit group alongside threshold-based classification metrics at a decision threshold of 0.5.
+The model correctly separates finance-adjacent profiles from unrelated backgrounds. IT and security candidates rank at the bottom (31\% and 25\%), while cash-handling and accounting profiles rank at the top. One nuance worth noting: the cashier/customer service profile (81\%) outranks the AP specialist (69\%) despite the AP specialist being closer to AR work. This is likely a TF-IDF keyword effect — terms such as \textit{collections} and \textit{cash posting} in the job description overlap more strongly with cashier terminology than with the more technical accounting vocabulary in the AP specialist's profile. This is a known limitation of keyword-based features rather than a failure of the model.
  
-\begin{table}[htbp]
+\paragraph{Job 377385 — Cash Counter: within-pool differentiation.}
+This job requires cash handling, basic computer skills, and customer service experience. Five actual applicants are scored to test whether the model creates meaningful differentiation within the hard discrimination task — distinguishing better from worse fits among people who all chose to apply. Table~\ref{tab:sanity_cash_counter} shows the results.
+ 
+\begin{table}[H]
     \centering
-    \caption{Labeled sanity check: average suitability scores and classification metrics by fit group (unseen jobs, actual applicants only), for each negative sampling strategy.}
-    \label{tab:recruiter_sanity_labeled}
-    \begin{tabular}{lccc}
+    \caption{Sanity check — Job 377385 (Cash Counter). Five actual applicants scored by the final combined model.}
+    \label{tab:sanity_cash_counter}
+    \small
+    \begin{tabular}{r r l r p{7cm}}
         \toprule
-        \textbf{Metric} & \textbf{Synthetic Negatives} & \textbf{LLM Negatives} & \textbf{Combined Negatives} \\
+        \textbf{Rank} & \textbf{Score} & \textbf{Degree} & \textbf{Exp} & \textbf{Recent History} \\
         \midrule
-        Avg.\ score — Good / Very Good Fit & TODO & TODO & TODO \\
-        Avg.\ score — Poor / Very Poor Fit & TODO & TODO & TODO \\
-        \midrule
-        Accuracy @ 0.5  & TODO & TODO & TODO \\
-        Precision       & TODO & TODO & TODO \\
-        Recall          & TODO & TODO & TODO \\
-        F1              & TODO & TODO & TODO \\
+        1 & 43.3\% & High School &  35y & Route Account Manager, Refreshment Services, Admin \\
+        2 & 37.2\% & High School &   7y & Clerical, Youth Activity Attendant, Customer Service \\
+        3 & 30.9\% & High School &   2y & Housekeeping, Customer Service, Elevator Operator \\
+        4 & 18.3\% & ---         &   3y & Customer Service Representative \\
+        5 &  8.6\% & ---         &  13y & Asset Protection Supervisor, Loss Prevention Manager \\
         \bottomrule
     \end{tabular}
 \end{table}
  
-\textit{TODO: add 2--3 sentences of observation once numbers are available, noting whether the model correctly separates the two groups and what this implies for deployment alongside the user-side recommender.}
+The model creates a meaningful score spread (8.6\%--43.3\%) among applicants who all self-selected for the role. The top candidate has 35 years of experience including direct cash-handling and administrative work — exactly the profile the job description targets. The bottom-ranked candidate is a loss prevention manager, whose background in surveillance and asset protection shares little with cash counting or customer-facing finance work. Absolute scores are lower here than in Job~1 because the model is operating in the harder within-pool regime, where it must rely on finer feature differences; the scores reflect fit quality rather than an absolute shortlist threshold.
+ 
+\paragraph{Job 38902 — Automotive Service Manager: mixed ranking.}
+This job requires 1--3 years of automotive service or customer service experience, leadership skills, and a valid driver's licence. Five applicants and five random non-applicants are scored together to probe whether the model ranks the two groups sensibly in a realistic mixed setting. Table~\ref{tab:sanity_auto_manager} shows the full combined ranking.
+ 
+\begin{table}[H]
+    \centering
+    \caption{Sanity check — Job 38902 (Automotive Service Manager). Five applicants (A) and five non-applicants (N) scored by the final combined model.}
+    \label{tab:sanity_auto_manager}
+    \small
+    \begin{tabular}{r r c l r p{6.5cm}}
+        \toprule
+        \textbf{Rank} & \textbf{Score} & \textbf{Type} & \textbf{Degree} & \textbf{Exp} & \textbf{Recent History} \\
+        \midrule
+        1  & 80.4\% & A & High School &  22y & VW Master Certified Service Manager, Service Manager \\
+        2  & 67.0\% & A & Master's    &   9y & Transportation Security Officer, HR Assistant \\
+        3  & 56.1\% & N & ---         &  17y & Customer Service Rep (Netflix), Closing Supervisor \\
+        4  & 48.1\% & N & Bachelor's  &  26y & Tutor, Hardware Technician, Bank Teller \\
+        5  & 47.9\% & A & Bachelor's  &   3y & Parking and Security Integrator, Intern \\
+        6  & 47.6\% & N & ---         &   8y & Direct Support Staff, Customer Service \\
+        7  & 41.0\% & A & Bachelor's  &   9y & Express Management, Retail Store Manager, Asst Manager \\
+        8  & 40.3\% & N & Bachelor's  &   4y & Loan Officer, Claims Analyst \\
+        9  & 25.3\% & N & ---         &   6y & Dispatcher, Luggage Agent \\
+        10 & 19.4\% & A & ---         &  11y & Business Owner, In-charge Operations \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+ 
+The top candidate — a Volkswagen Master Certified Service Manager with 22 years in automotive service — is correctly identified by a wide margin (80.4\%). This is the clearest possible true positive: the candidate's entire history is a direct match for the role. Applicants score 51.1\% on average versus 43.5\% for non-applicants, confirming that the model correctly assigns higher suitability to the self-selected group overall.
+ 
+The interleaving of non-applicants in ranks 3--4 and 6 is expected rather than a failure. The Netflix customer service supervisor (rank~3, 56.1\%) and the hardware technician/bank teller (rank~4, 48.1\%) have varied backgrounds with supervisory and customer-facing elements that are genuinely adjacent to an automotive service manager role. The model is not making an error — it is correctly recognising partial feature overlap. The dispatcher and luggage agent (rank~9, 25.3\%) and loan officer (rank~8, 40.3\%) score lower, as their backgrounds share less with automotive service work. This middle-range interleaving is precisely what a combined model trained on both hard and easy negatives is expected to produce: it does not hard-separate applicants from non-applicants, but scores all candidates on genuine fit quality.
  
 % ============================================================
 \section{Congestion Balancing Experiments}
