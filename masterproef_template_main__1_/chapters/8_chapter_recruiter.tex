@@ -79,13 +79,13 @@ This feature captures explicit keyword matches --- programming languages, domain
 
 \paragraph{Total Years of Experience} The raw value $e_u$ is included alongside $\delta_{\text{exp}}$, since the experience delta is uninformative when no requirement is stated and an absolute experience level remains a useful stand-alone signal in those cases. This feature is part of the dataset, meaning no regex extraction is needed which makes it more reliable than the experience delta feature.
 
-\paragraph{Degree Match} This feature indicates whether the candidate's degree type matches any degree requirements stated in the job posting. The degree requirements are extracted using regex patterns. More specifically, if the user has the degree needed or a higher degree, the feature is set to 1. If the user has no degree but the job requires one, the feature is set to -1. If the user has a degree but the job does not require one, the feature is set to 0.5. If neither the user has a degree nor the job requires one, the feature is set to 0. This feature was added due to the fact that the \gls{LLM} labeler often considers degree requirements as a key criterion, however in the final model this feature is not used as it does not improve performance due to the regex patterns not being able to capture all the different ways degree requirements are stated in the job descriptions. 
+\paragraph{Degree Match} This feature indicates whether the candidate's degree type matches any degree requirements stated in the job posting. The degree requirements are extracted using regex patterns. More specifically, if the user has the degree needed or a higher degree, the feature is set to 1. If the user has no degree but the job requires one, the feature is set to -1. If the user has a degree but the job does not require one, the feature is set to 0.5. If neither the user has a degree nor the job requires one, the feature is set to 0. This feature was added due to the fact that the \gls{LLM} labeler often considers degree requirements as a key criterion.
 
 \paragraph{Experience Freshness} This feature captures the ratio of the candidate's experience to the years since graduation, which serves as a proxy for how recent and relevant the experience is:
 \begin{equation}
     \text{experience\_freshness} = \frac{e_u}{\text{current\_year} - \text{graduation\_year} + 1}
 \end{equation}
-However this feature is not used in the final model as it does not improve performance. This is likely because the \gls{LLM} labeler does not consider this criterion as important, and therefore the model does not learn to use it either.
+
 \subsection{Semantic Features}
 \label{sec:recruiter_semantic}
 
