@@ -479,7 +479,7 @@ Performance is reported using Accuracy, Precision, Recall, F1-score, and AUC-ROC
 \subsection{Stage 1: Classifier Selection}
 \label{sec:exp_recruiter_model_comparison}
  
-All four candidate classifiers are compared on the \gls{LLM}-negative dataset, holding the training data fixed so that the only variable is the model type. Table~\ref{tab:recruiter_results_cv} reports 5-fold cross-validation results; Table~\ref{tab:recruiter_results_test} reports the held-out test set performance of the selected model.
+All four candidate classifiers are compared on the \gls{LLM}-negative dataset, holding the training data fixed so that the only variable is the model type. The choice of this dataset is motivated by the fact that this is a harder classification task compared to the synthetic negative dataset. Table~\ref{tab:recruiter_results_cv} reports 5-fold cross-validation results; Table~\ref{tab:recruiter_results_test} reports the held-out test set performance of the selected model.
 
 The Ensemble achieves the highest cross-validation AUC (0.696), but the gap over XGBoost (0.690) is 0.006 — well within the standard deviation of both models (0.017 and 0.019 respectively). This difference is not statistically meaningful. Random Forest is similarly tied on AUC (0.691) but has markedly lower Recall (0.528 vs.\ 0.588 for XGBoost), meaning it misses a larger fraction of genuinely qualified candidates. In a recruitment context, missing good candidates is the more costly error. XGBoost is therefore selected as the final classifier: it matches the Ensemble on AUC within noise, outperforms Random Forest on Recall, and provides native feature importance scores that support the interpretability of the model.
 
@@ -516,10 +516,10 @@ The Ensemble achieves the highest cross-validation AUC (0.696), but the gap over
 \subsubsection{Feature Importance}
 \label{sec:exp_recruiter_feature_importance}
 
-\paragraph{Interaction matrix PCA.}
+\paragraph{Interaction matrix PCA}
 The embedding interaction matrix $\mathbf{m}_{uj} \in \mathbb{R}^{2d_{\text{text}}}$ has 200 dimensions. \gls{PCA} is applied to reduce the interaction matrix to $d_{\text{pca}} = 80$ components, retaining 92.9\% of the total variance. This compression is justified on two grounds. First, the Hadamard product and absolute difference of the same pair of embeddings share significant covariance structure, meaning a large fraction of the 200 dimensions are redundant — a finding confirmed by the high variance retention at only 40\% of the original dimensionality. Second, reducing the feature space lowers the risk of XGBoost fitting to noise in the interaction dimensions, even with 5,896 training pairs.
 
-\paragraph{Feature importance.}
+\paragraph{Feature importance analysis}
 Table~\ref{tab:recruiter_feature_importance} shows the normalised feature 
 importance for each of the three base classifiers on the last cross-validation 
 fold. The \gls{PCA} interaction components dominate across all models — 
@@ -534,8 +534,7 @@ Among the scalar features, the pattern differs by model family. In Logistic Regr
 \begin{table}[htbp]
     \centering
     \caption{Normalised feature importance across classifiers (last cross-validation 
-    fold). PCA interaction components are aggregated into a single row. Features 
-    marked $\dagger$ contribute negligibly and are retained; see text for discussion.}
+    fold). PCA interaction components are aggregated into a single row.}
     \label{tab:recruiter_feature_importance}
     \begin{tabular}{lrrr}
         \toprule
@@ -548,9 +547,8 @@ Among the scalar features, the pattern differs by model family. In Logistic Regr
         TF-IDF overlap               &  5.5\% &  6.5\% &  5.2\% \\
         Experience freshness         &  1.3\% &  2.2\% &  1.3\% \\
         Experience delta             &  0.7\% &  0.6\% &  1.7\% \\
-        \midrule
-        Degree match$^\dagger$       &  2.6\% &  0.3\% &  0.8\% \\
-        MiniLM full-profile sim.$^\dagger$ &  0.4\% &  0.1\% &  0.0\% \\
+        Degree match       &  2.6\% &  0.3\% &  0.8\% \\
+        MiniLM full-profile similarity &  0.4\% &  0.1\% &  0.0\% \\
         \bottomrule
     \end{tabular}
 \end{table}
