@@ -22,7 +22,7 @@ For each candidate--job pair, the \gls{LLM} is prompted to derive a role's must-
 Based on this evaluation, the \gls{LLM} assigns each pair one of four fit levels: \textit{Very Good Fit}, \textit{Good Fit}, \textit{Poor Fit}, or \textit{Very Poor Fit}. These are mapped to binary labels: $y = 1$ for the two positive classes and $y = 0$ for the two negative classes.
 
 \paragraph{Prompt design.}
-The prompt is developed iteratively, with each revision guided by inspection of outputs on sampled pairs. The key insight driving the design is that without structured criteria, the \gls{LLM} applies inconsistent implicit thresholds across independent calls. Explicit \gls{CoT} instructions resolve this by forcing the model to reason through the same criteria for every pair before assigning a fit level and explicit rules for evaluation make sure the model is consistent. The output is returned in JSON format. The full prompt is detailed in Section~\ref{sec:exp_recruiter_datagen}.
+The prompt is developed iteratively, with each revision guided by inspection of outputs on sampled pairs. The key insight driving the design is that without structured criteria, the \gls{LLM} applies inconsistent implicit thresholds across independent calls. Explicit \gls{CoT} instructions resolve this by forcing the model to reason through the same criteria for every pair before assigning a fit level, and explicit rules for evaluation ensure the model is consistent. The output is returned in JSON format. The full prompt, together with an example output and the resulting label distribution, is given in Section~\ref{sec:exp_recruiter_datagen}.
 \subsection{Balanced Dataset Construction}
 \label{sec:recruiter_balanced}
 
@@ -30,7 +30,7 @@ Two different datasets are constructed for training and evaluation. The first on
 
 Another dataset is constructed by also using the rows for which the \gls{LLM} generated \textit{Good Fit} or \textit{Very Good Fit}  labels, but the negatives are random sampled from the full set of candidate-job pairs. This dataset is used to evaluate the model's ability to distinguish good candidates from the entire pool. This task is easier as the negatives are more likely to be truly unqualified.  
 
-In Section~\ref{sec:exp_recruiter}, both datasets are used for training to compare performance on both only applicants and the full candidate pool. The results show the performance is higher when the model is trained on the full candidate pool, which is expected as the task is easier. However we use the model trained on the dataset with negatives sampled from the \gls{LLM} labels in Chapter~\ref{chap:congestion_balancing} because this is a closer approximation to a real recruitment scenario where the model needs to distinguish good candidates from a pool of applicants, rather than from the entire candidate base.  
+In Section~\ref{sec:exp_recruiter_negatives}, both datasets are used for training to compare performance across the two negative construction strategies, with XGBoost held fixed as the classifier. The results confirm that performance is higher when trained on synthetic negatives, as expected given the easier task, but the model trained on \gls{LLM} negatives is the one carried forward into Chapter~\ref{chap:congestion_balancing}. This is because it more closely approximates the real recruitment scenario: a model that must distinguish genuinely qualified candidates from the broader applicant pool, rather than from the entire candidate base.  
 
 \section{Lightweight Recommender Architecture}
 \label{sec:recruiter_lightweight}
@@ -39,7 +39,7 @@ The recruiter-side model is a binary classifier that takes a feature vector $\ma
 
 \subsection{Model Selection}
 
-Several classifiers are considered as candidates: Logistic Regression, Random Forest, XGBoost, and a soft-voting ensemble of all three. Each is evaluated under the same group-based cross-validation protocol to ensure a fair comparison. The experimental comparison is reported in Chapter~\ref{chap:experiments}; based on those results, \textbf{XGBoost} is selected as the final model.
+Several classifiers are considered as candidates: Logistic Regression, Random Forest, XGBoost, and a soft-voting ensemble of all three. Each is evaluated under the same group-based cross-validation protocol to ensure a fair comparison. This constitutes the first of two selection steps in the experimental evaluation: Section~\ref{sec:exp_recruiter_model_comparison} reports the full comparison; based on those results, \textbf{XGBoost} is selected as the final classifier and held fixed for all subsequent experiments.
 
 XGBoost is a gradient-boosted decision tree ensemble that builds an additive sequence of shallow trees \cite{Chen_2016}, each correcting the residual errors of the previous one. The predicted probability for a pair is:
 
