@@ -104,7 +104,7 @@ All experiments are run on the Artificial Intelligence and Data Analytics Resear
  
 \subsection{Experiment Goal}
 \label{sec:exp_user_goal}
-The goal of the user-side experiments is to train and evaluate a two-tower model that can rank relevant jobs highly for cold-start users — users with no interaction history in the training period. The model is trained on Windows 1--4, validated on Windows 5--6, and evaluated on Window 7, where it must generalise to entirely new users and jobs. Success is measured primarily by \gls{ROC-AUC} during training, as this metric is least sensitive to the candidate pool size of the validation set combined with the practical utility of the model. The practical utility of the model is assessed qualitatively at inference time by inspecting recommendations for a sample of test users against the full Window 7 job pool.
+The goal of the user-side experiments is to train and evaluate a two-tower model that can rank relevant jobs highly for cold-start users — users with no interaction history in the training period. The model is trained on Windows 1--4, validated on Windows 5--6, and evaluated on Window 7 by doing sanity checks, where it must generalise to entirely new users and jobs. Success is measured primarily by \gls{ROC-AUC} during training, as this metric is least sensitive to the candidate pool size of the validation set combined with the practical utility of the model. The practical utility of the model is assessed qualitatively at inference time by inspecting recommendations for a sample of test users against the full Window 7 job pool.
  
 \subsection{Subsampling and Negative Sampling Strategy}
 \label{sec:negative_sampling}
@@ -156,7 +156,7 @@ Based on both quantitative and qualitative evidence, the final model \textbf{inc
 \subsection{Final Model Results}
 \label{sec:user_results}
  
-The final model is trained \textbf{with location features and without L2 normalisation}, as determined by the ablation study in Section~\ref{sec:exp_user_ablation}. The model is trained for a maximum of 50 epochs with early stopping (patience~= 5) and converges at epoch~19. Figure~\ref{fig:train_val_loss} shows the 
+The final model is trained \textbf{with location features and without L2 normalisation}, as determined by the ablation study in Section~\ref{sec:exp_user_ablation}. The model is trained for a maximum of 50 epochs with early stopping (patience~= 5) and converges at epoch~19. Figure~\ref{fig:trainval} shows the 
 training and validation loss curves across epochs.
 
 \begin{figure}[htbp]
@@ -165,6 +165,7 @@ training and validation loss curves across epochs.
     \caption{Training and validation loss curves for the final two-tower model. 
 The best validation checkpoint is saved at epoch~19. Training continues for 
 5 further epochs (patience~= 5) before early stopping halts at epoch~24.}
+    \label{fig:trainval}
 \end{figure}
 
 Table~\ref{tab:final_results_user} reports the validation set results at the best checkpoint.
@@ -302,7 +303,7 @@ Despite strong quantitative performance and qualitatively sensible recommendatio
 design are worth noting.
 
 \paragraph{Overfitting to the training distribution.}
-Figure~\ref{fig:train_val_loss} reveals a growing divergence between training and validation loss after approximately epoch~5. While validation loss plateaus 
+Figure~\ref{fig:trainval} reveals a growing divergence between training and validation loss after approximately epoch~5. While validation loss plateaus 
 around $0.27$, training loss continues to decrease to $0.20$, suggesting the model begins to overfit to the training windows. This is consistent with the 
 cold-start evaluation setup: the model is trained on Windows~1--4 and evaluated on entirely new users and jobs from Windows~5--7, meaning the distribution shift 
 between train and evaluation is structural rather than random. Dropout and batch normalisation partially mitigate this, but the gap suggests the model has 
@@ -336,6 +337,7 @@ representation — which then exposes the limitation above. This effect is expec
 to be most pronounced for users outside major metropolitan areas.
 % TODO - add statistics on city frequency distribution and how many users are affected by this sparsity issue
 
+\newpage
 \section{Recruiter-Side Recommendation Experiments}
 \label{sec:exp_recruiter}
 % ============================================================
@@ -343,7 +345,7 @@ to be most pronounced for users outside major metropolitan areas.
 \subsection{Experiment Goal}
 \label{sec:exp_recruiter_goal}
  
-The recruiter-side experiments address three questions. First, does the \gls{LLM}-based labeling pipeline produce a training signal rich enough to train a lightweight ranker — one that correctly separates qualified from unqualified applicants on jobs it has never seen? Second, which classifier best exploits the engineered feature set described in Section~\ref{sec:recruiter_features}? Third, does the choice of negative construction strategy — \gls{LLM}-evaluated hard negatives versus synthetically sampled non-applicants — have a measurable effect on ranking quality? Success is assessed both quantitatively via AUC-ROC as the primary metric, and qualitatively through a sanity check that inspects model scores on real applicant pools.
+The recruiter-side experiments address two design choices that must be made before a final model can be deployed. The first is \textbf{classifier selection}: given the engineered feature set described in Section~\ref{sec:recruiter_features}, which model family best exploits it? The second is \textbf{negative strategy selection}: given the chosen classifier, does the choice of negative construction — \gls{LLM}-evaluated hard negatives from the applicant pool, synthetically sampled non-applicants or a combination of both — have a measurable effect on ranking quality, and which strategy yields the more useful model? These two questions are answered sequentially in Sections~\ref{sec:exp_recruiter_model_comparison} and~\ref{sec:exp_recruiter_negatives}. Success is assessed both quantitatively via the metrics introduced in Section~\ref{sec:prelim_classification}, and qualitatively through sanity checks.
  
 \subsection{Data Generation}
 \label{sec:exp_recruiter_datagen}
@@ -413,7 +415,7 @@ An example output for a single candidate is shown below:
 The structured output format enforces consistency: every response contains an explicit must-haves assessment, a reasoning trace, and a fit level drawn from a fixed four-value vocabulary. Responses that fail JSON parsing or contain unexpected fit level values are discarded.
  
 \paragraph{Label distribution.}
-The resulting dataset contains \textbf{781} labeled pairs across \textbf{TODO} unique jobs. Table~\ref{tab:recruiter_label_dist} shows the fit level distribution. The positive class (Good and Very Good Fit) accounts for approximately 70\% of pairs, reflecting the natural tendency of actual applicants to have some relevant background. Class weights are applied during training to compensate for this imbalance, with weights set inversely proportional to class frequency.
+The resulting dataset contains \textbf{5,896} labeled pairs across \textbf{1511} unique jobs. Table~\ref{tab:recruiter_label_dist} shows the fit level distribution. The negative class (Poor and Very Poor Fit) accounts for 54.1\% of pairs, slightly outnumbering positives. This reflects the conservative evaluation style enforced by the prompt: missing values in profile fields are treated as absent features, and the model is instructed to be strict (see Sect~\ref{sec:exp_recruiter_prompt}). Poor Fit is the single most frequent label at 41.9\%, consistent with many applicants lacking one or more of the explicit must-haves extracted from the job description. Class weights are still applied during training to ensure each class contributes proportionally to the loss, with weights set inversely proportional to class frequency.
  
 \begin{table}[htbp]
     \centering
@@ -423,14 +425,14 @@ The resulting dataset contains \textbf{781} labeled pairs across \textbf{TODO} u
         \toprule
         \textbf{Fit Level} & \textbf{Count} & \textbf{Percentage} \\
         \midrule
-        Very Good Fit &  99 & 12.68\% \\
-        Good Fit      & 305 & 39.05\% \\
-        Poor Fit      & 238 & 30.47\% \\
-        Very Poor Fit & 139 & 17.79\% \\
+        Very Good Fit &   777 & 13.18\% \\
+        Good Fit      & 1,928 & 32.70\% \\
+        Poor Fit      & 2,472 & 41.93\% \\
+        Very Poor Fit &   719 & 12.19\% \\
         \midrule
-        \textbf{Total positive ($y=1$)} & 404 & 51.73\% \\
-        \textbf{Total negative ($y=0$)} & 377 & 48.27\% \\
-        \textbf{Grand total}            & 781 & 100\% \\
+        \textbf{Total positive ($y=1$)} & 2,705 & 45.88\% \\
+        \textbf{Total negative ($y=0$)} & 3,191 & 54.12\% \\
+        \textbf{Grand total}            & 5,896 & 100\% \\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -441,57 +443,71 @@ A separate held-out small labeled set is generated for the qualitative sanity ch
 \subsection{Experiment Setting}
 \label{sec:exp_recruiter_setting}
  
-\paragraph{Data split.}
-To evaluate generalisation to unseen jobs, a group-based split by job identity is used rather than a random instance split. All unique jobs are randomly shuffled and partitioned into 80\% training, 10\% validation, and 10\% test. All candidate-job pairs for a given job are placed in the same partition, ensuring the model is never evaluated on a job seen during training.
+\paragraph{Data split}
+To evaluate generalisation to unseen jobs, a group-based split by job identity is used rather than a random instance split. All unique jobs are randomly shuffled and partitioned into 80\% for cross-validation and final model training, and 20\% held-out test; all candidate-job pairs for a given job land in the same partition. The test set is used only once, after the final model has been chosen.
  
-\paragraph{Negative sampling variants.}
+\paragraph{Negative sampling variants}
 Three negative construction strategies are compared to isolate the effect of negative type:
 \begin{itemize}
     \item \textbf{LLM negatives}: Poor and Very Poor Fit applicants as labeled by the \gls{LLM} — hard negatives from the real applicant pool.
     \item \textbf{Synthetic negatives}: non-applicants sampled randomly from the broader user pool, filtered so that their job history shares no keywords with the job title — easy negatives.
-    \item \textbf{Combined negatives}: a balanced combination of LLM and synthetic negatives.
+    \item \textbf{Combined negatives}: an equal 50/50 mix of LLM and synthetic negatives (1,352 of each), exposing the model to both hard and easy discrimination during training.
 \end{itemize}
-All variants use the same positive set and are evaluated against the same held-out test split, with XGBoost as the classifier.
+All variants use the same positive set. Each variant is evaluated on a held-out test set of the same 20\% of jobs, but the test pairs differ by strategy: for the LLM-negative model the test negatives are Poor/Very Poor Fit applicants; for the synthetic model they are random non-applicants; for combined, a mix of both. This means each model is tested in its own operating regime rather than against a single shared test set. Table~\ref{tab:recruiter_dataset_sizes} summarises the resulting dataset sizes.
+
+\begin{table}[H]
+    \centering
+    \caption{Dataset composition for each negative construction strategy. The positive set is identical across all three variants.}
+    \label{tab:recruiter_dataset_sizes}
+    \begin{tabular}{lrrrr}
+        \toprule
+        \textbf{Strategy} & \textbf{Positives} & \textbf{LLM Negatives} & \textbf{Synthetic Negatives} & \textbf{Total} \\
+        \midrule
+        LLM only       & 2,705 &  3,191 &      0 &  5,896 \\
+        Synthetic only & 2,705 &      0 & 2,705 &  5,410 \\
+        Combined       & 2,705 &  1,352 &  1,352 &  5,409 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
  
-\paragraph{Training configuration.}
-Group 5-fold cross-validation is used for model selection, making sure jobs are not split across folds. All four candidate classifiers (Logistic Regression, Random Forest, XGBoost, soft-voting ensemble) are evaluated under the same protocol. All features are standardised using parameters estimated on the training fold only to prevent data leakage, except for \gls{TF-IDF} which is fitted on all jobs of windows 1--4. The reason for this is because these windows are considered as training data. \gls{PCA} is not fitted on all jobs, because this contains much more leakage information. The final model is retrained on all data and serialised together with the fitted preprocessing artifacts for inference.
+\paragraph{Training configuration}
+Group 5-fold cross-validation is used for model selection, ensuring jobs are not split across folds. All four candidate classifiers (Logistic Regression, Random Forest, XGBoost, soft-voting ensemble) are evaluated under the same protocol. All features are standardised using a \texttt{StandardScaler} fitted on each training fold only, to prevent data leakage into the validation fold. \gls{TF-IDF} is likewise fitted on the training fold's job texts within each fold and then used to transform both the training and validation fold. \gls{PCA} is also refitted per fold on the training partition of the interaction matrix. The final model is retrained on the full 80\% pool with \gls{TF-IDF}, \gls{PCA}, and the scaler all fitted on that same 80\%, and all artifacts are serialised for inference.
  
-\paragraph{Evaluation metrics.}
-Performance is reported using Accuracy, Precision, Recall, F1-score, and AUC-ROC as defined in Section~\ref{sec:prelim_metrics}. AUC-ROC is the primary model selection criterion.
+\paragraph{Evaluation metrics}
+Performance is reported using Accuracy, Precision, Recall, F1-score, and AUC-ROC as defined in Section~\ref{sec:prelim_metrics}. AUC-ROC is the primary model selection criterion. In the second stage of the experiment (negative strategy comparison), the same metrics are used to compare the final XGBoost model trained on each negative strategy, combined with a qualitative sanity check on different test sets to assess real-world ranking quality.
  
-\subsection{Model Comparison}
+\subsection{Stage 1: Classifier Selection}
 \label{sec:exp_recruiter_model_comparison}
  
-Table~\ref{tab:recruiter_results_cv} reports 5-fold cross-validation results for all four classifiers trained on the \gls{LLM}-negative dataset. Table~\ref{tab:recruiter_results_test} reports the results on the held-out test set. XGBoost achieves the highest AUC-ROC and is selected as the final model, confirming the choice described in Section~\ref{sec:recruiter_lightweight}. \textit{TODO: add 1--2 sentences of observation once numbers are available.}
- 
+All four candidate classifiers are compared on the \gls{LLM}-negative dataset, holding the training data fixed so that the only variable is the model type. Table~\ref{tab:recruiter_results_cv} reports 5-fold cross-validation results; Table~\ref{tab:recruiter_results_test} reports the held-out test set performance of the selected model.
+
+The Ensemble achieves the highest cross-validation AUC (0.696), but the gap over XGBoost (0.690) is 0.006 — well within the standard deviation of both models (0.017 and 0.019 respectively). This difference is not statistically meaningful. Random Forest is similarly tied on AUC (0.691) but has markedly lower Recall (0.528 vs.\ 0.588 for XGBoost), meaning it misses a larger fraction of genuinely qualified candidates. In a recruitment context, missing good candidates is the more costly error. XGBoost is therefore selected as the final classifier: it matches the Ensemble on AUC within noise, outperforms Random Forest on Recall, and provides native feature importance scores that support the interpretability of the model.
+
 \begin{table}[htbp]
     \centering
-    \caption{Recruiter-side model comparison (5-fold cross-validation, LLM negatives).}
+    \caption{Recruiter-side model comparison (5-fold cross-validation, LLM negatives). Mean $\pm$ standard deviation across folds.}
     \label{tab:recruiter_results_cv}
     \begin{tabular}{lrrrrr}
         \toprule
         \textbf{Model} & \textbf{Accuracy} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} & \textbf{AUC} \\
         \midrule
-        Logistic Regression & TODO & TODO & TODO & TODO & TODO \\
-        Random Forest       & TODO & TODO & TODO & TODO & TODO \\
-        XGBoost             & TODO & TODO & TODO & TODO & TODO \\
-        Ensemble            & TODO & TODO & TODO & TODO & TODO \\
+        Logistic Regression & $0.598 \pm 0.009$ & $0.554 \pm 0.027$ & $0.589 \pm 0.054$ & $0.569 \pm 0.024$ & $0.638 \pm 0.017$ \\
+        Random Forest       & $0.637 \pm 0.013$ & $0.619 \pm 0.036$ & $0.528 \pm 0.052$ & $0.567 \pm 0.021$ & $0.691 \pm 0.012$ \\
+        XGBoost             & $0.642 \pm 0.012$ & $0.610 \pm 0.024$ & $0.588 \pm 0.047$ & $0.597 \pm 0.021$ & $0.690 \pm 0.019$ \\
+        Ensemble            & $0.646 \pm 0.013$ & $0.619 \pm 0.032$ & $0.579 \pm 0.048$ & $0.596 \pm 0.019$ & $0.696 \pm 0.017$ \\
         \bottomrule
     \end{tabular}
 \end{table}
 
 \begin{table}[htbp]
     \centering
-    \caption{Recruiter-side model comparison on held-out test set, LLM negatives.}
+    \caption{Final XGBoost model performance on the held-out test set (LLM negatives). The test set is evaluated only for the selected model to avoid selection bias.}
     \label{tab:recruiter_results_test}
-    \begin{tabular}{lrrrrr}
+    \begin{tabular}{lrrrrrr}
         \toprule
         \textbf{Model} & \textbf{Accuracy} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} & \textbf{AUC} \\
         \midrule
-        Logistic Regression & TODO & TODO & TODO & TODO & TODO \\
-        Random Forest       & TODO & TODO & TODO & TODO & TODO \\
-        XGBoost             & TODO & TODO & TODO & TODO & TODO \\
-        Ensemble            & TODO & TODO & TODO & TODO & TODO \\
+        XGBoost & 0.669 & 0.675 & 0.600 & 0.636 & 0.724 \\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -501,71 +517,80 @@ Table~\ref{tab:recruiter_results_cv} reports 5-fold cross-validation results for
 \label{sec:exp_recruiter_feature_importance}
 
 \paragraph{Interaction matrix PCA.}
-The embedding interaction matrix $\mathbf{m}_{uj} \in \mathbb{R}^{2d_{\text{text}}}$ has 200 dimensions. With only 781 training pairs, using all 200 components as 
-features would risk overfitting. \gls{PCA} is therefore applied to reduce the 
-interaction matrix to $d_{\text{pca}} = 80$ components, retaining 92.9\% of the total variance. This value balances representational capacity against the 
-overfitting risk imposed by the small dataset. The high variance retention at 40\% of the original dimensionality reflects the inherent redundancy in the interaction matrix, as the Hadamard product and absolute difference of a 100-dimensional embedding share significant covariance structure.
+The embedding interaction matrix $\mathbf{m}_{uj} \in \mathbb{R}^{2d_{\text{text}}}$ has 200 dimensions. \gls{PCA} is applied to reduce the interaction matrix to $d_{\text{pca}} = 80$ components, retaining 92.9\% of the total variance. This compression is justified on two grounds. First, the Hadamard product and absolute difference of the same pair of embeddings share significant covariance structure, meaning a large fraction of the 200 dimensions are redundant — a finding confirmed by the high variance retention at only 40\% of the original dimensionality. Second, reducing the feature space lowers the risk of XGBoost fitting to noise in the interaction dimensions, even with 5,896 training pairs.
 
 \paragraph{Feature importance.}
 Table~\ref{tab:recruiter_feature_importance} shows the normalised feature 
 importance for each of the three base classifiers on the last cross-validation 
 fold. The \gls{PCA} interaction components dominate across all models — 
-accounting for 73.8\%, 85.0\%, and 88.8\% of total importance in Logistic 
+accounting for 69.2\%, 83.2\%, and 85.6\% of total importance in Logistic 
 Regression, Random Forest, and XGBoost respectively. This confirms that the 
 element-wise interaction between user and job Qwen embeddings captures the 
 majority of the discriminative signal, validating the design choice of computing 
 the full interaction matrix rather than relying solely on scalar cosine similarity.
 
-Among the scalar features, \texttt{tfidf\_overlap} and \texttt{TotalYearsExperience} 
-appear consistently in the top positions across all models, suggesting that 
-keyword-level overlap and raw experience are the most informative heuristic signals. 
-The full-profile MiniLM similarity (\texttt{full\_profile\_cosine\_sim}) contributes 
-the least across all three classifiers, indicating that the Qwen-based interaction 
-features already capture most of the semantic alignment signal.
+Among the scalar features, the pattern differs by model family. In Logistic Regression, the Qwen cosine similarity (12.6\%) is the second most important feature, suggesting the linear model benefits from the direct scalar similarity signal. In Random Forest and XGBoost, \texttt{tfidf\_overlap} ranks higher than cosine similarity, suggesting that tree-based models extract more value from explicit keyword matching once the dominant PCA signal is accounted for. \texttt{TotalYearsExperience} ranks consistently across all three models. Both \texttt{degree\_match} and \texttt{full\_profile\_cosine\_sim} contribute negligibly across all classifiers --- under 2.6\% in the best case, and zero in XGBoost --- indicating they are subsumed by the PCA interaction and TF-IDF features. Despite their low importance, both features are retained in the final model. XGBoost's built-in regularisation already suppresses low-importance features during training, so removing them would not meaningfully change performance. Retaining them also preserves consistency with the feature engineering pipeline described in Section~\ref{sec:recruiter_features} and avoids the need for a separate retraining run to confirm that the delta is negligible.
 
 \begin{table}[htbp]
     \centering
     \caption{Normalised feature importance across classifiers (last cross-validation 
-    fold). PCA interaction components are aggregated into a single row.}
+    fold). PCA interaction components are aggregated into a single row. Features 
+    marked $\dagger$ contribute negligibly and are retained; see text for discussion.}
     \label{tab:recruiter_feature_importance}
     \begin{tabular}{lrrr}
         \toprule
         \textbf{Feature} & \textbf{Logistic Reg.} & \textbf{Random Forest} 
                          & \textbf{XGBoost} \\
         \midrule
-        Interaction PCA (aggregated) & 73.8\% & 85.0\% & 88.8\% \\
-        TF-IDF overlap               &  3.3\% &  5.4\% &  3.2\% \\
-        Total years experience       &  9.3\% &  4.2\% &  2.6\% \\
-        Experience delta             &  5.7\% &  1.0\% &  2.4\% \\
-        Qwen cosine similarity       &  5.7\% &  3.1\% &  1.8\% \\
-        MiniLM full-profile sim.     &  2.3\% &  1.3\% &  1.2\% \\
+        Interaction PCA (aggregated) & 69.2\% & 83.2\% & 85.6\% \\
+        Qwen cosine similarity       & 12.6\% &  3.8\% &  1.9\% \\
+        Total years experience       &  7.7\% &  3.3\% &  3.5\% \\
+        TF-IDF overlap               &  5.5\% &  6.5\% &  5.2\% \\
+        Experience freshness         &  1.3\% &  2.2\% &  1.3\% \\
+        Experience delta             &  0.7\% &  0.6\% &  1.7\% \\
+        \midrule
+        Degree match$^\dagger$       &  2.6\% &  0.3\% &  0.8\% \\
+        MiniLM full-profile sim.$^\dagger$ &  0.4\% &  0.1\% &  0.0\% \\
         \bottomrule
     \end{tabular}
 \end{table}
-\subsection{Effect of Negative Sampling Strategy}
+\subsection{Stage 2: Negative Strategy Selection}
 \label{sec:exp_recruiter_negatives}
  
-Table~\ref{tab:recruiter_neg_comparison} compares XGBoost trained on \gls{LLM} negatives, trained on synthetic negatives, and trained on a combined dataset, all evaluated on the same held-out test set. \textit{TODO: add observation once numbers are available.} This result is consistent with the design rationale in Section~\ref{sec:recruiter_balanced}: a model that must distinguish genuine qualification from surface-level interest is a harder but ultimately more useful model for recruiters, who need to prioritise candidates that are not only interested but also truly qualified. 
- 
+Having established XGBoost as the strongest classifier, the model type is now held fixed and the negative construction strategy is varied. Table~\ref{tab:recruiter_neg_comparison} reports XGBoost test set performance for each strategy, where each model is evaluated on a test set constructed with the same negative type as its training data.
+
+A critical caveat applies before interpreting these numbers: the three test sets are not equivalent in difficulty. The synthetic model is tested on random non-applicants — an easy discrimination task — while the LLM model is tested on poor-fit applicants from the real pool — a hard one. The AUC scores therefore reflect both model quality \emph{and} task difficulty, and cannot be compared directly on an absolute basis.
+
+With that in mind, the synthetic model achieves the highest AUC (0.852) because it solves the simplest version of the problem: almost any sensible feature should separate a strong applicant from a random non-applicant. The LLM model achieves the lowest AUC (0.724), correctly reflecting the genuine difficulty of separating good applicants from poor-fit ones within the same self-selected pool. The combined model sits between the two (0.755), having seen both types of negatives during training and being tested on both.
+
+Despite its lower raw metrics, the \textbf{LLM-negative model is chosen for deployment}. The deployment scenario mirrors the LLM test set: a recruiter using the system sees real applicants — not random people — and needs to distinguish genuinely qualified candidates from those who applied despite a poor fit. The sanity check in Section~\ref{sec:exp_recruiter_sanity} provides an additional test: if the LLM model assigns higher scores to applicants than to random non-applicants on held-out jobs (a test it was never trained for), it confirms the model has learned genuine fit signals rather than artefacts of the training negatives.
+
+A secondary finding concerns feature importance. Across all three models (Table~\ref{tab:recruiter_feature_importance}), the PCA interaction components dominate — but their share drops noticeably when training on synthetic negatives (XGB: 81.4\% vs 85.6\% for LLM). TF-IDF overlap compensates, rising to 9.3\% from 5.2\%. This pattern suggests that on easy negatives the model can rely more on surface keyword matching to separate careers, whereas the harder LLM negatives force the model to use the deeper embedding interactions.
+
 \begin{table}[htbp]
     \centering
-    \caption{Effect of negative sampling strategy on XGBoost performance (held-out test set).}
+    \caption{Effect of negative sampling strategy on XGBoost test set performance. Each model is evaluated on a test set matching its training negatives; AUC values are not directly comparable across rows (see text).}
     \label{tab:recruiter_neg_comparison}
     \begin{tabular}{lrrrrr}
         \toprule
         \textbf{Negative Type} & \textbf{Accuracy} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} & \textbf{AUC} \\
         \midrule
-        Synthetic (non-applicants)   & TODO & TODO & TODO & TODO & TODO \\
-        LLM (Poor / Very Poor Fit)   & TODO & TODO & TODO & TODO & TODO \\
-        Combined                     & TODO & TODO & TODO & TODO & TODO \\
+        LLM (Poor / Very Poor Fit)   & 0.669 & 0.675 & 0.600 & 0.636 & 0.724 \\
+        Synthetic (non-applicants)   & 0.772 & 0.818 & 0.748 & 0.781 & 0.852 \\
+        Combined                     & 0.687 & 0.721 & 0.624 & 0.669 & 0.755 \\
         \bottomrule
     \end{tabular}
 \end{table}
  
+\subsubsection{Final Model}
+\label{sec:exp_recruiter_final}
+
+The two-stage selection process yields a clear conclusion: \textbf{XGBoost trained on LLM negatives} is the final recruiter-side model. Despite its lower raw metrics relative to the synthetic variant, it operates in the most realistic setting — distinguishing genuinely qualified applicants from poor-fit ones within the same self-selected pool — which directly mirrors deployment. This model is serialised and used as the recruiter-side suitability scorer in Chapter~\ref{chap:congestion_balancing}.
+
 \subsubsection{Qualitative Sanity Check}
 \label{sec:exp_recruiter_sanity}
  
-To validate practical model behaviour, two complementary sanity checks are performed on jobs from the held-out Windows~5--6 validation set.
+To validate that the final model behaves sensibly in practice, two complementary sanity checks are performed on the held-out validation jobs from Windows~5--6. Both checks are run across all three negative strategy variants so that the effect of the training data choice is visible in qualitative behaviour as well as in the quantitative metrics above.
  
 \paragraph{Applicants vs.\ non-applicants.}
 For a sample of randomly selected jobs, the model scores both actual applicants and randomly drawn non-applicants. A well-functioning model should assign higher scores to applicants on average, since candidates who chose to apply have at least some level of self-assessed fit. Table~\ref{tab:recruiter_sanity_random} summarises the results for the XGBoost model trained on the 3 different negative sampling strategies.
