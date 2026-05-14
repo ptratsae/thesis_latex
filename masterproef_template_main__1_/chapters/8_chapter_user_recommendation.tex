@@ -1,7 +1,7 @@
 \chapter{User-Side Job Recommendation System}
 \label{chap:user_recommendation}
 
-This chapter describes the job recommendation system built for users, consisting of the data pipeline and the two-tower neural network architecture. The system learns dense representations of both users and jobs and uses their similarity to rank job opportunities for each individual user. This model is later used in Chapter~\ref{chap:congestion_balancing} as the basis for the user-side congestion reduction strategy.
+This chapter describes the job recommendation system built for users, consisting of the data pipeline and the two-tower neural network architecture. The system learns dense representations of both users and jobs and uses their similarity to rank job opportunities for each individual user. This model is later used in Chapter~\ref{chap:congestion_balancing} as the one of the two fundamental components for two-sided recommendations and mitigating congestion.
 
 A two-tower \gls{RS} is chosen because neural networks can handle the cold-start problem~\cite{rama2019deeplearningaddresscandidate} — a user with no prior interaction history can still receive recommendations based on their profile features alone by using the learned user embedding. This property is essential given the temporal evaluation setup described in Chapter~\ref{chap:experiments}.
 

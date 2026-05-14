@@ -28,20 +28,40 @@ Job-side congestion is measured over the distribution of applications per job
 posting, using the Gini coefficient $G(\mathbf{c})$ defined in
 Equation~\ref{eq:gini} and the safe/starved/congested zone classification from
 Section~\ref{sec:prelim_zones}. The zone boundaries are set to the median and
-90th percentile of the empirical application-count distribution in Window~7,
-yielding $\tau_{\min}^{\text{job}} = 2$ and $\tau_{\max}^{\text{job}} = 10$.
+90th percentile of the empirical application-count distribution in windows 1-6 --- because this is considered the past and window 7 is the future (See Section~\ref{sec:custom_split}) ---
+yielding $\tau_{\min}^{\text{job}} = 2$ and $\tau_{\max}^{\text{job}} = 10$. Figure~\ref{fig:job_congestion_distribution} shows the distribution of applications per job in the windows 1-6 historical application pool.
 
-Applying the historical Window~7 application records to this framework reveals a
-highly skewed distribution. Over 80\% of active job postings receive fewer than
-two applications, while a small fraction attract tens or hundreds. The Gini
-coefficient of the historical distribution is 0.8575, confirming extreme
-concentration. This baseline reflects the natural self-selection behaviour of job
-seekers: certain postings are intrinsically more appealing by title, location, or
-employer brand, and attract disproportionate organic interest. A recommender
-system operating without congestion awareness risks amplifying this imbalance
-further, as the experimental results in Section~\ref{sec:exp_job_congestion}
-demonstrate.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{images/job_application_distribution_window_1_6.png}
+    \caption{Distribution of applications per job posting in the historical
+    Window~7 application pool. The Gini coefficient is 0.5432, indicating a
+    high level of inequality. The safe zone (green) contains 50.1\% of jobs,
+    the starved zone (blue) contains 34.9\%, and the congested zone (red)
+    contains 15.0\%.}
+    \label{fig:job_congestion_distribution}
+\end{figure}
 
+The distribution is highly skewed, with a big head and long tail. The Gini coefficient of 0.8669 indicates a high level of inequality: a small fraction of jobs receive a large fraction of applications. Table~\ref{tab:job_congestion_zones} quantifies the zone classification: 81.20\% of jobs are starved with fewer than 2 applications, 15.80\% are in the safe zone with 2-10 applications, and 3.00\% are congested with more than 10 applications. This baseline reflects the natural skew in job popularity and candidate quality, as well as the feedback loop where popular jobs attract more applications, further increasing their visibility and appeal to users. The experimental results in Section~\ref{sec:exp_job_congestion} evaluate the effectiveness of the market-maker strategies against this baseline.
+
+% Gini = 0.5432 for windows 1-6, 0.8669 for window 7
+% starved (<2) = 81.20%
+% congested (>10) = 3.00%
+% safe zone (2-10) = 15.80%
+\begin{table}
+    \centering
+    \caption{Zone classifications for job-side congestion.}
+    \label{tab:job_congestion_zones}
+    \begin{tabular}{|c|c|c|}
+        \hline
+        Zone & Threshold & Percentage \\
+        \hline
+        Safe & 2-10 & 15.80\% \\
+        Starved & <2 & 81.20\% \\
+        Congested & >10 & 3.00\% \\
+        \hline
+    \end{tabular}
+\end{table}
 \subsection{Market-Maker Intervention}
 \label{sec:job_congestion_intervention}
 
