@@ -802,11 +802,11 @@ rate and reaches its maximum only at the hard cap.
 
 \begin{figure}
     \centering
-    \label{fig:modification_functions}
     \includegraphics[width=\textwidth]{images/modification_functions.png}
     \caption{The three modification functions $\delta(c)$ plotted over the
     application count range $[0, H^{\text{job}}]$. Zone boundaries at
     $\tau_{\min}=2$ and $\tau_{\max}=9$ are shown as dashed vertical lines.}
+    \label{fig:modification_functions}
 \end{figure}
 
 \paragraph{Simulation mechanics.}
@@ -1068,7 +1068,41 @@ the user level for cold-start profiles. Tables \ref{tab:sanity_668904} and~\ref{
 \end{table}
 \subsection{User-Side Congestion Analysis}
 \label{sec:exp_user_congestion}
-\subsubsection{Historical Analysis}
+\subsubsection{Baseline Analysis}
+
+Because no recruiter-side shortlisting data is available in the historical pool, the user-side congestion baseline is constructed by simulating the shortlisting on the Window~7 application pool: for each job, applicants are scored by the XGBoost recruiter model and the top-5 are shortlisted, with no
+candidate-level modification applied. This produces a distribution of
+shortlisting events per candidate that reflects how attention would be
+distributed under a purely merit-based, uncorrected system.
+ 
+The results reveal a substantially unequal distribution. In the free-market
+setting, 15.8\% of candidates receive zero shortlisting events despite having
+applied to at least one job, while 9.1\% are shortlisted across more than five
+jobs simultaneously. The Gini coefficient is 0.5393. This baseline reflects
+two interacting forces: the natural skew in candidate quality as assessed by
+the recruiter model, and the concentration of applications on popular postings
+that brings the same strong candidates into contact with many recruiters at
+once. Table~\ref{tab:user_mm_results} compares the four market-maker strategies
+against this baseline.
+ 
+\begin{table}[htbp]
+    \centering
+    \caption{User-side market-maker results on Window~7. Lower Gini and fewer
+    starved/congested candidates indicate better attention balance.
+    $\bar{p}_{\text{rec}}$ is the average recruiter probability of shortlisted
+    candidates, used as a proxy for shortlisting quality.}
+    \label{tab:user_mm_results}
+    \begin{tabular}{@{}lccccr@{}}
+        \toprule
+        \textbf{Strategy} & \textbf{Gini} & \textbf{Starved} & \textbf{Safe} & \textbf{Congested} & $\bar{p}_{\textbf{rec}}$ \\
+        \midrule
+        Free Market (baseline) & & & & & \\
+        Linear                 & & & & & \\
+        Quadratic              & & & & & \\
+        Sigmoid                & & & & & \\
+        \bottomrule
+    \end{tabular}
+\end{table}
 \subsubsection{Market-maker simulation results}
 
 \subsection{Hybrid Balancing Results}

@@ -10,7 +10,7 @@ Section~\ref{sec:user_arch} describes the architecture of the model. Section~\re
 \section{Architecture: The Two-Tower Model}
 \label{sec:user_arch}
 
-The two-tower model consists of two separate neural networks. The user tower processes user features and the job tower processes job features. Both towers learn a dense vector representation of its respective input. The compatibility of a user-job pair is then measured as the dot product of these two vectors, as defined in Section~\ref{sec:notation}. The design allows job embeddings to be precomputed and cached, enabling efficient real-time recommendations for users. 
+The two-tower model consists of two separate neural networks. The user tower processes user features and the job tower processes job features. Both towers learn a dense vector representation of its respective input. The compatibility of a user-job pair is then measured as the dot product of these two vectors, as defined in Section~\ref{sec:prelim_notation}. The design allows job embeddings to be precomputed and cached, enabling efficient real-time recommendations for users. 
 
 \subsection{User Tower}
 \label{sec:user_tower}
