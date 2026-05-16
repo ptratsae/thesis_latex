@@ -3,7 +3,7 @@
 
 This chapter introduces the background knowledge, notation and evaluation metrics used throughout the thesis. The goal is to make the subsequent method chapters self-contained: a reader familiar with machine learning but not with recommender systems or two-sided markets should be able to follow the technical content without consulting external references.
 
-The chapter is organised as follows. Section~\ref{sec:prelim_notation} establishes notation. Section~\ref{sec:prelim_rs_background} covers concepts specific to recommender systems, including a taxonomy of filtering approaches and the two-sided market setting that motivates this work. Section~\ref{sec:prelim_ml_background} reviews the general machine learning techniques employed across the thesis. Section~\ref{sec:prelim_metrics} defines the evaluation metrics used in the experiments.
+The chapter is organised as follows. Section~\ref{sec:prelim_notation} establishes notation. Section~\ref{sec:prelim_rs_background} covers concepts specific to recommender systems, including a taxonomy of filtering approaches and the two-sided market setting that motivates this work. Section~\ref{sec:prelim_ml_background} reviews the general machine learning techniques employed across the thesis. Section~\ref{sec:prelim_metrics} defines the evaluation metrics used in the experiments. Finally, Section~\ref{sec:prelim_related_work} situates this thesis within the broader literature on recommender systems, two-sided markets and congestion control.
 
 \section{Notation}
 \label{sec:prelim_notation}
@@ -13,53 +13,61 @@ The following notation is used consistently across all chapters. Let $\mathcal{U
 Each user $u$ is associated with a feature vector $\mathbf{x}_u \in \mathbb{R}^{d_u}$ and each job $j$ with a feature vector $\mathbf{x}_j \in \mathbb{R}^{d_j}$, where $d_u$ and $d_j$ are the respective input dimensionalities. A recommendation model maps these features to dense embedding vectors $\mathbf{e}_u \in \mathbb{R}^{d}$ and $\mathbf{e}_j \in \mathbb{R}^{d}$ in a shared $d$-dimensional space. The compatibility score between a user and a job is then a function $s : \mathbb{R}^d \times \mathbb{R}^d \rightarrow \mathbb{R}$, typically the dot product $s(\mathbf{e}_u, \mathbf{e}_j) = \mathbf{e}_u \cdot \mathbf{e}_j$.
 
 Table~\ref{tab:notation} summarises the key symbols used throughout.
-% TO DO FIX COMPILING ISSUE WITH TABLE
-% \begin{table}[H]
-%     \centering
-%     \caption{Summary of notation used throughout the thesis.}
-%     \label{tab:notation}
-%     \begin{tabular}{cl}
-%         \toprule
-%         \textbf{Symbol} & \textbf{Meaning} \\
-%         \midrule
-%         $\mathcal{U}$ & Set of all users (job seekers) \\
-%         $\mathcal{J}$ & Set of all jobs \\
-%         $u, j$ & Individual user and job \\
-%         $\mathcal{J}^{+}_u$ & Jobs applied to by user $u$ (positive interactions) \\
-%         $\mathbf{x}_u, \mathbf{x}_j$ & Raw feature vectors for user and job \\
-%         $\mathbf{e}_u, \mathbf{e}_j$ & Learned embedding vectors for user and job \\
-%         $d$ & Embedding dimension (shared between towers) \\
-%         $d_u, d_j$ & Input feature dimensionalities for user and job \\
-%         $d_{\text{text}}$ & Dimensionality of text embeddings \\
-%         $s(\mathbf{e}_u, \mathbf{e}_j)$ & Compatibility score between user $u$ and job $j$ \\
-%         $\hat{y}$ & Predicted score or probability \\
-%         $y \in \{0,1\}$ & Binary ground truth label \\
-%         $N$ & Number of training examples \\
-%         $K$ & Cutoff for ranking metrics (e.g.\ Hit@$K$) \\
-%         $d_{\text{pca}}$ & Output dimensionality of PCA reduction \\
-%         $F$ & Total number of features in the recruiter feature vector \\
-%         \midrule
-%         \multicolumn{2}{l}{\textit{Congestion and hybrid balancing}} \\
-%         \midrule
-%         $c_j$ & Number of applications received by job $j$ \\
-%         $\mathbf{c} = (c_1,\ldots,c_J)$ & Vector of application counts over all jobs \\
-%         $c_j^{(t)}$ & Applications to job $j$ at simulation step $t$ \\
-%         $v_u$ & Number of shortlisting events received by candidate $u$ \\
-%         $\mathbf{v} = (v_1,\ldots,v_U)$ & Vector of shortlisting counts over all candidates \\
-%         $v_u^{(t)}$ & Shortlisting events for candidate $u$ at simulation step $t$ \\
-%         $G(\mathbf{x})$ & Gini coefficient over distribution $\mathbf{x}$ \\
-%         $\tau_{\min}, \tau_{\max}$ & Lower and upper zone thresholds (starved / congested) \\
-%         $H$ & Hard cap; entities exceeding this are excluded from ranking \\
-%         $B,\, P$ & Maximum boost and penalty magnitudes \\
-%         $\delta(\cdot)$ & Congestion modification function \\
-%         $s_{uj},\, \hat{s}_{uj}$ & Base and modified ranking score for $(u,j)$ pair \\
-%         $r_{uj},\, \hat{r}_{uj}$ & Base and modified recruiter score for $(u,j)$ pair \\
-%         $p_{\text{TT}}$ & Two-Tower shortlisting probability $\sigma(\hat{y}_{\text{TT}})$ \\
-%         $p_{\text{rec}}$ & XGBoost recruiter shortlisting probability \\
-%         $\alpha$ & Weighting parameter for bilateral combined score \\
-%         \bottomrule
-%     \end{tabular}
-% \end{table}
+
+\begin{table}[htbp]
+    \centering
+    \caption{Summary of notation used throughout the thesis.}
+    \label{tab:notation}
+    \begin{tabular}{@{}ll@{}}
+        \toprule
+        \textbf{Symbol} & \textbf{Meaning} \\
+        \midrule
+        \multicolumn{2}{l}{\textit{Users, jobs and interactions}} \\
+        \midrule
+        $\mathcal{U}$ & Set of all users (job seekers) \\
+        $\mathcal{J}$ & Set of all jobs \\
+        $u,\, j$ & Individual user and job \\
+        $\mathcal{J}^{+}_u$ & Jobs applied to by user $u$ (positive interactions) \\
+        $\mathcal{J}^{-}_u$ & Jobs not applied to by user $u$; $\mathcal{J} \setminus \mathcal{J}^{+}_u$ \\
+        $\mathbf{x}_u,\, \mathbf{x}_j$ & Raw feature vectors for user and job \\
+        $\mathbf{e}_u,\, \mathbf{e}_j$ & Learned embedding vectors for user and job \\
+        $d$ & Shared embedding dimension \\
+        $d_u,\, d_j$ & Input feature dimensionalities for user and job \\
+        $d_{\text{text}}$ & Dimensionality of truncated text embeddings \\
+        $s(\mathbf{e}_u, \mathbf{e}_j)$ & Compatibility score (typically $\mathbf{e}_u \cdot \mathbf{e}_j$) \\
+        $\hat{y}$ & Predicted score or probability \\
+        $y \in \{0,1\}$ & Binary ground truth label \\
+        $N$ & Number of training examples \\
+        $K$ & Cutoff for ranking metrics (e.g.\ Hit@$K$) \\
+        \midrule
+        \multicolumn{2}{l}{\textit{Recruiter-side model}} \\
+        \midrule
+        $d_{\text{pca}}$ & Output dimensionality of PCA reduction \\
+        $F$ & Total number of features in the recruiter feature vector \\
+        $\mathbf{f} \in \mathbb{R}^F$ & Recruiter feature vector for a candidate–job pair \\
+        \midrule
+        \multicolumn{2}{l}{\textit{Congestion and hybrid balancing}} \\
+        \midrule
+        $c_j^{(t)}$ & Applications received by job $j$ at simulation step $t$ \\
+        $\mathbf{c} = (c_1,\ldots,c_{|\mathcal{J}|})$ & Vector of application counts over all jobs \\
+        $v_u^{(t)}$ & Shortlisting events for candidate $u$ at simulation step $t$ \\
+        $\mathbf{v} = (v_1,\ldots,v_{|\mathcal{U}|})$ & Vector of shortlisting counts over all candidates \\
+        $G(\mathbf{x})$ & Gini coefficient over a count distribution $\mathbf{x}$ \\
+        $\tau_{\min},\, \tau_{\max}$ & Lower and upper zone thresholds (starved / congested) \\
+        $H$ & Hard cap; entities exceeding this are excluded from ranking \\
+        $B,\, P$ & Maximum boost and penalty magnitudes \\
+        $\gamma_b,\, \gamma_p$ & Linear boost and penalty rates \\
+        $\kappa_b,\, \kappa_p$ & Quadratic boost and penalty scaling parameters \\
+        $k$ & Sigmoid steepness parameter \\
+        $\delta(\cdot)$ & Congestion modification function \\
+        $s_{uj},\, \hat{s}_{uj}$ & Base and modified job-ranking score for $(u,j)$ \\
+        $r_{uj},\, \hat{r}_{uj}$ & Base and modified recruiter score for $(u,j)$ \\
+        $p_{\text{TT}}$ & Two-Tower probability $\sigma(\hat{y}_{\text{TT}}) \in [0,1]$ \\
+        $p_{\text{rec}}$ & XGBoost recruiter suitability probability $\in [0,1]$ \\
+        $\alpha$ & Weighting parameter for the bilateral combined score \\
+        \bottomrule
+    \end{tabular}
+\end{table}
 
 \section{Recommender Systems Background}
 \label{sec:prelim_rs_background}
@@ -250,3 +258,47 @@ safe zone captures the typical experience while flagging genuine outliers on
 both ends. Separate thresholds are used for the job-side and candidate-side
 distributions, as their natural scales differ. The specific values used in all
 congestion experiments are reported in Chapter~\ref{chap:congestion_balancing}.
+
+
+\section{Related Work}
+\label{sec:prelim_related_work}
+
+The rapid advancement of digital labor platforms has shifted the matching paradigm from simple keyword search engines toward autonomous decision-making systems. As mentioned in Section~\ref{sec:intro:problem}, the job market is a two-sided reciprocal market characterized by rivalrous goods, hard capacity constraints, and heterogeneous preferences on both sides \cite{goda2024bestofbothapproachimprovematch, mashayekhi2023reconreducingcongestionjob}. A successful recommendation in this context is not merely one that elicits a click, but one that leads to a bilateral agreement where both the job seeker and the recruiter find the pairing optimal \cite{biLorentzFM2025}.
+
+\subsection{Reciprocal Recommendation Paradigms}
+The scientific literature classifies Reciprocal Recommender Systems (RRS) based on how they integrate the preferences of both parties. 
+
+\subsubsection{Aggregation and Match Prediction}
+The traditional approach, known as \textit{Predict-then-Aggregate} (PtA), trains separate models for each direction (user-to-job and job-to-user) and combines their scores using fusion functions like the harmonic mean or product \cite{goda2024bestofbothapproachimprovematch}. To address the error propagation inherent in PtA, the recent \textit{Best-of-Both} (BoB) framework leverages pseudo-match scores—a weighted average of sparse ground-truth labels and dense predictions—to train meta-models that directly output match likelihoods \cite{Goda2024, RRS_Survey2024}.
+
+\subsubsection{Stability and Bandit Learning}
+The theoretical foundation of RRS often relies on stable matching theory. Modern research addresses unknown and dynamic preferences through multi-agent bandit learning, such as \textit{Multi-agent Multi-type Thompson Sampling} (MMTS) \cite{Li2024_MMTS}. This allows platforms to learn preferences through interaction while converging toward a stable matching equilibrium that respects participant quotas \cite{Li2024_MMTS, StableMatching2025}.
+
+\subsection{Neural Architectures for Retrieval}
+As platforms scale to millions of users, the "Two-Tower" neural architecture has become the industrial standard for candidate retrieval \cite{Shaped_DeepDive2024, DSSM2013}. 
+
+\subsubsection{Two-Tower Enhancements}
+Standard Two-Tower models suffer from "Late Interaction," where user and item features do not interact until the final dot product. Recent state-of-the-art enhancements include:
+\begin{itemize}
+    \item \textbf{Hierarchical Interaction-Enhanced Two-Tower (HIT):} Augments the paradigm with multi-head representers to project embeddings into multi-faceted interest dimensions \cite{HIT2025}.
+    \item \textbf{biLorentzFM:} Utilizes hyperbolic embeddings to capture the hierarchical nature of job markets (e.g., senior roles requiring specific junior experiences) \cite{biLorentzFM2025}.
+    \item \textbf{ContextGNN:} Fuses pair-wise representations for local interaction graphs with global Two-Tower representations for exploratory items \cite{ContextGNN2025}.
+\end{itemize}
+
+\subsection{Market Congestion and Distributional Equity}
+Market congestion occurs when recommendation policies concentrate attention on a tiny subset of popular job postings, leading to "orphan jobs" that receive zero applications \cite{JoLA2025, Mashayekhi2023}. This concentration degrades the welfare of all participants and creates information overload for recruiters \cite{ManagingCongestion2021}.
+
+\subsubsection{Measuring Inequality}
+To quantify this phenomenon, the research community has adopted the \textit{Gini coefficient} from economics to measure concentration in recommendation distributions \cite{Do2022, GiniFairness2021}. A Gini coefficient near 1 indicates extreme concentration, prompting the need for "market-maker" interventions that act as coordinates for the labor pool \cite{JoLA2025}.
+
+\subsubsection{Algorithmic Mitigation}
+Advanced strategies for mitigation include \textit{In-processing} methods like the \textit{ReCon} model, which integrates \textit{Optimal Transport} (OT) theory into the recommendation objective \cite{Mashayekhi2023, ReCon_RecSys2023}. By utilizing the Sinkhorn algorithm to solve entropic regularized OT, these systems ensure a more equal distribution of jobs across seekers while maintaining relevance \cite{Mashayekhi2023}. Other methods, such as \textit{JoLA} (Job Landscape Aware), introduce differentiable market share approximations to specifically target and reduce the number of orphan job ads \cite{JoLA2025}.
+
+\subsection{Reasoning-Based Recruiter Suitability Modeling}
+A persistent challenge is data asymmetry: seeker behavioral signals are captured at scale, but recruiter decision signals (shortlisting, hiring) are often invisible or off-platform \cite{RecSysHR2025_DecisionLogic}.
+
+\subsubsection{LLM-Based Synthetic Feedback}
+To overcome data scarcity, state-of-the-art research leverages Large Language Models (LLMs) to generate synthetic labels for candidate suitability \cite{LLM_Recruitment2025}. These models possess high \textit{Algorithmic Fidelity}, enabling them to simulate expert professional judgments \cite{Argyle2023_Silicon}. Dominant methodologies involve \textit{Chain-of-Thought} (CoT) prompting to extract explicit criteria (Must-Haves, Deal-Breakers) from job descriptions and reason through candidate fit \cite{LLM_DecisionLogic2025, AgenticHR2026}.
+
+\subsubsection{Explainability and Ranking}
+Advanced frameworks move beyond simple classification toward listwise tournament mechanisms. The \textit{LLM-Driven Active Listwise Tournament} evaluates small subsets of candidates simultaneously to provide stable, criteria-driven rankings that are more interpretable than "black-box" deep learning models \cite{AgenticHR2026, PJRS_Survey2025}.

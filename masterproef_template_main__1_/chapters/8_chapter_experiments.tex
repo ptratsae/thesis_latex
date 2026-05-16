@@ -415,7 +415,7 @@ An example output for a single candidate is shown below:
 The structured output format enforces consistency: every response contains an explicit must-haves assessment, a reasoning trace, and a fit level drawn from a fixed four-value vocabulary. Responses that fail JSON parsing or contain unexpected fit level values are discarded.
  
 \paragraph{Label distribution.}
-The resulting dataset contains \textbf{5,896} labeled pairs across \textbf{1511} unique jobs. Table~\ref{tab:recruiter_label_dist} shows the fit level distribution. The negative class (Poor and Very Poor Fit) accounts for 54.1\% of pairs, slightly outnumbering positives. This reflects the conservative evaluation style enforced by the prompt: missing values in profile fields are treated as absent features, and the model is instructed to be strict (see Sect~\ref{sec:exp_recruiter_prompt}). Poor Fit is the single most frequent label at 41.9\%, consistent with many applicants lacking one or more of the explicit must-haves extracted from the job description. Class weights are still applied during training to ensure each class contributes proportionally to the loss, with weights set inversely proportional to class frequency.
+The resulting dataset contains \textbf{5,896} labeled pairs across \textbf{1511} unique jobs. Table~\ref{tab:recruiter_label_dist} shows the fit level distribution. The negative class (Poor and Very Poor Fit) accounts for 54.1\% of pairs, slightly outnumbering positives. This reflects the conservative evaluation style enforced by the prompt: missing values in profile fields are treated as absent features, and the model is instructed to be strict (see Section~\ref{sec:exp_recruiter_datagen}). Poor Fit is the single most frequent label at 41.9\%, consistent with many applicants lacking one or more of the explicit must-haves extracted from the job description. Class weights are still applied during training to ensure each class contributes proportionally to the loss, with weights set inversely proportional to class frequency.
  
 \begin{table}[htbp]
     \centering
@@ -485,6 +485,7 @@ The Ensemble achieves the highest cross-validation AUC (0.696), but the gap over
 
 \begin{table}[htbp]
     \centering
+    \small
     \caption{Recruiter-side model comparison (5-fold cross-validation, LLM negatives). Mean $\pm$ standard deviation across folds.}
     \label{tab:recruiter_results_cv}
     \begin{tabular}{lrrrrr}
@@ -501,6 +502,7 @@ The Ensemble achieves the highest cross-validation AUC (0.696), but the gap over
 
 \begin{table}[htbp]
     \centering
+    \small
     \caption{Final XGBoost model performance on the held-out test set (LLM negatives). The test set is evaluated only for the selected model to avoid selection bias.}
     \label{tab:recruiter_results_test}
     \begin{tabular}{lrrrrrr}
@@ -557,10 +559,10 @@ Among the scalar features, the pattern differs by model family. In Logistic Regr
  
 Having established XGBoost as the strongest classifier, the model type is now held fixed and the negative construction strategy is varied. Table~\ref{tab:recruiter_neg_comparison} reports XGBoost test set performance for each strategy, where each model is evaluated on a test set constructed with the same negative type as its training data.
  
-\paragraph{Synthetic vs.\ LLM negatives.}
+\subsubsection{Synthetic vs.\ LLM negatives}
 The most striking result is the gap between the synthetic and LLM models: AUC 0.852 vs.\ 0.724, a difference of 0.128. This gap is primarily a task-difficulty effect, not a quality difference. The synthetic model is tested on random non-applicants, who by construction are unlikely to match the job on any meaningful feature; almost any signal separates them from strong applicants. The LLM model is tested on poor-fit applicants from the real pool --- candidates who self-selected to apply despite a mismatch. These share the same self-selection signal as positives, forcing the model to rely on deeper feature differences. The lower AUC correctly reflects the genuine difficulty of that discrimination task.
  
-\paragraph{Combined as the best choice.}
+\subsubsection{Combined as the best choice}
 The combined model achieves AUC 0.755 on a mixed test set with equal proportions of LLM and synthetic negatives, outperforming the LLM-only model (0.724) but underperforming the synthetic-only model (0.852). Crucially, in the congestion balancing context of Chapter~\ref{chap:congestion_balancing}, the model must score candidates who may not have applied to the job at all --- which is precisely the synthetic scenario. A model trained exclusively on LLM negatives has never seen that setting and may not generalise well to it. The combined model handles both regimes and achieves the best verified performance across them.
  
 Table~\ref{tab:recruiter_fi_strategies} shows XGBoost feature importances across all three training strategies, revealing a gradient rather than a simple redistribution. The PCA interaction components decrease steadily from LLM to synthetic (85.6\% $\rightarrow$ 81.4\%), but drop sharply in the combined setting (61.6\%) --- a reduction of 24\% relative to LLM-only. Qwen cosine similarity moves in the opposite direction: negligible at 1.9\% for LLM, modest at 3.8\% for synthetic, then jumping to 17.2\% in combined, becoming the second most important feature. TF-IDF overlap roughly doubles from LLM to synthetic (5.2\% $\rightarrow$ 9.3\%) and increases further in combined (10.3\%).
@@ -697,20 +699,378 @@ The interleaving of non-applicants in ranks 3--4 and 6 is expected rather than a
  
 \subsection{Experiment Goal}
 \label{sec:exp_congestion_goal}
-TODO
+ 
+The congestion balancing experiments pursue three goals in sequence. The first
+is to demonstrate that both forms of congestion described in
+Chapter~\ref{chap:congestion_balancing} are genuinely present in the data,
+before any intervention is applied and to form a baseline for the subsequent experiments. The second is to show that the job-side and
+user-side market-maker strategies each independently reduce their respective
+form of congestion while preserving acceptable match quality. The third is toshow that the dual-sided hybrid pipeline from
+Section~\ref{sec:hybrid_strategy} addresses both forms simultaneously, and
+that the bilateral scoring alone — without explicit congestion penalties —
+already produces a measurable improvement compared to the baseline results.
  
 \subsection{Experiment Setting}
 \label{sec:exp_congestion_setting}
-TODO
+\paragraph{Simulation arena.}
+All congestion experiments are conducted on the Window~7 application pool,
+which serves as the held-out test set (Section~\ref{sec:custom_split}). Users who submitted more than 45 applications in Window~7 are removedbefore the simulation begins, as their behaviour is not representative of
+genuine job seeking and would distort the congestion metrics. They are considered as outliers and this is done for simplicity.
+
  
-\subsection{Job-Side Congestion Analysis}
+\paragraph{Threshold derivation.}
+A key design decision is that the zone thresholds $\tau_{\min}$ and
+$\tau_{\max}$ — which define the boundary between starved, safe, and congested
+entities — are derived exclusively from the historical Windows~1--6 data, not
+from Window~7. This mirrors realistic deployment conditions: in practice, a
+platform can only observe past behaviour when configuring its market-maker, and
+must apply the resulting thresholds to future traffic without knowing the future
+distribution in advance. The thresholds are therefore not optimised against any
+validation objective; they are a principled reading of what the historical
+market looked like, translated into concrete zone boundaries.
+ 
+For the job side, the lower threshold $\tau_{\min}^{\text{job}} = 2$ is set to
+the median number of applications per job in Windows~1--6, and the upper
+threshold $\tau_{\max}^{\text{job}} = 9$ is set to the 90th percentile. This
+means the safe zone captures what a typical job in the historical market
+received, while jobs above the 90th percentile are flagged as congested. For
+the candidate side, the thresholds $\tau_{\min}^{\text{cand}} = 1$ and
+$\tau_{\max}^{\text{cand}} = 5$ are set to reflect the recruiter's screen
+capacity of top-5: a candidate who has never been shortlisted is starved, and a candidate who has been shortlisted more than five times is accumulating more
+attention than a single recruiter screens per job.
+ 
+\paragraph{Parameter values.}
+Tables~\ref{tab:job_mm_params} and~\ref{tab:cand_mm_params} list the
+market-maker parameter values used in all congestion experiments. As with the
+thresholds, these are design choices rather than optimised hyperparameters:
+the boost and penalty magnitudes are set to be on the same $[0,1]$ probability
+scale as the base scores they modify, and the shape parameters ($\gamma_p$,
+$\kappa_p$, $k$) are chosen so that each functional form reaches its maximum
+penalty at approximately the hard cap. Figure~\ref{fig:modification_functions} illustrates the three functional
+forms over the congestion range. The sigmoid curve reaches its maximum
+penalty earliest, making it the most aggressive redistributor for moderately
+congested jobs. The quadratic curve is initially lenient but accelerates
+once congestion becomes severe. The linear curve descends at a constant
+rate and reaches its maximum only at the hard cap.
+
+\begin{table}[htbp]
+    \centering
+    \caption{Market-maker parameter values for job-side congestion mitigation.
+    Base scores are sigmoid-transformed Two-Tower logits in $[0,1]$, so the
+    boost and penalty magnitudes are on the same probability scale.}
+    \label{tab:job_mm_params}
+    \begin{tabular}{@{}llp{7.5cm}@{}}
+        \toprule
+        \textbf{Parameter} & \textbf{Value} & \textbf{Description} \\
+        \midrule
+        $\tau_{\min}^{\text{job}}$ & 2    & Starved threshold (applications) \\
+        $\tau_{\max}^{\text{job}}$ & 9   & Congested threshold (applications) \\
+        $H^{\text{job}}$           & 50   & Hard cap; job removed from rankings \\
+        $B$                        & 0.25 & Maximum boost magnitude \\
+        $P$                        & 0.25 & Maximum penalty magnitude \\
+        $\gamma_b$ (linear)        & 0.11  & Boost rate per application below $\tau_{\min}$ \\
+        $\gamma_p$ (linear)        & 0.006 & Penalty rate per application beyond $\tau_{\max}$ \\
+        $\kappa_b$ (quadratic)     & 0.06  & Quadratic boost scaling parameter \\
+        $\kappa_p$ (quadratic)     & 0.001 & Quadratic penalty scaling parameter \\
+        $k_b$ (sigmoid)            & 1.4   & Sigmoid steepness (boost side) \\
+        $k_p$ (sigmoid)            & 0.25  & Sigmoid steepness (penalty side) \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+ 
+\begin{table}[htbp]
+    \centering
+    \caption{Market-maker parameter values for user-side congestion mitigation.
+    Base scores are XGBoost shortlisting probabilities in $[0,1]$.}
+    \label{tab:cand_mm_params}
+    \begin{tabular}{@{}llp{7.5cm}@{}}
+        \toprule
+        \textbf{Parameter} & \textbf{Value} & \textbf{Description} \\
+        \midrule
+        $\tau_{\min}^{\text{cand}}$ & 2    & Starved threshold (shortlists) \\
+        $\tau_{\max}^{\text{cand}}$ & 6    & Congested threshold (shortlists) \\
+        $H^{\text{cand}}$           & 10   & Hard cap; candidate removed from shortlisting \\
+        $B$                         & 0.25 & Maximum boost magnitude \\
+        $P$                         & 0.25 & Maximum penalty magnitude \\
+        
+        $\gamma_p$ (linear)         & 0.083 & Penalty rate per shortlist beyond $\tau_{\max}$ \\
+        $\kappa_p$ (quadratic)      & 0.028 & Quadratic penalty scaling parameter \\
+        $k$ (sigmoid)               & 1.0 & Sigmoid steepness \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\begin{figure}
+    \centering
+    \label{fig:modification_functions}
+    \includegraphics[width=\textwidth]{images/modification_functions.png}
+    \caption{The three modification functions $\delta(c)$ plotted over the
+    application count range $[0, H^{\text{job}}]$. Zone boundaries at
+    $\tau_{\min}=2$ and $\tau_{\max}=9$ are shown as dashed vertical lines.}
+\end{figure}
+
+\paragraph{Simulation mechanics.}
+For the job-side and hybrid experiments, Two-Tower recommendations and
+recruiter scores are pre-computed and cached before any strategy is run, so
+that all four strategy variants see identical model outputs and differ only in
+how those outputs are combined and modified. Users and job inboxes are processed
+sequentially; the running counters $c_j^{(t)}$ and $v_u^{(t)}$ are reset
+between strategy runs. The weighting parameter $\alpha = 0.5$ is used in
+all hybrid experiments for simplicity, giving equal weight to the Two-Tower and recruiter signals.
+ 
+\paragraph{Metrics.}
+Congestion is measured using the Gini coefficient $G$ (lower is more equal)
+and the percentage of entities in each zone (starved, safe, congested) as
+defined in Section~\ref{sec:prelim_zones}. To assess whether congestion
+reduction comes at the cost of match quality, the average Two-Tower probability
+$\bar{p}_{\text{TT}}$ and average recruiter probability $\bar{p}_{\text{rec}}$
+are also reported across all applied (user, job) pairs. A strategy that reduces
+congestion while keeping these averages close to the free-market baseline is
+considered successful.
+ 
+\subsection{Job-Side Congestion}
 \label{sec:exp_job_congestion}
-TODO
+% ============================================================
+
+\subsubsection{Historical Analysis}
+\label{sec:exp_job_congestion_baseline}
+Figure~\ref{fig:job_congestion_baseline} shows the distribution of applications
+per job in the Windows~1--6 historical pool. The distribution is heavily
+right-skewed: the vast majority of jobs receive zero or one application, while
+a long tail of popular postings accumulates a disproportionate share of
+candidate attention. Table~\ref{tab:job_congestion_baseline} quantifies this
+across both the historical period and the held-out Window~7, confirming that
+the pattern is stable across time. The
+Gini coefficients of 0.8655 and 0.8575 for Windows~1--6 and Window~7
+respectively indicate a high and consistent level of inequality. In both
+periods, roughly 80\% of jobs are starved — receiving fewer than two
+applications — while only around 15\% sit in the safe zone. This stability
+justifies using the Windows~1--6 distribution to derive the zone thresholds
+applied to Window~7.
  
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{images/job_application_distribution_window_1_6.png}
+    \caption{Distribution of applications per job in the Windows~1--6 historical
+    pool. The vertical dashed lines indicate the starved/safe (green) and safe/congested (orange) thresholds}
+    \label{fig:job_congestion_baseline}
+\end{figure}
+ 
+\begin{table}[htbp]
+    \centering
+    \caption{Job-side congestion across historical and test periods.
+    Thresholds are derived from the Windows~1--6 distribution and applied
+    consistently across both rows.}
+    \label{tab:job_congestion_baseline}
+    \begin{tabular}{@{}lrrrr@{}}
+        \toprule
+        \textbf{Period} & \textbf{Gini} & \textbf{Starved ($<$2)} & \textbf{Safe (2--9)} & \textbf{Congested ($>$9)} \\
+        \midrule
+        Historical Windows~1--6 & 0.8655 & 82.6\% & 14.7\% & 2.8\% \\
+        Historical Window~7     & 0.8575 & 80.9\% & 15.8\% & 3.3\% \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+ 
+\subsubsection{Market-maker simulation results}
+Table~\ref{tab:job_mm_results} compares all strategies on Window~7. The first
+notable finding is that the free-market Two-Tower recommender makes congestion
+\emph{worse} than the historical baseline: the Gini rises from 0.8575 to
+0.9625 and the starved fraction increases from 80.9\% to 90.8\%. This is
+expected — the Two-Tower model optimises for relevance and will confidently
+direct many users towards the same popular jobs, amplifying the feedback loop
+rather than correcting it. This result motivates the market-maker intervention
+directly: an uncorrected recommender is not a neutral system; it actively
+concentrates traffic further.
+ 
+All three market-maker strategies produce a large improvement over the free
+market. The Gini drops from 0.9625 to between 0.5985 and 0.6131 depending on
+the strategy, and the safe zone grows from 6.4\% to between 22.7\% and 39.2\%.
+ 
+The three functional forms produce meaningfully different distributions, which
+is the intended effect of adjusting the penalty scales. The sigmoid strategy
+achieves the best overall balance: it has the lowest Gini (0.5985), the
+smallest starved fraction (57.8\%), and the largest safe zone (39.2\%). The
+quadratic strategy achieves a lower Gini than linear (0.6016 vs 0.6131) but
+leaves more jobs starved (74.5\% vs 64.8\%). This is explained by its design:
+the quadratic penalty is lenient on mildly congested jobs but becomes
+aggressive on heavily congested ones, pulling down the extreme tail while
+doing less to help the mildly under-applied. The linear strategy is the most
+conservative, applying a steady uniform penalty that produces the least
+redistribution but preserves the highest match quality (TT probability 0.8999).
+ 
+The match quality cost is modest across all strategies. The average Two-Tower
+probability drops from 0.9537 under free market to between 0.8928 and 0.8999
+— a reduction of 5--6\%. Crucially, the average recruiter probability is
+almost unchanged (0.5711 free market vs 0.5684--0.5700 with penalties),
+indicating that from the recruiter's perspective the suitability of applied
+candidates is preserved despite the redistribution. The market-maker is
+redirecting traffic toward genuinely qualified but overlooked candidates, not
+toward random jobs.
+ 
+\begin{table}[htbp]
+    \centering
+    \caption{Job-side market-maker results on Window~7. Historical W7 shows
+    the raw application distribution for reference. $\bar{p}_{\text{TT}}$ is
+    the average Two-Tower probability of applied (user, job) pairs;
+    $\bar{p}_{\text{rec}}$ is the average recruiter suitability probability.
+    Both serve as proxies for match quality.}
+    \label{tab:job_mm_results}
+    \begin{tabular}{@{}lccccrr@{}}
+        \toprule
+        \textbf{Strategy} & \textbf{Gini} & \textbf{Starved} & \textbf{Safe} & \textbf{Congested} & $\bar{p}_{\textbf{TT}}$ & $\bar{p}_{\textbf{rec}}$ \\
+        \midrule
+        Historical W7         & 0.8575 & 80.9\% & 15.8\% & 3.3\% & ---    & ---    \\
+        Free Market (TT only) & 0.9625 & 90.8\% &  6.4\% & 2.9\% & 0.9537 & 0.5711 \\
+        \midrule
+        Linear                & 0.6131 & 64.8\% & 32.7\% & 2.5\% & 0.8999 & 0.5700 \\
+        Quadratic             & 0.6016 & 74.5\% & 22.7\% & 2.8\% & 0.8954 & 0.5699 \\
+        Sigmoid               & 0.5985 & 57.8\% & 39.2\% & 3.0\% & 0.8928 & 0.5684 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+ 
+Figure~\ref{fig:job_mm_grid} visualises the application distributions produced
+by each strategy. The free-market panel confirms the pathological concentration
+described above: a massive spike at zero and a flat, heavy tail extending to
+the hard cap. All three market-maker panels shift mass rightward out of the
+starved zone and truncate the tail earlier, but do so in visibly different
+ways. The linear strategy spreads traffic broadly, producing a gradual decay
+across the safe zone. The quadratic strategy concentrates the redistribution
+more sharply: the safe zone fills unevenly, with a secondary bump around
+20--24 applications where jobs cluster just below the point at which the
+quadratic penalty becomes severe. The sigmoid panel shows the smoothest
+redistribution, with a steady decline through the safe zone and the earliest
+tail truncation of the three, consistent with its lowest Gini and largest safe
+fraction.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{images/all_universes_job_congestion_grid.png}
+    \caption{Application distributions per job for all four algorithmic
+    universes on Window~7. The red and orange dashed lines mark the
+    starved/safe and safe/congested thresholds respectively. The hard cap
+    at $H=50$ is never visibly triggered as a cliff; the gradient penalties
+    suppress traffic before any job reaches it.}
+    \label{fig:job_mm_grid}
+\end{figure}
+\subsubsection{Qualitative Inference Evaluation}
+\label{sec:exp_job_congestion_sanity}
+To verify that the aggregate improvements translate to sensible individual
+recommendations, the same two users from Section~\ref{sec:exp_recruiter_sanity}
+are examined across all four universes. Their profiles are summarised in
+Tables~\ref{tab:user668904_profile} and~\ref{tab:user831532_profile}. 
+ 
+\textbf{User 668904 — strong career signal.} In the historical universe this
+user has a single entry (the one job they applied to), since the historical
+pool contains only real applications. The free-market Two-Tower recommendations
+are tightly clustered around accounts payable and accounting roles in Houston,
+TX — consistent with 18 years of finance experience. Across the three
+market-maker strategies, the geographic coherence to Houston is preserved in
+all cases and the recommendations remain within the finance cluster. The
+strategies redirect the user away from the most popular AP postings toward
+slightly less applied-to but equally relevant alternatives: Tax Accountant,
+Financial Accountant, and Accounting Analyst variants appear in place of the
+exact same Senior AP Specialist roles that dominate the free market list.
+The quadratic strategy surfaces two lower-scoring entries at ranks 1--2
+(Document Controller and Energy Quantitative Analyst with original scores of
+1.72 and 1.49 respectively) because those jobs had almost no applications and
+received the largest boost. These are less obvious but not unreasonable for a
+candidate with document control experience.
+ 
+\textbf{User 831532 — cold-start user.} This user has no job history and only
+2 years of experience, making the TT model rely entirely on location and basic
+profile features. The free-market recommendations are geographically coherent
+across the PA/NJ/DE tri-state area and semantically consistent around
+community care and support roles (Discussed in Section~\ref{sec:exp_recruiter_sanity}). The market-maker strategies introduce more diversity
+but with a visible cost. The linear strategy adds Home Health Aides (Langhorne
+PA) at rank~2 — a reasonable care-adjacent role — but also surfaces HVAC
+(Wilmington DE) at rank~8, which is semantically distant. The sigmoid strategy
+similarly surfaces a Water Operator role, and the quadratic strategy places
+Loss Prevention (Middletown NJ, original score 1.05) at rank~1 purely due to
+its low application count.
+ 
+The contrast between the two users reveals the market-maker's inherent
+tradeoff. When the Two-Tower model has high confidence — a clear career signal
+and many relevant jobs in the pool — the penalty only redirects the user
+toward equally relevant alternatives. When model confidence is lower — a
+cold-start user with minimal profile signal — boosted low-application jobs
+occasionally surface that are less semantically coherent. This is consistent
+with the aggregate match quality drop observed in Table~\ref{tab:job_mm_results}:
+the 5--6\% reduction in average TT probability is not uniformly distributed
+across users, but is concentrated among those for whom the base model is less
+certain. The market-maker optimises for distributional fairness at the market
+level, not for individual relevance, and this distinction is most visible at
+the user level for cold-start profiles. Tables \ref{tab:sanity_668904} and~\ref{tab:sanity_831532} show the top-3 recommendations for each user across all universes, along with their original TT probabilities for reference. For a full list of all 10 recommendations per user per universe, see Appendix~\ref{app:sanity_check_full}.
+\begin{table}[htbp]
+    \centering
+    \caption{Top-3 recommendations for User~668904 across all universes.
+    New Score is the modified ranking score; Orig Score is the raw Two-Tower
+    logit.}
+    \label{tab:sanity_668904}
+    \begin{tabular}{@{}clp{6.5cm}l@{}}
+        \toprule
+        \textbf{Rank} & \textbf{New Prob} & \textbf{Job Title} & \textbf{Orig Prob} \\
+        \midrule
+        \multicolumn{4}{l}{\textit{Free Market}} \\
+        1 & 0.729 & Senior Accounts Payable Specialist (Houston, TX) & 0.989 \\
+        2 & 0.729 & Accounting Payable / Receivable Specialist (Houston, TX) & 0.989 \\
+        3 & 0.729 & Accounting Assistant (Houston, TX) & 0.988 \\
+        \midrule
+        \multicolumn{4}{l}{\textit{Market Maker Linear}} \\
+        1 & 0.748 & Tax Accountant (Houston, TX) & 0.977 \\
+        2 & 0.747 & Financial Accountant (Houston, TX) & 0.975 \\
+        3 & 0.747 & Junior Accountant (Houston, TX) & 0.974 \\
+        \midrule
+        \multicolumn{4}{l}{\textit{Market Maker Quadratic}} \\
+        1 & 0.748 & Document Controller 4 (Houston, TX) & 0.848 \\
+        2 & 0.742 & Energy Quantitative Analyst (Houston, TX) & 0.817 \\
+        3 & 0.739 & Accounts Payable Supervisor (Houston, TX) & 0.979 \\
+        \midrule
+        \multicolumn{4}{l}{\textit{Market Maker Sigmoid}} \\
+        1 & 0.756 & Tax Accountant (Houston, TX) & 0.977 \\
+        2 & 0.755 & Accounting Analyst — Tubular Accounting (Houston, TX) & 0.973 \\
+        3 & 0.754 & Reporting/GAAP Accountant (Houston, TX) & 0.967 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+ 
+\begin{table}[htbp]
+    \centering
+    \caption{Top-3 recommendations for User~831532 across all universes.
+    $\dagger$~Indicates a job the user actually applied to in Window~7.}
+    \label{tab:sanity_831532}
+    \begin{tabular}{@{}clp{6.5cm}l@{}}
+        \toprule
+        \textbf{Rank} & \textbf{New Prob} & \textbf{Job Title} & \textbf{Orig Prob} \\
+        \midrule
+        \multicolumn{4}{l}{\textit{Free Market}} \\
+        1 & 0.728 & Customer Service Representative (Broomall, PA) & 0.985 \\
+        2 & 0.728 & Nanny / Childcare / Teacher (Madison, NJ) & 0.983 \\
+        7 & 0.726 & Residential Youth Care Workers Needed$^\dagger$ (Conshohocken, PA) & 0.973 \\
+        \midrule
+        \multicolumn{4}{l}{\textit{Market Maker Linear}} \\
+        1 & 0.726 & Shelter Staff (Wilmington, DE) & 0.975 \\
+        2 & 0.726 & Home Health Aides (Langhorne, PA) & 0.865 \\
+        3 & 0.726 & Residential Youth Care Workers Needed$^\dagger$ (Conshohocken, PA) & 0.973 \\
+        \midrule
+        \multicolumn{4}{l}{\textit{Market Maker Quadratic}} \\
+        1 & 0.728 & Loss Prevention openings (Middletown, NJ) & 0.742 \\
+        2 & 0.726 & Shelter Staff (Wilmington, DE) & 0.975 \\
+        7 & 0.725 & Nanny / Childcare / Teacher (Madison, NJ) & 0.983 \\
+        \midrule
+        \multicolumn{4}{l}{\textit{Market Maker Sigmoid}} \\
+        1 & 0.730 & CHHA — Home Health Aide (Vineland, NJ) & 0.843 \\
+        2 & 0.729 & Certified Home Health Aides (Medford, NJ) & 0.836 \\
+        6 & 0.726 & Residential Youth Care Workers Needed$^\dagger$ (Conshohocken, PA) & 0.973 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
 \subsection{User-Side Congestion Analysis}
 \label{sec:exp_user_congestion}
-TODO
- 
+\subsubsection{Historical Analysis}
+\subsubsection{Market-maker simulation results}
+
 \subsection{Hybrid Balancing Results}
 \label{sec:exp_hybrid_results}
 TODO
