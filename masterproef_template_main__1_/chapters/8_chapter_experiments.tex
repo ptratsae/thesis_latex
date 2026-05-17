@@ -848,7 +848,7 @@ applications — while only around 15\% sit in the safe zone. This stability
 justifies using the Windows~1--6 distribution to derive the zone thresholds
 applied to Window~7.
  
-\begin{figure}[htbp]
+\begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth]{images/job_application_distribution_window_1_6.png}
     \caption{Distribution of applications per job in the Windows~1--6 historical
@@ -856,7 +856,7 @@ applied to Window~7.
     \label{fig:job_congestion_baseline}
 \end{figure}
  
-\begin{table}[htbp]
+\begin{table}[H]
     \centering
     \caption{Job-side congestion across historical and test periods.
     Thresholds are derived from the Windows~1--6 distribution and applied
@@ -908,7 +908,7 @@ candidates is preserved despite the redistribution. The market-maker is
 redirecting traffic toward genuinely qualified but overlooked candidates, not
 toward random jobs.
  
-\begin{table}[htbp]
+\begin{table}[H]
     \centering
     \caption{Job-side market-maker results on Window~7. Historical W7 shows
     the raw application distribution for reference. $\bar{p}_{\text{TT}}$ is
@@ -944,7 +944,7 @@ redistribution, with a steady decline through the safe zone and the earliest
 tail truncation of the three, consistent with its lowest Gini and largest safe
 fraction.
 
-\begin{figure}[htbp]
+\begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth]{images/all_universes_job_congestion_grid.png}
     \caption{Application distributions per job for all four algorithmic
@@ -1002,7 +1002,7 @@ across users, but is concentrated among those for whom the base model is less
 certain. The market-maker optimises for distributional fairness at the market
 level, not for individual relevance, and this distinction is most visible at
 the user level for cold-start profiles. Tables \ref{tab:sanity_668904} and~\ref{tab:sanity_831532} show the top-3 recommendations for each user across all universes, along with their original TT probabilities for reference. For a full list of all 10 recommendations per user per universe, see Appendix~\ref{app:sanity_check_full}.
-\begin{table}[htbp]
+\begin{table}[H]
     \centering
     \caption{Top-3 recommendations for User~668904 across all universes.
     New Score is the modified ranking score; Orig Score is the raw Two-Tower
@@ -1035,7 +1035,7 @@ the user level for cold-start profiles. Tables \ref{tab:sanity_668904} and~\ref{
     \end{tabular}
 \end{table}
  
-\begin{table}[htbp]
+\begin{table}[H]
     \centering
     \caption{Top-3 recommendations for User~831532 across all universes.
     $\dagger$~Indicates a job the user actually applied to in Window~7.}
@@ -1068,43 +1068,361 @@ the user level for cold-start profiles. Tables \ref{tab:sanity_668904} and~\ref{
 \end{table}
 \subsection{User-Side Congestion Analysis}
 \label{sec:exp_user_congestion}
-\subsubsection{Baseline Analysis}
+\subsubsection{Historical Analysis}
+Figure~\ref{fig:user_congestion_baseline} shows the distribution of recruiter
+shortlists per candidate in the Windows~1--6 historical pool, obtained by
+simulating the top-5 recruiter screen on the raw application data. The
+distribution is heavily right-skewed: a small fraction of candidates
+accumulates a disproportionate share of recruiter attention while roughly
+half receive fewer than two shortlists. Unlike the job-side distribution
+however, the tail is considerably less extreme — candidates who applied to
+at least one job have a non-trivial chance of being shortlisted, so the
+spike at zero is smaller. Table~\ref{tab:user_congestion_baseline}
+quantifies this across both periods.
 
-Because no recruiter-side shortlisting data is available in the historical pool, the user-side congestion baseline is constructed by simulating the shortlisting on the Window~7 application pool: for each job, applicants are scored by the XGBoost recruiter model and the top-5 are shortlisted, with no
-candidate-level modification applied. This produces a distribution of
-shortlisting events per candidate that reflects how attention would be
-distributed under a purely merit-based, uncorrected system.
- 
-The results reveal a substantially unequal distribution. In the free-market
-setting, 15.8\% of candidates receive zero shortlisting events despite having
-applied to at least one job, while 9.1\% are shortlisted across more than five
-jobs simultaneously. The Gini coefficient is 0.5393. This baseline reflects
-two interacting forces: the natural skew in candidate quality as assessed by
-the recruiter model, and the concentration of applications on popular postings
-that brings the same strong candidates into contact with many recruiters at
-once. Table~\ref{tab:user_mm_results} compares the four market-maker strategies
-against this baseline.
- 
+The Gini coefficients of 0.5356 and 0.5370 for Windows~1--6 and Window~7
+respectively confirm two things. First, meaningful inequality exists:
+recruiter attention is far from uniformly distributed. Second, the pattern
+is highly stable across time — a delta of only 0.0014 between periods. In
+both windows, roughly half of all candidates are starved, receiving fewer
+than two shortlists, while around 41--43\% sit in the safe zone. This
+stability justifies using the Windows~1--6 distribution to derive the zone
+thresholds applied to Window~7.
+
+It is worth noting that both the historical and the market-maker baselines
+in this section are derived from the real application pool — the recruiter
+model is applied to the actual job inboxes, with no Two-Tower recommendation
+step involved. This is a deliberate design choice for the standalone
+user-side analysis: the market-maker operates purely on the recruiter
+ranking stage, isolating its effect from any upstream recommendation
+behaviour. The full interaction between the Two-Tower and the recruiter
+— where TT-generated applications form the inboxes the recruiter then
+ranks — is evaluated separately in the hybrid experiment
+(Section~\ref{sec:exp_hybrid_results}).
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{images/views_per_candidate_past_windows_1_6.png}
+    \caption{Distribution of recruiter shortlists per candidate in the
+    Windows~1--6 historical pool, obtained by simulating the top-5
+    recruiter screen on the raw application data. The vertical dashed lines
+    indicate the starved/safe ($\tau_{\min}^{\text{cand}} = 2$) and
+    safe/congested ($\tau_{\max}^{\text{cand}} = 6$) thresholds.}
+    \label{fig:user_congestion_baseline}
+\end{figure}
+
 \begin{table}[htbp]
     \centering
-    \caption{User-side market-maker results on Window~7. Lower Gini and fewer
-    starved/congested candidates indicate better attention balance.
-    $\bar{p}_{\text{rec}}$ is the average recruiter probability of shortlisted
-    candidates, used as a proxy for shortlisting quality.}
-    \label{tab:user_mm_results}
-    \begin{tabular}{@{}lccccr@{}}
+    \caption{User-side congestion across historical and test periods,
+    measured by applying the top-5 recruiter screen to the raw application
+    pool. Thresholds are derived from the Windows~1--6 distribution and
+    applied consistently across both rows.}
+    \label{tab:user_congestion_baseline}
+    \begin{tabular}{@{}lrrrr@{}}
         \toprule
-        \textbf{Strategy} & \textbf{Gini} & \textbf{Starved} & \textbf{Safe} & \textbf{Congested} & $\bar{p}_{\textbf{rec}}$ \\
+        \textbf{Period} & \textbf{Gini} & \textbf{Starved ($<$2)} &
+        \textbf{Safe (2--6)} & \textbf{Congested ($>$6)} \\
         \midrule
-        Free Market (baseline) & & & & & \\
-        Linear                 & & & & & \\
-        Quadratic              & & & & & \\
-        Sigmoid                & & & & & \\
+        Historical Windows~1--6 & 0.5356 & 48.7\% & 42.6\% & 8.7\% \\
+        Historical Window~7     & 0.5370 & 52.3\% & 40.8\% & 6.9\% \\
         \bottomrule
     \end{tabular}
 \end{table}
+
 \subsubsection{Market-maker simulation results}
+Table~\ref{tab:user_mm_results} compares the three market-maker strategies
+against the Window~7 historical baseline. The baseline here is the recruiter
+screen applied to the real Window~7 application pool — identical to the
+Historical Window~7 row above — so no separate free-market recommender
+row is included. The market-maker operates purely at the recruiter ranking
+stage: for each job inbox, candidates are re-ranked by their recruiter score
+modified by a congestion penalty based on how many times they have already
+been shortlisted in the current simulation run.
+
+All three strategies produce a consistent improvement over the baseline.
+The Gini drops from 0.5370 to approximately 0.481 and the safe zone grows
+from 40.8\% to around 46\%. The match quality cost is minimal: the average
+base recruiter score drops from 0.8576 to approximately 0.847 — a reduction
+of around 1.2\% — indicating that the market-maker is redistributing
+shortlisting attention toward genuinely suitable but overlooked candidates
+rather than arbitrary ones.
+
+The three functional forms produce near-identical outcomes: Gini values of
+0.4809, 0.4816, and 0.4807 for linear, quadratic, and sigmoid respectively
+— a spread of less than 0.001. The overlay in
+Figure~\ref{fig:user_mm_grid} confirms this visually: the three curves are
+almost perfectly superimposed. This contrasts sharply with the job side,
+where sigmoid clearly outperformed the others. The convergence here is
+structural rather than coincidental: because the congested zone spans only
+three integer values (views 7, 8, and 9) before the hard cap at
+$H^{\text{cand}} = 10$, the functional form of the penalty has negligible
+influence on the outcome — all three strategies apply a similar suppression
+within that narrow range. This asymmetry between the job and candidate sides
+reflects a fundamental difference in the nature of the two congestion
+problems: job-side congestion is driven by a recommendation feedback loop
+that creates a wide, heavy tail the penalty curves can act across, while
+candidate-side congestion is structurally bounded by individual application
+behaviour and cannot develop the same runaway dynamic.
+
+\begin{table}[htbp]
+    \centering
+    \caption{User-side market-maker results on Window~7. The baseline is
+    the top-5 recruiter screen applied to the raw application pool, with
+    no market-maker intervention. $\bar{p}_{\text{rec}}$ is the average
+    base recruiter suitability probability of shortlisted (candidate, job)
+    pairs, serving as a proxy for match quality.}
+    \label{tab:user_mm_results}
+    \begin{tabular}{@{}lccccr@{}}
+        \toprule
+        \textbf{Strategy} & \textbf{Gini} & \textbf{Starved} &
+        \textbf{Safe} & \textbf{Congested} & $\bar{p}_{\text{rec}}$ \\
+        \midrule
+        Baseline (raw apps)   & 0.5370 & 52.3\% & 40.8\% & 6.9\% & 0.8576 \\
+        \midrule
+        Linear                & 0.4809 & 47.3\% & 46.4\% & 6.3\% & 0.8470 \\
+        Quadratic             & 0.4816 & 47.4\% & 46.3\% & 6.3\% & 0.8471 \\
+        Sigmoid               & 0.4807 & 47.3\% & 46.3\% & 6.3\% & 0.8469 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Figure~\ref{fig:user_mm_grid} visualises the shortlist distributions
+produced by each strategy. All three market-maker panels shift mass
+rightward out of the starved zone and truncate the tail earlier relative
+to the baseline, but because the strategies are nearly indistinguishable
+in their penalty curves at this scale, the panels differ only in the
+magnitude of the starved spike at zero and one, not in the shape of the
+tail. The hard cap at $H^{\text{cand}} = 10$ is never visibly triggered
+as a cliff for the same reason as the job side: the gradient penalties
+suppress shortlisting before any candidate reaches it.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{images/all_universes_user_congestion_grid.png}
+    \caption{Shortlist distributions per candidate for the three
+    market-maker strategies on Window~7, alongside the raw-application
+    baseline. The red and orange dashed lines mark the starved/safe
+    ($\tau_{\min}^{\text{cand}} = 2$) and safe/congested
+    ($\tau_{\max}^{\text{cand}} = 6$) thresholds respectively. Unlike the
+    job-side grid, the three market-maker panels are visually
+    near-identical, reflecting the structural convergence of the penalty
+    functions over the narrow congested zone.}
+    \label{fig:user_mm_grid}
+\end{figure}
 
 \subsection{Hybrid Balancing Results}
 \label{sec:exp_hybrid_results}
-TODO
+
+The hybrid experiment evaluates the full dual-sided pipeline, where the
+Two-Tower recommender and the recruiter model operate jointly across two
+phases. In Phase~1, each user applies to their top-$k$ jobs ranked by a
+combined score:
+%
+\begin{equation}
+    s(u, j) = \alpha \cdot \bigl(p_{\text{TT}}(u,j) + \delta_{\text{job}}(c_j)\bigr)
+             + (1-\alpha) \cdot p_{\text{rec}}(u,j)
+    \label{eq:hybrid_score}
+\end{equation}
+%
+where $p_{\text{TT}}(u,j)$ is the sigmoid-transformed Two-Tower logit,
+$p_{\text{rec}}(u,j)$ is the recruiter suitability probability,
+$\delta_{\text{job}}(c_j)$ is the job-side congestion modification as a
+function of the current application count $c_j$, and $\alpha = 0.5$ gives
+equal weight to both signals. In Phase~2, each job's inbox — formed by
+the applications from Phase~1 — is ranked by the recruiter model, optionally
+modified by a candidate-side congestion penalty $\delta_{\text{cand}}(v_u)$
+based on how many times candidate $u$ has already been shortlisted. The
+top-5 candidates per job are shortlisted.
+
+Four universes are evaluated in an ablation design, using the sigmoid
+functional form throughout since it produced the best results in the
+standalone job-side experiments
+(Section~\ref{sec:exp_job_congestion}):
+
+\begin{enumerate}
+    \item \textbf{Bilateral scoring, no penalties} — the combined
+    $\alpha$-weighted score drives applications; the recruiter ranks
+    inboxes without any congestion penalty. This isolates the effect of
+    bilateral scoring alone.
+    \item \textbf{Job-side sigmoid only} — the job congestion penalty
+    $\delta_{\text{job}}$ is active in Phase~1; no candidate penalty in
+    Phase~2.
+    \item \textbf{Candidate-side sigmoid only} — no job penalty in
+    Phase~1; the candidate congestion penalty $\delta_{\text{cand}}$ is
+    active in Phase~2.
+    \item \textbf{Both sigmoid} — both penalties active simultaneously.
+    This is the complete dual-sided market-maker.
+\end{enumerate}
+
+\subsubsection{Bilateral scoring baseline}
+Table~\ref{tab:hybrid_job_results} shows that bilateral scoring alone
+already improves over the pure Two-Tower free market from
+Section~\ref{sec:exp_job_congestion}: the job-side Gini drops from
+0.9625 to 0.9182, and the starved fraction decreases from 90.8\% to
+85.6\%. This improvement requires no explicit congestion penalty —
+it arises purely from incorporating the recruiter signal into the
+application ranking. Because the recruiter score captures candidate-job
+fit from a different perspective than the Two-Tower, the combined score
+diversifies which jobs users apply to, partially breaking the feedback
+loop that concentrates traffic on popular postings.
+
+On the candidate side (Table~\ref{tab:hybrid_cand_results}), the
+bilateral baseline produces a Gini of 0.6326 with 32.1\% of candidates
+starved. This is considerably worse than the standalone user-side
+baseline (Gini 0.5370, 52.3\% starved) because the population here
+is different: the standalone simulation operated on the real application
+pool where candidates self-selected into jobs. Here, the TT recommender
+directs users toward jobs the model believes are relevant, which
+concentrates applications — and therefore recruiter attention — more
+unevenly than organic behaviour.
+
+\subsubsection{Ablation: isolating each penalty}
+
+\paragraph{Job-side penalty only.}
+Adding the job-side sigmoid penalty reduces the job Gini substantially
+from 0.9182 to 0.7276, and grows the safe zone from 11.1\% to 29.4\%.
+However, this improvement is considerably smaller than in the standalone
+job-side experiment, where the same sigmoid penalty achieved a Gini of
+0.5985. The gap is explained by the structure of the combined scoring
+function (Equation~\ref{eq:hybrid_score}): the job penalty
+$\delta_{\text{job}}$ only acts on the Two-Tower component, which
+carries weight $\alpha = 0.5$. The recruiter probability term is
+congestion-unaware and pulls the combined score in the opposite
+direction — a user may still apply to a congested job if the recruiter
+score is high enough to outweigh the penalty. This dilution is a
+fundamental consequence of the bilateral design: the recruiter signal
+improves match quality but attenuates the market-maker's redistribution
+power. A higher $\alpha$ would strengthen the penalty at the cost of
+recruiter influence, and represents a tunable trade-off left for future
+work.
+
+The candidate-side effect of the job penalty is striking: starved
+candidates drop from 32.1\% to just 6.8\%, and the candidate Gini
+falls from 0.6326 to 0.5256. This improvement is entirely indirect —
+by redistributing applications more evenly across jobs, each job inbox
+contains a more diverse set of candidates, so recruiter attention
+naturally spreads. The trade-off is a rise in congested candidates from
+6.7\% to 13.7\%: when the job penalty pushes applications toward
+previously empty jobs, those jobs now have small inboxes where all
+applicants are automatically shortlisted, including candidates who are
+already frequently shortlisted elsewhere.
+
+\paragraph{Candidate-side penalty only.}
+The candidate-side penalty applied without any job penalty produces a
+modest improvement on the candidate side: Gini drops from 0.6326 to
+0.5884 and starved candidates from 32.1\% to 27.9\%. The job-side
+distribution is unchanged from the bilateral baseline by design — the
+candidate penalty operates only in Phase~2 and has no influence on
+which jobs users apply to in Phase~1. The candidate-side improvement
+here is smaller than the job-side penalty's indirect effect (Gini 0.5884
+vs 0.5256), confirming that redistributing the application pool in
+Phase~1 is a more powerful lever for candidate equity than re-ranking
+within fixed inboxes in Phase~2.
+
+\subsubsection{Full dual-sided market-maker}
+Universe~4 combines both penalties and achieves the best results across
+all metrics. On the job side, the Gini and zone fractions are identical
+to universe~2 (0.7276, 29.4\% safe) — as expected, since the candidate
+penalty operates in Phase~2 and cannot influence Phase~1 job
+distributions. On the candidate side, the full system achieves a Gini
+of 0.4950 with only 3.9\% of candidates starved and 82.9\% in the safe
+zone. Compared to the bilateral baseline this represents a reduction of
+28.2 percentage points in the starved fraction.
+
+The congested fraction remains elevated at 13.2\%, marginally below the
+13.7\% of universe~2. The candidate penalty suppresses repeat shortlisting
+but cannot fully counteract the structural effect of the job penalty
+pushing applications into small inboxes. This is an inherent tension in
+the dual-sided design: the mechanisms that most effectively reduce
+candidate starvation also create pathways for mild candidate congestion.
+
+Match quality is preserved throughout. The average TT probability of
+applied jobs drops from 0.8966 (bilateral) to 0.8671 with the job
+penalty — a 3.3\% reduction — and the average recruiter probability
+drops from 0.8405 to 0.8158. These reductions reflect the intended
+behaviour: the market-maker redirects some users away from their
+highest-scoring jobs toward less popular alternatives, accepting a
+modest match quality cost in exchange for a substantially more equitable
+distribution of both applications and recruiter attention.
+
+\begin{table}[htbp]
+    \centering
+    \caption{Hybrid simulation results — job-side congestion on Window~7.
+    Historical Reality shows the raw application distribution for
+    reference. Universes~1 and~3 are identical on the job side by design
+    since neither applies a job-side penalty; the same holds for
+    universes~2 and~4.}
+    \label{tab:hybrid_job_results}
+    \begin{tabular}{@{}lccccc@{}}
+        \toprule
+        \textbf{Universe} & \textbf{Gini} & \textbf{Starved} &
+        \textbf{Safe} & \textbf{Congested} \\
+        \midrule
+        Historical Reality          & 0.8575 & 80.9\% & 15.8\% & 3.3\% \\
+        \midrule
+        1: Bilateral (no penalties) & 0.9182 & 85.6\% & 11.1\% & 3.4\% \\
+        2: Job-side sigmoid         & 0.7276 & 67.4\% & 29.4\% & 3.2\% \\
+        3: Candidate-side sigmoid   & 0.9182 & 85.6\% & 11.1\% & 3.4\% \\
+        4: Both sigmoid             & 0.7276 & 67.4\% & 29.4\% & 3.2\% \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+    \centering
+    \caption{Hybrid simulation results — candidate-side congestion on
+    Window~7. $\bar{p}_{\text{TT}}$ and $\bar{p}_{\text{rec}}$ are
+    the average Two-Tower and recruiter probabilities of applied
+    (user, job) pairs, serving as match quality proxies. Scores are
+    only available for universes where Phase~1 differs.}
+    \label{tab:hybrid_cand_results}
+    \begin{tabular}{@{}lcccccc@{}}
+        \toprule
+        \textbf{Universe} & \textbf{Gini} & \textbf{Starved} &
+        \textbf{Safe} & \textbf{Congested} &
+        $\bar{p}_{\text{TT}}$ & $\bar{p}_{\text{rec}}$ \\
+        \midrule
+        1: Bilateral (no penalties) & 0.6326 & 32.1\% & 61.1\% & 6.7\%
+            & 0.8966 & 0.8405 \\
+        2: Job-side sigmoid         & 0.5256 &  6.8\% & 79.5\% & 13.7\%
+            & 0.8671 & 0.8158 \\
+        3: Candidate-side sigmoid   & 0.5884 & 27.9\% & 66.2\% & 5.9\%
+            & 0.8966 & 0.8405 \\
+        4: Both sigmoid             & 0.4950 &  3.9\% & 82.9\% & 13.2\%
+            & 0.8671 & 0.8158 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Figure~\ref{fig:hybrid_job_grid} and Figure~\ref{fig:hybrid_cand_grid}
+visualise the distributions across all four universes. The job grid
+confirms the paired structure: bilateral and candidate-sigmoid are
+visually identical, as are job-sigmoid and both-sigmoid. The contrast
+between the two pairs is stark — the penalised universes show a sharp
+drop in the tail beyond the congested threshold and a clear build-up of
+mass in the safe zone. The candidate grid shows all four panels
+diverging, with the progression from bilateral through to both-sigmoid
+clearly visible in the shrinking starved spike at zero and one and the
+extending but flattening tail.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{images/combined_job_counts_grid.png}
+    \caption{Application distributions per job for all four hybrid
+    universes on Window~7. Universes~1 and~3 (left column) are
+    identical; universes~2 and~4 (right column) are identical. The
+    note in the top-right of the left panels indicates jobs beyond the
+    $x$-axis clip that exist due to the absence of a job-side penalty.}
+    \label{fig:hybrid_job_grid}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{images/combined_candidate_views_grid.png}
+    \caption{Shortlist distributions per candidate for all four hybrid
+    universes on Window~7. All four panels differ, reflecting the
+    independent contribution of each penalty. Universe~4 (both sigmoid)
+    achieves the lowest starved fraction and best Gini at the cost of
+    an elevated congested tail.}
+    \label{fig:hybrid_cand_grid}
+\end{figure}
