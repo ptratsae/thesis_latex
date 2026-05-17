@@ -15,12 +15,19 @@ The chapter should be one page at most.
 \textbf{Title:} Can AI help you find your dream job?\\
 \textbf{Author:} Pharrell Tratsaert\\
 \textbf{Student number:} 02111011\\
-\textbf{Supervisor:} Prof. dr. Tijl De Bie\\
-\textbf{Counsellor:} Iman Johary\\
+\textbf{Supervisor:} Prof. dr. Bo Kang\\
+\textbf{Counsellor:} Prof. dr. Tijl De Bie\\
 \textbf{Programme:} Master of Science in Computer Science Engineering\\
 \textbf{Academic year:} 2025-2026
-This dissertation studies how AI-driven recommender systems can improve matching quality in a two-sided job market by reducing congestion while preserving fair and efficient matches. A dual-phase approach is proposed: a user-side recommender based on a Two-Tower neural architecture that generates candidate job shortlists for jobseekers, and a recruiter-side lightweight logistic regression model that scores candidate suitability for shortlisting. Because recruiter training labels were not available, we develop a preprocessing pipeline that synthesizes training examples and produces a compact recruiter model for fast inference. We combine these components in a hybrid congestion-balancing strategy that applies job-level adjustments at recommendation time and candidate-level adjustments during recruiter shortlisting, evaluated via counterfactual simulations on real application logs. Metrics include applications-per-job and shortlists-per-candidate distributions, Gini coefficients, and match quality (model-based probabilities). Results show the combined strategy can meaningfully reduce over-exposure of popular jobs and rebalance recruiter attention with minimal loss of matching relevance. The work demonstrates that coordinating user-side recommendations and recruiter-side ranking is an effective lever for congestion mitigation in large-scale labor platforms.
+\bigskip
+\bigskip
 
-STILL NEED TO FILL IN RESULTS AND EVALUATION
+Job platforms suffer from severe market congestion, where popular postings attract disproportionate applications while qualified candidates go unseen. This dissertation addresses this imbalance by proposing a dual-phase AI-driven recommendation framework for two-sided job markets that reduces congestion while preserving fair and efficient matches. On the user side, a Two-Tower neural architecture generates personalised job recommendation lists for jobseekers; on the recruiter side, a lightweight XGBoost model scores candidate suitability for shortlisting. Because recruiter training labels were unavailable, a large language model is used to synthesise them, producing a compact model suited for fast inference. Both components are integrated into a hybrid congestion-balancing strategy that applies job-level score adjustments at recommendation time and candidate-level adjustments during recruiter shortlisting. The approach is evaluated via counterfactual simulations on real application logs from the CareerBuilder dataset, using applications-per-job and shortlists-per-candidate distributions, Gini coefficients, and model-based match probabilities as metrics. The full hybrid strategy reduces the job-side Gini coefficient from 0.918 to 0.728 and lowers the fraction of starved jobs from 85.6\% to 67.4\%, while simultaneously reducing the candidate-side Gini from 0.633 to 0.495 and the fraction of unseen candidates from 32.1\% to 3.9\%. The full hybrid strategy reduces the job-side Gini coefficient from 
+0.918 to 0.728 and lowers the fraction of starved jobs from 85.6\% 
+to 67.4\%, while simultaneously reducing the candidate-side Gini 
+from 0.633 to 0.495 and the fraction of unseen candidates from 
+32.1\% to 3.9\%, at a match quality cost of under 3.5\% in average 
+Two-Tower probability relative to the unpenalised bilateral baseline. These results demonstrate that coordinating user-side recommendations and recruiter-side ranking is an effective lever for congestion mitigation in large-scale labour platforms.
+
 
 \textbf{Keywords:} recommender systems; job matching; two-sided markets; market congestion; machine learning
