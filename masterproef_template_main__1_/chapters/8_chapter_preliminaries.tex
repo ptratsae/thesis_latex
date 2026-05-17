@@ -125,10 +125,10 @@ A neural embedding is a learned mapping from a discrete or high-dimensional inpu
 
 
 In addition to the neural architecture used for user-side recommendation, this thesis also employs several lightweight machine learning models for the recruiter-side recommendation component. See Chapter~\ref{chap:recruiter_recommendation} for details. These models include:
-\paragraph{Logistic Regression} is a linear model that estimates the probability of a binary outcome based on a weighted sum of input features. It is interpretable and efficient, making it suitable for the small synthetic dataset generated for recruiter-side training.
-\paragraph{Random Forest} is an ensemble of decision trees that improves predictive performance by averaging the outputs of multiple trees trained on random subsets of the data and features. It can capture non-linear relationships and interactions between features.
-\paragraph{XGBoost} is a gradient boosting framework that builds an ensemble of weak learners (typically decision trees) in a stage-wise manner, optimising a differentiable loss function. It is known for its high performance on structured data and is used here as a strong baseline for recruiter-side recommendation.
-\paragraph{Voting Classifier} is an ensemble method that combines the predictions of multiple models (in this case, Logistic Regression, Random Forest and XGBoost) by majority voting. This approach can improve robustness and generalisation by leveraging the strengths of different algorithms.
+\medskip\noindent\textbf{Logistic Regression.} is a linear model that estimates the probability of a binary outcome based on a weighted sum of input features. It is interpretable and efficient, making it suitable for the small synthetic dataset generated for recruiter-side training.
+\medskip\noindent\textbf{Random Forest.} is an ensemble of decision trees that improves predictive performance by averaging the outputs of multiple trees trained on random subsets of the data and features. It can capture non-linear relationships and interactions between features.
+\medskip\noindent\textbf{XGBoost.} is a gradient boosting framework that builds an ensemble of weak learners (typically decision trees) in a stage-wise manner, optimising a differentiable loss function. It is known for its high performance on structured data and is used here as a strong baseline for recruiter-side recommendation.
+\medskip\noindent\textbf{Voting Classifier.} is an ensemble method that combines the predictions of multiple models (in this case, Logistic Regression, Random Forest and XGBoost) by majority voting. This approach can improve robustness and generalisation by leveraging the strengths of different algorithms.
 
 \subsection{TF-IDF Representations}
 \label{sec:prelim_tfidf}
