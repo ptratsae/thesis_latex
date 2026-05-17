@@ -1213,22 +1213,12 @@ suppress shortlisting before any candidate reaches it.
 \subsection{Hybrid Balancing Results}
 \label{sec:exp_hybrid_results}
 
-The hybrid experiment evaluates the full dual-sided pipeline, where the
+As discussed in Section~\ref{sec:hybrid_strategy}, the hybrid experiment evaluates the full dual-sided pipeline, where the
 Two-Tower recommender and the recruiter model operate jointly across two
-phases. In Phase~1, each user applies to their top-$k$ jobs ranked by a
-combined score:
-%
-\begin{equation}
-    s(u, j) = \alpha \cdot \bigl(p_{\text{TT}}(u,j) + \delta_{\text{job}}(c_j)\bigr)
-             + (1-\alpha) \cdot p_{\text{rec}}(u,j)
-    \label{eq:hybrid_score}
-\end{equation}
-%
-where $p_{\text{TT}}(u,j)$ is the sigmoid-transformed Two-Tower logit,
-$p_{\text{rec}}(u,j)$ is the recruiter suitability probability,
-$\delta_{\text{job}}(c_j)$ is the job-side congestion modification as a
-function of the current application count $c_j$, and $\alpha = 0.5$ gives
-equal weight to both signals. In Phase~2, each job's inbox — formed by
+phases. In the first phase, users are scored against jobs using a combined score that sums the logit outputs of both models. The weighting parameter $\alpha = 0.5$ is used for simplicity, giving
+equal weight to both signals. The Two-Tower term has an optional penalty term. 
+
+In Phase~2, each job's inbox — formed by
 the applications from Phase~1 — is ranked by the recruiter model, optionally
 modified by a candidate-side congestion penalty $\delta_{\text{cand}}(v_u)$
 based on how many times candidate $u$ has already been shortlisted. The
@@ -1266,6 +1256,20 @@ fit from a different perspective than the Two-Tower, the combined score
 diversifies which jobs users apply to, partially breaking the feedback
 loop that concentrates traffic on popular postings.
 
+The match quality picture is particularly striking. Compared to the
+standalone Two-Tower free market ($\bar{p}_{\text{TT}} = 0.9537$), the
+bilateral baseline shows a modest drop in average TT probability to
+0.8966 (Table~\ref{tab:hybrid_scores}) — a reduction of 5.9\%. However, the average recruiter
+probability rises significantly from 0.5711 to 0.8405. This is not a
+contradiction: the TT model was optimised purely for relevance and
+its top recommendations are jobs the user is likely to apply to, but
+not necessarily jobs where the recruiter would consider them a strong
+fit. By weighting the recruiter signal equally alongside the TT score,
+the combined ranking steers users toward jobs where they are both
+interested and genuinely suitable — accepting a small reduction in
+application likelihood in exchange for a large gain in candidate-job
+fit quality from the recruiter's perspective.
+
 On the candidate side (Table~\ref{tab:hybrid_cand_results}), the
 bilateral baseline produces a Gini of 0.6326 with 32.1\% of candidates
 starved. This is considerably worse than the standalone user-side
@@ -1296,6 +1300,16 @@ power. A higher $\alpha$ would strengthen the penalty at the cost of
 recruiter influence, and represents a tunable trade-off left for future
 work.
 
+Notably, despite the redistribution cost, the recruiter probability
+remains substantially higher than the standalone Two-Tower free market
+baseline (Table~\ref{tab:hybrid_scores}), confirming that the
+bilateral scoring gain in candidate-job fit quality is preserved even
+after the job penalty is applied. The TT probability is lower than the
+standalone baseline (0.8671 vs 0.9537), which is expected — the
+bilateral score never optimises for TT probability alone, and the job
+penalty pushes this further by redirecting users away from their
+highest-ranked jobs.
+
 The candidate-side effect of the job penalty is striking: starved
 candidates drop from 32.1\% to just 6.8\%, and the candidate Gini
 falls from 0.6326 to 0.5256. This improvement is entirely indirect —
@@ -1313,7 +1327,7 @@ modest improvement on the candidate side: Gini drops from 0.6326 to
 0.5884 and starved candidates from 32.1\% to 27.9\%. The job-side
 distribution is unchanged from the bilateral baseline by design — the
 candidate penalty operates only in Phase~2 and has no influence on
-which jobs users apply to in Phase~1. The candidate-side improvement
+which jobs users apply to in Phase~1. The match quality scores are the also equal for the same reason. The candidate-side improvement
 here is smaller than the job-side penalty's indirect effect (Gini 0.5884
 vs 0.5256), confirming that redistributing the application pool in
 Phase~1 is a more powerful lever for candidate equity than re-ranking
@@ -1327,7 +1341,7 @@ penalty operates in Phase~2 and cannot influence Phase~1 job
 distributions. On the candidate side, the full system achieves a Gini
 of 0.4950 with only 3.9\% of candidates starved and 82.9\% in the safe
 zone. Compared to the bilateral baseline this represents a reduction of
-28.2 percentage points in the starved fraction.
+28.2\% in the starved fraction.
 
 The congested fraction remains elevated at 13.2\%, marginally below the
 13.7\% of universe~2. The candidate penalty suppresses repeat shortlisting
@@ -1336,14 +1350,29 @@ pushing applications into small inboxes. This is an inherent tension in
 the dual-sided design: the mechanisms that most effectively reduce
 candidate starvation also create pathways for mild candidate congestion.
 
-Match quality is preserved throughout. The average TT probability of
-applied jobs drops from 0.8966 (bilateral) to 0.8671 with the job
-penalty — a 3.3\% reduction — and the average recruiter probability
-drops from 0.8405 to 0.8158. These reductions reflect the intended
-behaviour: the market-maker redirects some users away from their
-highest-scoring jobs toward less popular alternatives, accepting a
-modest match quality cost in exchange for a substantially more equitable
-distribution of both applications and recruiter attention.
+Match quality scores are identical to universe~2
+(Table~\ref{tab:hybrid_scores}),
+as expected — the candidate-side penalty operates exclusively in
+Phase~2 and has no influence on which jobs users apply to in Phase~1.
+The match quality cost of the full system is therefore entirely
+attributable to the job-side penalty, not to the candidate-side
+penalty. These reductions reflect the intended behaviour: the market-maker redirects some users away from
+their highest-scoring jobs toward less popular alternatives, accepting
+a modest match quality cost in exchange for a substantially more
+equitable distribution of both applications and recruiter attention.
+
+On the candidate side, the full system achieves a Gini of 0.4950 with
+only 3.9\% of candidates starved and 82.9\% in the safe zone —
+improvements of 28.2\% and 21.8\% respectively over the
+bilateral baseline. The addition of the candidate-side penalty over
+universe~2 reduces the starved fraction further from 6.8\% to 3.9\%
+and brings the congested fraction down marginally from 13.7\% to
+13.2\%, confirming that the candidate penalty is doing its job but
+cannot fully counteract the structural effect of small inboxes created
+by the job penalty. The remaining congestion is an inherent tension in
+the dual-sided design: the mechanisms that most effectively reduce
+candidate starvation also create pathways for mild candidate congestion
+that the candidate penalty can only partially suppress.
 
 \begin{table}[htbp]
     \centering
@@ -1353,7 +1382,7 @@ distribution of both applications and recruiter attention.
     since neither applies a job-side penalty; the same holds for
     universes~2 and~4.}
     \label{tab:hybrid_job_results}
-    \begin{tabular}{@{}lccccc@{}}
+    \begin{tabular}{@{}lcccc@{}}
         \toprule
         \textbf{Universe} & \textbf{Gini} & \textbf{Starved} &
         \textbf{Safe} & \textbf{Congested} \\
@@ -1367,7 +1396,24 @@ distribution of both applications and recruiter attention.
         \bottomrule
     \end{tabular}
 \end{table}
-
+\begin{table}[htbp]
+    \centering
+    \caption{Average match quality scores over all applied (user, job)
+    pairs in Phase~1. Scores are determined by Phase~1 only and are
+    therefore identical across universes that share the same job-side
+    strategy.}
+    \label{tab:hybrid_scores}
+    \begin{tabular}{@{}lcc@{}}
+        \toprule
+        \textbf{Universe} & $\bar{p}_{\text{TT}}$ & $\bar{p}_{\text{rec}}$ \\
+        \midrule
+        1: Bilateral (no penalties) & 0.8966 & 0.8405 \\
+        2: Job-side sigmoid         & 0.8671 & 0.8158 \\
+        3: Candidate-side sigmoid   & 0.8966 & 0.8405 \\
+        4: Both sigmoid             & 0.8671 & 0.8158 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
 \begin{table}[htbp]
     \centering
     \caption{Hybrid simulation results — candidate-side congestion on
@@ -1376,20 +1422,15 @@ distribution of both applications and recruiter attention.
     (user, job) pairs, serving as match quality proxies. Scores are
     only available for universes where Phase~1 differs.}
     \label{tab:hybrid_cand_results}
-    \begin{tabular}{@{}lcccccc@{}}
+    \begin{tabular}{@{}lcccc@{}}
         \toprule
         \textbf{Universe} & \textbf{Gini} & \textbf{Starved} &
-        \textbf{Safe} & \textbf{Congested} &
-        $\bar{p}_{\text{TT}}$ & $\bar{p}_{\text{rec}}$ \\
+        \textbf{Safe} & \textbf{Congested}\\
         \midrule
-        1: Bilateral (no penalties) & 0.6326 & 32.1\% & 61.1\% & 6.7\%
-            & 0.8966 & 0.8405 \\
-        2: Job-side sigmoid         & 0.5256 &  6.8\% & 79.5\% & 13.7\%
-            & 0.8671 & 0.8158 \\
-        3: Candidate-side sigmoid   & 0.5884 & 27.9\% & 66.2\% & 5.9\%
-            & 0.8966 & 0.8405 \\
-        4: Both sigmoid             & 0.4950 &  3.9\% & 82.9\% & 13.2\%
-            & 0.8671 & 0.8158 \\
+        1: Bilateral (no penalties) & 0.6326 & 32.1\% & 61.1\% & 6.7\% \\
+        2: Job-side sigmoid         & 0.5256 &  6.8\% & 79.5\% & 13.7\% \\
+        3: Candidate-side sigmoid   & 0.5884 & 27.9\% & 66.2\% & 5.9\% \\
+        4: Both sigmoid             & 0.4950 &  3.9\% & 82.9\% & 13.2\% \\
         \bottomrule
     \end{tabular}
 \end{table}
