@@ -16,6 +16,7 @@ Table~\ref{tab:notation} summarises the key symbols used throughout.
 
 \begin{table}[htbp]
     \centering
+    \small
     \caption{Summary of notation used throughout the thesis.}
     \label{tab:notation}
     \begin{tabular}{@{}ll@{}}
@@ -88,15 +89,19 @@ A \gls{RS} is a function that, given a user $u$, returns a ranked list of items 
 \subsection{Two-Sided Markets and Congestion}
 \label{sec:prelim_twosided}
 
-A two-sided market is a platform that serves two distinct groups of participants whose value derives from interacting with each other \cite{mashayekhi2023challengebasedsurveyerecruitmentrecommendation}. The job market is a canonical example: job seekers derive value from being matched to a suitable employer, and recruiters derive value from being matched to a suitable candidate. Unlike a one-sided market such as video streaming, where the same item can be consumed by arbitrarily many users simultaneously, the job market operates under \emph{capacity constraints}: each position can be filled by at most one candidate.
+A two-sided market is a platform that serves two distinct groups of participants whose value derives from interacting with each other \cite{mashayekhi2023challengebasedsurveyerecruitmentrecommendation}. The job market is a canonical example: job seekers derive value from being matched to a suitable job, and recruiters or employers derive value from finding suitable candidates. Unlike a one-sided market such as video streaming, where the same item can be consumed by arbitrarily many users simultaneously, the job market operates under \emph{capacity constraints}: each position can be filled by at most one candidate.
 
-This constraint leads to \textbf{market congestion}. Formally, congestion occurs when the recommendation distribution is highly concentrated: a large fraction of users are directed towards a small subset of jobs, resulting in those jobs receiving far more applications than they can process, while other jobs receive too few. Congestion is harmful on both sides: over-exposed jobs create noise and decision fatigue for recruiters, and under-exposed jobs represent missed opportunities for seekers.
+This constraint leads to \textbf{market congestion}. Formally, congestion occurs when the recommendation distribution is highly concentrated: a large fraction of users are directed towards a small subset of jobs, resulting in those jobs receiving far more applications than they can process, while other jobs receive too few. Congestion is harmful on both sides: over-exposed jobs create noise and decision fatigue for recruiters, and under-exposed jobs represent missed opportunities for seekers and vacant positions.
 
 Two concrete manifestations of congestion are studied in this thesis:
 
 \begin{itemize}
     \item \textbf{Job-side congestion}: a small number of jobs accumulate a disproportionate share of recommended applications. This is closely related to the popularity bias described in Section~\ref{sec:intro:motivation}.
-    \item \textbf{User-side congestion}: a large fraction of users receive heavily overlapping recommendation lists, reducing the diversity of outcomes across the market. A good example was mentioned in Section \ref{sec:intro:problem}.
+    \item \textbf{Candidate-side congestion}: a small fraction of candidates 
+    receive a disproportionate share of recruiter shortlisting events, while 
+    the majority are overlooked entirely. This mirrors job-side congestion but 
+    operates on the recruiter's inbox rather than the job posting's application 
+    pool.
 \end{itemize}
 
 A key goal of this thesis is to propose strategies that reduce both forms of congestion while preserving recommendation relevance for individual users.
@@ -113,17 +118,17 @@ A neural embedding is a learned mapping from a discrete or high-dimensional inpu
 
 \textbf{Learnable embedding layers} are used for categorical features such as city or education level. Each unique category value is assigned a vector of dimension $d_{\text{cat}}$, and these vectors are updated during training by gradient descent. Unlike one-hot encodings, learned embeddings can capture semantic similarity: categories that behave similarly in the training data will converge to nearby vectors.
 
-\textbf{Pre-trained text embeddings} are used to encode natural language fields such as job titles, descriptions and work history. In this thesis, the Qwen3 Embedding model (0.6B parameters) is used to produce continuous vector representations of text. Further discussed in Chapter~\ref{chap:user_recommendation}).
+\textbf{Pre-trained text embeddings} are used to encode natural language fields such as job titles, descriptions and work history. In this thesis, the Qwen3 Embedding model (0.6B parameters) is used to produce continuous vector representations of text. Further discussed in Chapter~\ref{chap:user_recommendation}.
 
 \subsection{Lightweight Machine Learning Models}
 \label{sec:prelim_lightweight}
-% Need a very small section about Logistic Regression, Random Forest, XGB and Voting Classifier
 
-In addition to the neural architecture used for user-side recommendation, this thesis also employs several lightweight machine learning models for the recruiter-side recommendation component (Chapter~\ref{chap:recruiter_recommendation}). These include:
-\textbf{Logistic Regression} is a linear model that estimates the probability of a binary outcome based on a weighted sum of input features. It is interpretable and efficient, making it suitable for the small synthetic dataset generated for recruiter-side training.
-\textbf{Random Forest} is an ensemble of decision trees that improves predictive performance by averaging the outputs of multiple trees trained on random subsets of the data and features. It can capture non-linear relationships and interactions between features.
-\textbf{XGBoost} is a gradient boosting framework that builds an ensemble of weak learners (typically decision trees) in a stage-wise manner, optimising a differentiable loss function. It is known for its high performance on structured data and is used here as a strong baseline for recruiter-side recommendation.
-\textbf{Voting Classifier} is an ensemble method that combines the predictions of multiple models (in this case, Logistic Regression, Random Forest and XGBoost) by majority voting. This approach can improve robustness and generalisation by leveraging the strengths of different algorithms.
+
+In addition to the neural architecture used for user-side recommendation, this thesis also employs several lightweight machine learning models for the recruiter-side recommendation component. See Chapter~\ref{chap:recruiter_recommendation} for details. These models include:
+\paragraph{Logistic Regression} is a linear model that estimates the probability of a binary outcome based on a weighted sum of input features. It is interpretable and efficient, making it suitable for the small synthetic dataset generated for recruiter-side training.
+\paragraph{Random Forest} is an ensemble of decision trees that improves predictive performance by averaging the outputs of multiple trees trained on random subsets of the data and features. It can capture non-linear relationships and interactions between features.
+\paragraph{XGBoost} is a gradient boosting framework that builds an ensemble of weak learners (typically decision trees) in a stage-wise manner, optimising a differentiable loss function. It is known for its high performance on structured data and is used here as a strong baseline for recruiter-side recommendation.
+\paragraph{Voting Classifier} is an ensemble method that combines the predictions of multiple models (in this case, Logistic Regression, Random Forest and XGBoost) by majority voting. This approach can improve robustness and generalisation by leveraging the strengths of different algorithms.
 
 \subsection{TF-IDF Representations}
 \label{sec:prelim_tfidf}
@@ -147,7 +152,7 @@ In this thesis, an \gls{LLM} is used not as a recommender system in itself, but 
  
 \subsubsection{Naive Prompting and Its Limitations}
  
-A naive prompt instructs the model to perform a task in a single step: for example, \emph{``Given this candidate profile and job description, is this a good fit? Answer yes or no.''}. In practice, this approach produces inconsistent outputs for structured evaluation tasks. The model may apply different implicit criteria across examples as each prompt is independently generated when making different calls to the model. This leads to incosistent labels and noise, which consequently degrades the performance of models trained on the labeled data.
+A naive prompt instructs the model to perform a task in a single step: for example, \emph{``Given this candidate profile and job description, is this a good fit? Answer yes or no.''}. In practice, this approach produces inconsistent outputs for structured evaluation tasks. The model may apply different implicit criteria across examples as each prompt is independently generated when making different calls to the model. This leads to inconsistent labels and noise, which consequently degrades the performance of models trained on the labeled data.
 \subsubsection{Chain-of-Thought Prompting}
 \label{sec:prelim_cot}
  
@@ -263,7 +268,7 @@ congestion experiments are reported in Chapter~\ref{chap:congestion_balancing}.
 \section{Related Work}
 \label{sec:prelim_related_work}
 
-The rapid advancement of digital labor platforms has shifted the matching paradigm from simple keyword search engines toward autonomous decision-making systems. As mentioned in Section~\ref{sec:intro:problem}, the job market is a two-sided reciprocal market characterized by rivalrous goods, hard capacity constraints, and heterogeneous preferences on both sides \cite{goda2024bestofbothapproachimprovematch, mashayekhi2023reconreducingcongestionjob}. A successful recommendation in this context is not merely one that elicits a click, but one that leads to a bilateral agreement where both the job seeker and the recruiter find the pairing optimal \cite{biLorentzFM2025}.
+The rapid advancement of digital labour platforms has shifted the matching paradigm from simple keyword search engines toward autonomous decision-making systems. As mentioned in Section~\ref{sec:intro:problem}, the job market is a two-sided reciprocal market characterized by rivalrous goods, hard capacity constraints, and heterogeneous preferences on both sides \cite{goda2024bestofbothapproachimprovematch, mashayekhi2023reconreducingcongestionjob}. A successful recommendation in this context is not merely one that elicits a click, but one that leads to a bilateral agreement where both the job seeker and the recruiter find the pairing optimal \cite{biLorentzFM2025}.
 
 \subsection{Reciprocal Recommendation Paradigms}
 The scientific literature classifies Reciprocal Recommender Systems (RRS) based on how they integrate the preferences of both parties. 
