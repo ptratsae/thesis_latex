@@ -1,16 +1,16 @@
-\chapter{User-Side Job Recommendation System}
+\chapter{User-Side Job Recommender System}
 \label{chap:user_recommendation}
 
-This chapter describes the job recommendation system built for users, consisting of the data pipeline and the two-tower neural network architecture. The system learns dense representations of both users and jobs and uses their similarity to rank job opportunities for each individual user. This model is later used in Chapter~\ref{chap:congestion_balancing} as the one of the two fundamental components for two-sided recommendations and mitigating congestion.
+This chapter describes the job recommender system built for users, consisting of the data pipeline and the two-tower neural network architecture. The system learns dense representations of both users and jobs and uses their similarity to rank job opportunities for each individual user. This model is later used in Chapter~\ref{chap:congestion_balancing} as one of the two fundamental components for two-sided recommendations and mitigating congestion.
 
-A two-tower \gls{RS} is chosen because neural networks can handle the cold-start problem~\cite{rama2019deeplearningaddresscandidate} — a user with no prior interaction history can still receive recommendations based on their profile features alone by using the learned user embedding. This property is essential given the temporal evaluation setup described in Chapter~\ref{chap:experiments}.
+A two-tower recommender is chosen because neural networks can handle the cold-start problem~\cite{rama2019deeplearningaddresscandidate} --- a user with no prior interaction history can still receive recommendations based on their profile features alone by using the learned user embedding. This property is essential given the temporal evaluation setup described in Chapter~\ref{chap:experiments}.
 
 Section~\ref{sec:user_arch} describes the architecture of the model. Section~\ref{sec:user_data_pipeline} describes the data pipeline and feature engineering. Section~\ref{sec:user_training} describes the training procedure. All experimental results and hyperparameter choices are reported in Chapter~\ref{chap:experiments}.
 
-\section{Architecture: The Two-Tower Model}
+\section{Two-Tower Model Architecture}
 \label{sec:user_arch}
 
-The two-tower model consists of two separate neural networks. The user tower processes user features and the job tower processes job features. Both towers learn a dense vector representation of its respective input. The compatibility of a user-job pair is then measured as the dot product of these two vectors, as defined in Section~\ref{sec:prelim_notation}. The design allows job embeddings to be precomputed and cached, enabling efficient real-time recommendations for users. 
+The two-tower recommender consists of two separate neural networks. The user tower processes user features and the job tower processes job features. Both towers learn a dense vector representation of their respective input. The compatibility of a user-job pair is then measured as the dot product of these two vectors. The design allows job embeddings to be precomputed and cached, enabling efficient real-time recommendations for users. 
 
 \subsection{User Tower}
 \label{sec:user_tower}
@@ -64,15 +64,14 @@ The final user-job compatibility score is computed as the dot product of the two
 s(\mathbf{e}_u, \mathbf{e}_j) = \mathbf{e}_u \cdot \mathbf{e}_j = \sum_{i=1}^{d} (\mathbf{e}_u)_i \cdot (\mathbf{e}_j)_i
 \end{equation}
 
-Higher scores indicate stronger predicted affinity between a user's preferences and a job's characteristics. At training time, this raw score is passed through a sigmoid to produce a probability for the binary cross-entropy loss because the label is binary. At inference time, the raw score is used directly for ranking, as discussed in Section~\ref{sec:inference_postprocessing}.
+Higher scores indicate stronger predicted affinity between a user's preferences and a job's characteristics. At training time, this raw score is passed through a sigmoid to produce a probability for the binary cross-entropy loss to produce a probability estimate, as the training is binary cross-entropy. At inference time, the raw score is used directly for ranking, as discussed in Section~\ref{sec:user_inference}.
 
 L2 normalisation of the output embeddings was considered as an alternative design. The impact of this choice on model performance is evaluated in the ablation study in Section~\ref{sec:exp_user_ablation}.
 
 \section{Data Pipeline and Feature Engineering}
 \label{sec:user_data_pipeline}
 
-The raw data must be preprocessed before it can be used by the two-tower model. The pipeline consists of two main stages: user feature processing and job feature processing. Both stages include text embedding as part of their respective pipelines. The construction of the training dataset, including the negative sampling strategy, is described in Chapter~\ref{chap:experiments}.
-
+The raw data must be preprocessed before it can be used by the two-tower model. The pipeline consists of two main stages: user feature processing and job feature processing. Both stages include text embedding as part of their respective pipelines. Specific sampling ratios and dataset construction details are described in Chapter~\ref{chap:experiments}.
 
 
 \subsection{User Feature Processing}
@@ -86,7 +85,7 @@ Raw user features such as demographics, education and location are merged with t
 \begin{equation}
 \text{Recent\_JobTitle} = \text{``Current: } t_1 \text{ | Previous: } t_2 \text{ | Earlier: } t_3\text{''}
 \end{equation}
-where $t_1, t_2, t_3$ are the three most recent job titles in reverse chronological order. 
+where $t_1, t_2, t_3$ are the three most recent job titles in reverse chronological order. This string is then embedded using the Qwen3 model and truncated to $d_{\text{text}}$ dimensions.
 
 \subsubsection{Feature Engineering}
 
@@ -109,8 +108,8 @@ Table~\ref{tab:user_features} summarises the full user feature engineering pipel
         \textbf{Category} & \textbf{Feature} & \textbf{Type} & \textbf{Processing} & \textbf{Output} \\
         \midrule
         \multirow{2}{*}{Location}
-            & City  & categorical & LabelEncoder & int $[1, N]$ \\
-            & State / Region & categorical & LabelEncoder & int $[1, N]$ \\
+            & City  & categorical & Shared LabelEncoder & int $[1, N]$ \\
+            & State / Region & categorical & Shared LabelEncoder & int $[1, N]$ \\
         \midrule
         \multirow{3}{*}{Education}
             & Degree level   & categorical & LabelEncoder & int $[1, N]$ \\
@@ -159,47 +158,24 @@ Job features undergo the same encoding and scaling process as user features: num
     \end{tablenotes}
 \end{table}
 
-\subsection{Text Cleaning and Embedding}
+\subsection{Text Embedding dimension}
 \label{sec:text_embedding}
 
-Job titles and descriptions often contain HTML markup, special characters and inconsistent formatting. Text is cleaned by removing HTML tags, lowercasing and stripping whitespace.
+As mentioned in the previous sections, both user and job towers incorporate a text embedding component to capture the semantic information contained in job titles and user career histories. The embeddings from the Qwen model are unit-normalised to ensure comparable similarity scores. 
 
-The cleaned job titles are encoded into dense vectors using the Qwen3 Embedding model. The descriptions are not embedded because their contribution is deemed less significant than that of the titles. As with user job history, the embedding dimension is truncated to $d_{\text{text}}$ to balance the contribution of text against other input features. The embeddings from the Qwen model are unit-normalised to ensure comparable similarity scores across the job corpus. These Qwen embeddings capture semantic relationships between job titles enabling the job tower to learn meaningful job-to-job relationships beyond categorical attributes alone.
-
-\paragraph{Text embedding dimension.}
-The Qwen3 model produces 1536-dimensional embeddings by default. Using the full 
+The Qwen3 model is able to produce embeddings in the range of 32 to 1024 dimensions. Using the full 
 vector would cause the text signal to dominate the input to both towers, since all 
 other features combined contribute far fewer dimensions. The embedding is therefore 
-truncated to $d_{\text{text}} = 100$ at encoding time, which retains the leading principal dimensions of 
-the output space.
+truncated to $d_{\text{text}}$ to ensure that the text signal contributes meaningfully but does not overshadow the structured features. The specific choice of $d_{\text{text}}$ is mentioned in Section~\ref{sec:exp_user_hyperparameters}.
 
-Table~\ref{tab:tower_input_dims} shows the resulting input dimension breakdown for 
-each tower. Text accounts for approximately 51\% of the user tower input and 76\% of 
-the job tower input — large enough to carry the semantic signal but not so large as 
-to suppress the structured features.
-
-\begin{table}[htbp]
-    \centering
-    \caption{Input dimension breakdown for each tower after feature encoding.}
-    \label{tab:tower_input_dims}
-    \begin{tabular}{lrrr}
-        \toprule
-        \textbf{Tower} & \textbf{Cat. Embeddings} & \textbf{Numerical} 
-                       & \textbf{Text ($d_{\text{text}}$)} \\
-        \midrule 
-        User & $6 \times 16 + 100$ & $6$ & $196$ \\
-        Job  & $2 \times 16 + 100$ & $2$ & $132$ \\
-        \bottomrule
-    \end{tabular}
-\end{table}
-\section{Training}
+\section{Training Procedure}
 \label{sec:user_training}
- 
+
 \subsection{Negative Sampling}
 \label{sec:user_neg_sampling}
 Because the dataset contains only positive interactions, negative examples must be constructed. Randomly sampled negatives drawn uniformly from the job pool are typically too easy and do not produce useful gradients — the model can trivially separate a nurse from a software engineer without learning anything about genuine preference. Hard negatives are therefore constructed by geographic stratification: for each positive pair, negatives are drawn from a mix of geographically close and distant jobs. This ensures the model is trained to distinguish true job-fit from mere co-location, which is especially important given that geographic signals are informative but should not dominate the learned representations. The specific sampling ratios used in practice are described in Section~\ref{sec:negative_sampling}.
-\subsection{Loss Function}
 
+\subsection{Loss Function}
 The model is optimised using Binary Cross-Entropy with Logits loss, which combines a sigmoid activation with binary cross-entropy in a numerically stable form:
 \begin{equation}
 \mathcal{L} = -\frac{1}{N} \sum_{i=1}^{N} \left[ y_i \log(\sigma(\hat{y}_i)) + (1 - y_i) \log(1 - \sigma(\hat{y}_i)) \right]
@@ -207,9 +183,9 @@ The model is optimised using Binary Cross-Entropy with Logits loss, which combin
 where $y_i \in \{0, 1\}$ is the ground truth label and $\hat{y}_i = s(\mathbf{e}_u, \mathbf{e}_j)$ is the raw dot product score. The sigmoid $\sigma$ maps the unbounded score to a probability during training. The model is optimised using the Adam optimiser with early stopping based on validation loss to prevent overfitting. Specific hyperparameter values are reported in Section~\ref{sec:exp_user_hyperparameters}.
 
 \subsection{Inference}
-\label{sec:inference_postprocessing}
+\label{sec:user_inference}
 At inference time, recommendations are generated efficiently by precomputing all job embeddings once and caching them in memory. For each user, only the user tower forward pass is executed, followed by a single matrix multiplication against the precomputed job matrix. This reduces per-user recommendation time to one matrix multiply regardless of the size of the job pool.
  
-At inference, both raw scores or sigmoid probabilities could be used for ranking. The raw dot product scores are used directly for ranking because they preserve the relative distances in the embedding space, which is more meaningful for nearest-neighbour retrieval. Applying a sigmoid would compress the scores into a narrow range, reducing the model's ability to differentiate between closely ranked items.
+At inference, either raw scores or sigmoid probabilities could be used for ranking. The raw dot product scores are used directly for ranking because they preserve the relative distances in the embedding space, which is more meaningful for nearest-neighbour retrieval. However, the hybrid model described in Chapter~\ref{chap:congestion_balancing} uses the sigmoid probabilities for ranking because the recruiter-side model produces probability estimates, so using the same scale for both components simplifies the aggregation step.
  
 Because geographic preference is learned directly from the training signal through the stratified negative sampling strategy (Section~\ref{sec:negative_sampling}), no post-processing boost is applied at inference — jobs in the user's region surface naturally at the top of the ranking as a consequence of what the model has learned. In Section~\ref{sec:exp_user_ablation}, examples of user recommendations are provided to illustrate the model's ability to capture geographic and semantic preferences.
