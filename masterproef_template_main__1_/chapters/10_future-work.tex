@@ -2,3 +2,42 @@
 \label{chap:future}
 
 Future directions and improvements for this research.
+\subsection{Limitations}
+\label{sec:exp_user_limitations}
+Despite strong quantitative performance and qualitatively sensible recommendations for users with stable career histories, 3 structural limitations of the current 
+design are worth noting.
+
+\paragraph{Overfitting to the training distribution.}
+Figure~\ref{fig:trainval} reveals a growing divergence between training and validation loss after approximately epoch~5. While validation loss plateaus 
+around $0.27$, training loss continues to decrease to $0.20$, suggesting the model begins to overfit to the training windows. This is consistent with the 
+cold-start evaluation setup: the model is trained on Windows~1--4 and evaluated on entirely new users and jobs from Windows~5--7, meaning the distribution shift 
+between train and evaluation is structural rather than random. Dropout and batch normalisation partially mitigate this, but the gap suggests the model has 
+memorised aspects of the training user-job distribution that do not fully generalise. Possible mitigations include stronger regularisation, increased dropout rates, or data augmentation techniques such as feature masking during 
+training.
+\paragraph{Temporally flat job history representation.}
+The job history embedding is produced by encoding the three most recent job titles 
+as a single concatenated string and passing it through the Qwen encoder. This means 
+all three titles contribute equally to the resulting vector, regardless of how recent 
+they are and the duration of their employment. Recent jobs contain more signal about the user's current preferences and are more predictive of their next move, while older jobs may reflect past interests or even noise. The duration of each job is also relevant — a user with a 10-year tenure as a software engineer followed by a 3-month stint in retail likely has different preferences than a user with the opposite pattern. However, the CareerBuilder dataset does not provide employment duration in the user history, making this signal inaccessible to the current model.
+
+A natural extension would be to embed each title independently and compute a weighted 
+sum with recency weights, for example:
+\begin{equation}
+    \mathbf{e}_{\text{history}} = 0.5 \cdot \mathbf{e}_{t_1} 
+                                + 0.3 \cdot \mathbf{e}_{t_2} 
+                                + 0.2 \cdot \mathbf{e}_{t_3}
+\end{equation}
+where $\mathbf{e}_{t_1}$ is the embedding of the most recent title. This would 
+encode both the content and the direction of career movement into the user 
+representation. This limitation was not apparent in the two cases presented in 
+Section~\ref{sec:exp_user_inference}, as both users had coherent and stable 
+career histories. It is expected to surface most clearly in evaluation on users 
+with mixed or transitioning profiles.
+% TODO - add example of a user with a mixed/transitioning profile and how the current design fails to capture it
+
+\paragraph{City and State embedding sparsity.}
+City and state are encoded as categorical features with learned embeddings. Cities and states that appear rarely in Windows~1--4 have fewer training examples and therefore an undertrained embedding. For users located in such cities, the geographic signal 
+is weak and the model compensates by relying more heavily on the job history 
+representation — which then exposes the limitation above. This effect is expected 
+to be most pronounced for users outside major metropolitan areas.
+% TODO - add statistics on city frequency distribution and how many users are affected by this sparsity issue

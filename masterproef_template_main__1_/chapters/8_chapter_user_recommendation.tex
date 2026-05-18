@@ -64,7 +64,8 @@ The final user-job compatibility score is computed as the dot product of the two
 s(\mathbf{e}_u, \mathbf{e}_j) = \mathbf{e}_u \cdot \mathbf{e}_j = \sum_{i=1}^{d} (\mathbf{e}_u)_i \cdot (\mathbf{e}_j)_i
 \end{equation}
 
-Higher scores indicate stronger predicted affinity between a user's preferences and a job's characteristics. At training time, this raw score is passed through a sigmoid to produce a probability for the binary cross-entropy loss to produce a probability estimate, as the training is binary cross-entropy. At inference time, the raw score is used directly for ranking, as discussed in Section~\ref{sec:user_inference}.
+Higher scores indicate stronger predicted affinity between a user's preferences and a job's characteristics. At training time, this raw score is passed through a sigmoid to produce 
+a probability estimate, as the training objective is binary cross-entropy. At inference time, the raw score is used directly for ranking, as discussed in Section~\ref{sec:user_inference}.
 
 L2 normalisation of the output embeddings was considered as an alternative design. The impact of this choice on model performance is evaluated in the ablation study in Section~\ref{sec:exp_user_ablation}.
 
@@ -158,15 +159,15 @@ Job features undergo the same encoding and scaling process as user features: num
     \end{tablenotes}
 \end{table}
 
-\subsection{Text Embedding dimension}
+\subsection{Text Embedding Dimension}
 \label{sec:text_embedding}
 
 As mentioned in the previous sections, both user and job towers incorporate a text embedding component to capture the semantic information contained in job titles and user career histories. The embeddings from the Qwen model are unit-normalised to ensure comparable similarity scores. 
 
-The Qwen3 model is able to produce embeddings in the range of 32 to 1024 dimensions. Using the full 
+The Qwen3 model produces 1024-dimensional embeddings by default. Using the full 
 vector would cause the text signal to dominate the input to both towers, since all 
 other features combined contribute far fewer dimensions. The embedding is therefore 
-truncated to $d_{\text{text}}$ to ensure that the text signal contributes meaningfully but does not overshadow the structured features. The specific choice of $d_{\text{text}}$ is mentioned in Section~\ref{sec:exp_user_hyperparameters}.
+truncated to $d_{\text{text}}$ to ensure that the text signal contributes meaningfully but does not overshadow the structured features. The specific choice of $d_{\text{text}}$ is reported in Section~\ref{sec:exp_user_hyperparameters}.
 
 \section{Training Procedure}
 \label{sec:user_training}

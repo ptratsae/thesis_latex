@@ -1,6 +1,6 @@
 \chapter{Experiments and Results}
 \label{chap:experiments}
-This chapter describes the experimental evaluation of the systems developed in previous chapters. First, the shared experiment settings are described in Section~\ref{sec:exp_settings} which includes the custom dataset split, dataset statistics, and hardware configuration. Then, experiments are presented for the user-side recommendation system (Section~\ref{sec:exp_user}), the recruiter-side recommendation system (Section~\ref{sec:exp_recruiter}), and the congestion balancing strategies (Section~\ref{sec:exp_congestion}).
+This chapter describes the experimental evaluation of the systems developed in previous chapters. First, the shared experiment settings are described in Section~\ref{sec:exp_settings} which includes how the data is split for training, validation, and testing. It also includes dataset statistics, and hardware configuration. Then, experiments are presented for the user-side recommender system (Section~\ref{sec:exp_user}), the recruiter-side recommender system (Section~\ref{sec:exp_recruiter}), and the congestion balancing strategies (Section~\ref{sec:exp_congestion}).
 
 \section{General Experiments Setting}
 \label{sec:exp_settings}
@@ -25,7 +25,7 @@ All experiments are conducted on the CareerBuilder Job Recommendation dataset~\c
     \end{tabular}
 \end{table}
 
-The extremely high sparsity — fewer than one in 200,000 user-job pairs has a recorded interaction — means thatcollaborative approaches relying on interaction density are infeasible. The two-tower architecture instead uses interactions as a training signal while generalising through user and job profile features, making it robust to sparse data.
+The extremely high sparsity --- fewer than one in 200,000 user-job pairs has a recorded interaction --- means that collaborative approaches relying on interaction density are infeasible. The two-tower architecture instead uses interactions as a training signal while generalising through user and job profile features, making it robust to sparse data.
 
 \subsection{Custom Train/Validation/Test Split}
 \label{sec:custom_split}
@@ -33,43 +33,93 @@ The extremely high sparsity — fewer than one in 200,000 user-job pairs has a r
 \begin{figure}[ht]
     \centering
     \begin{tikzpicture}[
-        window/.style={draw, minimum width=1.4cm, minimum height=0.8cm, font=\footnotesize, fill=white},
-        label_node/.style={font=\small\bfseries, align=center}
+        window/.style={
+            draw, minimum width=1.2cm, minimum height=0.7cm,
+            font=\footnotesize, fill=white},
+        deploy/.style={
+            draw, minimum width=1.2cm, minimum height=0.7cm,
+            font=\footnotesize, fill=orange!15},
+        label_node/.style={font=\scriptsize\bfseries, align=center}
     ]
-    \node [window] (w1) at (0,0)   {W1};
-    \node [window] (w2) at (1.5,0) {W2};
-    \node [window] (w3) at (3,0)   {W3};
-    \node [window] (w4) at (4.5,0) {W4};
-    \node [window] (w5) at (6.5,0) {W5};
-    \node [window] (w6) at (8,0)   {W6};
-    \node [window] (w7) at (9.5,0) {W7};
 
-    \draw [dashed, line width=1.5pt, red!80!black] (5.5, 1.2) -- (5.5, -2.5)
-        node[below, font=\footnotesize\itshape, text=red!80!black] {Temporal Boundary};
-    \draw [-{Stealth}, thick] (-1, -0.7) -- (10.5, -0.7) node[right] {Time};
+    \node [window, fill=blue!20] (w1) at (0,0)   {W1};
+    \node [window, fill=blue!20] (w2) at (1.5,0) {W2};
+    \node [window, fill=blue!20] (w3) at (3,0)   {W3};
+    \node [window, fill=blue!20] (w4) at (4.5,0) {W4};
+    \node [window, fill=green!20] (w5) at (6.5,0) {W5};
+    \node [window, fill=green!20] (w6) at (8,0)   {W6};
+    \node [deploy]  (w7) at (9.5,0) {W7};
 
-    \draw [decorate, decoration={brace, amplitude=10pt}]
-        (-0.7, 0.6) -- (5.2, 0.6)
-        node [midway, yshift=0.6cm, label_node, color=blue!70!black] {Training Set (Windows 1--4)};
-    \node [align=center, font=\scriptsize, color=gray!80!black] at (2.25, 1.6) {Historical Data};
+    %% Temporal boundary
+    \draw [dashed, line width=1.5pt, red!80!black] (5.5, 1.0) -- (5.5, -2.8)
+        node[below, font=\footnotesize\itshape, text=red!80!black]
+        {Temporal Boundary};
 
-    \draw [decorate, decoration={brace, amplitude=10pt}]
-        (5.8, 0.6) -- (10.2, 0.6)
-        node [midway, yshift=0.6cm, label_node, color=green!50!black] {Validation/Test Set (Windows 5--7)};
-    \node [align=center, font=\scriptsize, color=gray!80!black] at (8, 1.6) {Cold-Start Evaluation};
+    %% Time arrow
+    \draw [-{Stealth}, thick] (-1, -0.55) -- (10.8, -0.55) node[right] {Time};
 
-    \node [draw, rounded corners, fill=gray!5, font=\tiny, align=left] at (2.25, -1.8) {
+    %% Training bracket
+    \draw [decorate, decoration={brace, amplitude=6pt}]
+        (-0.7, 0.55) -- (5.2, 0.55)
+        node [midway, yshift=0.45cm, label_node, color=blue!70!black]
+        {Training Set};
+    \node [font=\scriptsize, color=gray!70!black] at (2.25, 1.45)
+        {Historical Data};
+
+    %% Model development bracket (W5--W6 only)
+    \draw [decorate, decoration={brace, amplitude=6pt}]
+        (5.8, 0.55) -- (8.75, 0.55)
+        node [midway, yshift=0.45cm, label_node, color=green!50!black]
+        {Model Development};
+
+    %% Deployment bracket (W7)
+    \draw [decorate, decoration={brace, amplitude=6pt}]
+        (9.1, 0.55) -- (9.9, 0.55)
+        node [midway, yshift=0.45cm, label_node, color=orange!70!black]
+        {Deployment};
+
+    %% Bottom note — training
+    \node [draw, rounded corners, fill=gray!5, font=\tiny, align=left]
+        at (2.25, -1.85) {
         \textbullet\ All users/jobs included \\
         \textbullet\ Historical behaviour used for training
     };
-    \node [draw, rounded corners, fill=gray!5, font=\tiny, align=left] at (8, -1.8) {
+
+    %% Bottom note — model development
+    \node [draw, rounded corners, fill=gray!5, font=\tiny, align=left]
+        at (7.15, -1.85) {
         \textbullet\ No overlap with training users \\
-        \textbullet\ Simulates realistic deployment
+        \textbullet\ Validation and model selection
     };
+
+    %% Bottom note — deployment
+    \node [draw, rounded corners, fill=orange!8, font=\tiny, align=left]
+        at (9.5, -1.85) {
+        \textbullet\ Production window \\
+        \textbullet\ Unseen during training
+    };
+
     \end{tikzpicture}
-    \caption{Custom temporal split for the CareerBuilder dataset. Unlike the original within-window split, this approach divides by window boundary, ensuring a strict cold-start evaluation scenario.}
+    \caption{Temporal split for the CareerBuilder dataset. Window~7 is the
+    target deployment window, unseen during training and model selection
+    across all chapters. Windows~1--4 form the primary training period;
+    Windows~5--6 are used for validation and model development. The exact
+    use of each window group varies by component and is described in each
+    experiment section.}
     \label{fig:custom_temporal_split}
 \end{figure}
+
+Window~7 represents the target deployment period — the future time window 
+that all models in this thesis are designed to serve. No model observes 
+any interaction from Window~7 during training or model selection; it is 
+reserved exclusively as the production window in which the full two-sided 
+system operates. Windows~1--6 provide the historical data from which each 
+model learns and is evaluated, though the exact partitioning differs by 
+component and is described in the respective experiment sections.
+
+Table~\ref{tab:split_stats} shows the dataset statistics for each window 
+group.
+
 
 Rather than using the original within-window train/test labels provided by the dataset, a temporal split across windows is applied (Figure~\ref{fig:custom_temporal_split}). Windows 1--4 form the training set and Windows 5--7 form the validation and test set, with Windows 5--6 used for validation and Window 7 reserved for final evaluation.
 
@@ -104,7 +154,17 @@ All experiments are run on the Artificial Intelligence and Data Analytics Resear
  
 \subsection{Experiment Goal}
 \label{sec:exp_user_goal}
-The goal of the user-side experiments is to train and evaluate a two-tower model that can rank relevant jobs highly for cold-start users — users with no interaction history in the training period. The model is trained on Windows 1--4, validated on Windows 5--6, and evaluated on Window 7 by doing sanity checks, where it must generalise to entirely new users and jobs. Success is measured primarily by \gls{AUC-ROC} during training, as this metric is least sensitive to the candidate pool size of the validation set combined with the practical utility of the model. The practical utility of the model is assessed qualitatively at inference time by inspecting recommendations for a sample of test users against the full Window 7 job pool.
+The goal of the user-side experiments is to train and evaluate a 
+two-tower model that can rank relevant jobs highly for cold-start users 
+--- users with no interaction history in the training period. 
+Windows~1--4 are used for training, Windows~5--6 for validation, and 
+Window~7 serves as the qualitative evaluation window, where the model 
+is applied to entirely new users and jobs as it would be in production. 
+Success is measured primarily by \gls{AUC-ROC}, as this metric is least 
+sensitive to the candidate pool size of the validation set. The practical 
+utility of the model is additionally assessed qualitatively at inference 
+time by inspecting recommendations for a sample of Window~7 users against 
+the full Window~7 job pool.
  
 \subsection{Subsampling and Negative Sampling Strategy}
 \label{sec:negative_sampling}
@@ -123,7 +183,27 @@ The 2:1:1 strategy ensures the training distribution is representative of the re
 
 \subsection{Hyperparameters and Training Settings}
 \label{sec:exp_user_hyperparameters}
-The model is trained for a maximum of 50 epochs with early stopping (patience~= 5) based on validation loss. The Adam optimiser is used with a learning rate of $10^{-3}$ and a batch size of 1024. The embedding dimension $d$ is set to 64.
+The model is trained for a maximum of 50 epochs with early stopping (patience~= 5) based on validation loss. The Adam optimiser is used with a learning rate of $10^{-3}$ and a batch size of 1024. The output embedding dimension $d$ is set to 64.
+
+Table~\ref{tab:tower_input_dims} shows the resulting input dimension breakdown for 
+each tower. Text accounts for approximately 51\% of the user tower input and 76\% of 
+the job tower input — large enough to carry the semantic signal but not so large as 
+to suppress the structured features.
+
+\begin{table}[htbp]
+    \centering
+    \caption{Input dimension breakdown for each tower after feature encoding.}
+    \label{tab:tower_input_dims}
+    \begin{tabular}{lrrrr}
+        \toprule
+        \textbf{Tower} & \textbf{Cat. Embeddings} & \textbf{Numerical} 
+                       & \textbf{Text ($d_{\text{text}}$)} & \textbf{Total} \\
+        \midrule 
+        User & $6 \times 16$ & $6$ & $100$ & $202$ \\
+        Job  & $2 \times 16$ & $2$ & $100$ & $134$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
 \subsection{Ablation Study}
 \label{sec:exp_user_ablation}
  
@@ -202,7 +282,7 @@ Table~\ref{tab:final_results_user} reports the validation set results at the bes
 \subsection{Qualitative Inference Evaluation}
 \label{sec:exp_user_inference}
  
-To assess real-world recommendation quality, the final model is run at inference time against all jobs from Window~7 (approximately 40,000 jobs) for a sample of test users. As described in Section~\ref{sec:inference_postprocessing}, no geographic post-processing boost is applied — same-state jobs surface organically from the model's learned preferences. Two representative cases are discussed below.
+To assess real-world recommendation quality, the final model is run at inference time against all jobs from Window~7 (approximately 40,000 jobs) for a sample of test users. As described in Section~\ref{sec:user_inference}, no geographic post-processing boost is applied — same-state jobs surface organically from the model's learned preferences. Two representative cases are discussed below.
  
 \paragraph{User 668904 — clear career signal, strong geographic coherence.}
 This user is based in Deer Park, TX, holds a high school diploma and has 18 years of work experience. Their job history consists entirely of accounts payable and administrative finance roles: Accounts Payable Analyst, Administrative Assistant, and AP/AR support positions. In Window~7 the user applied to a single job — a Payroll Specialist role in Houston, TX — which the model scores at 3.65. All ten recommended jobs are in Houston and fall squarely within the same financial-administrative cluster: Senior Accounts Payable Specialist, AP/AR Specialist, Accounting Assistant, Accounts Payable Clerk, and similar titles. This is a clean demonstration of the model working as intended: a coherent career signal in the user embedding produces semantically tight, geographically appropriate recommendations with no location post-processing required.
@@ -297,47 +377,6 @@ This user is based in Philadelphia, PA, holds a high school diploma and has only
     \end{tabular}
 \end{table}
 
-\subsection{Limitations}
-\label{sec:exp_user_limitations}
-Despite strong quantitative performance and qualitatively sensible recommendations for users with stable career histories, 3 structural limitations of the current 
-design are worth noting.
-
-\paragraph{Overfitting to the training distribution.}
-Figure~\ref{fig:trainval} reveals a growing divergence between training and validation loss after approximately epoch~5. While validation loss plateaus 
-around $0.27$, training loss continues to decrease to $0.20$, suggesting the model begins to overfit to the training windows. This is consistent with the 
-cold-start evaluation setup: the model is trained on Windows~1--4 and evaluated on entirely new users and jobs from Windows~5--7, meaning the distribution shift 
-between train and evaluation is structural rather than random. Dropout and batch normalisation partially mitigate this, but the gap suggests the model has 
-memorised aspects of the training user-job distribution that do not fully generalise. Possible mitigations include stronger regularisation, increased dropout rates, or data augmentation techniques such as feature masking during 
-training.
-\paragraph{Temporally flat job history representation.}
-The job history embedding is produced by encoding the three most recent job titles 
-as a single concatenated string and passing it through the Qwen encoder. This means 
-all three titles contribute equally to the resulting vector, regardless of how recent 
-they are and the duration of their employment. Recent jobs contain more signal about the user's current preferences and are more predictive of their next move, while older jobs may reflect past interests or even noise. The duration of each job is also relevant — a user with a 10-year tenure as a software engineer followed by a 3-month stint in retail likely has different preferences than a user with the opposite pattern. However, the CareerBuilder dataset does not provide employment duration in the user history, making this signal inaccessible to the current model.
-
-A natural extension would be to embed each title independently and compute a weighted 
-sum with recency weights, for example:
-\begin{equation}
-    \mathbf{e}_{\text{history}} = 0.5 \cdot \mathbf{e}_{t_1} 
-                                + 0.3 \cdot \mathbf{e}_{t_2} 
-                                + 0.2 \cdot \mathbf{e}_{t_3}
-\end{equation}
-where $\mathbf{e}_{t_1}$ is the embedding of the most recent title. This would 
-encode both the content and the direction of career movement into the user 
-representation. This limitation was not apparent in the two cases presented in 
-Section~\ref{sec:exp_user_inference}, as both users had coherent and stable 
-career histories. It is expected to surface most clearly in evaluation on users 
-with mixed or transitioning profiles.
-% TODO - add example of a user with a mixed/transitioning profile and how the current design fails to capture it
-
-\paragraph{City and State embedding sparsity.}
-City and state are encoded as categorical features with learned embeddings. Cities and states that appear rarely in Windows~1--4 have fewer training examples and therefore an undertrained embedding. For users located in such cities, the geographic signal 
-is weak and the model compensates by relying more heavily on the job history 
-representation — which then exposes the limitation above. This effect is expected 
-to be most pronounced for users outside major metropolitan areas.
-% TODO - add statistics on city frequency distribution and how many users are affected by this sparsity issue
-
-\newpage
 \section{Recruiter-Side Recommendation Experiments}
 \label{sec:exp_recruiter}
 % ============================================================
@@ -351,7 +390,21 @@ The recruiter-side experiments address two design choices that must be made befo
 \label{sec:exp_recruiter_datagen}
  
 Because no ground-truth recruiter feedback exists in the dataset, training labels must be generated synthetically. The method is described in Section~\ref{sec:recruiter_data_gen}; this section provides the implementation details specific to this experiment.
- 
+
+The recruiter-side model uses a different window partitioning from the 
+two-tower model, reflecting the different nature of its training data. 
+Because recruiter labels are generated synthetically via \gls{LLM} 
+evaluation rather than observed from user behaviour, the model does not 
+require a temporal train/validation split in the same sense. Instead, 
+\gls{LLM}-labelled pairs are drawn from Windows~1--4, and a 
+group-based cross-validation split by job identity is applied within 
+this pool (described in Section~\ref{sec:exp_recruiter_setting}). 
+A separate held-out sanity check set is generated from Windows~5--6 
+to verify that the model generalises to unseen jobs from a later time 
+period which is not used for training or model selection. Window~7 is not used for training or model selection; the final 
+model is applied to Window~7 candidates in the congestion balancing 
+simulation of Chapter~\ref{chap:congestion_balancing}.
+
 \paragraph{Labeling setup}
 Labels are generated using the Qwen3.5 (35B) model served locally via the Ollama API. For computational feasibility, a sample of jobs is drawn from Windows~1--4; for each job, up to 20 applicants are evaluated in a single batched prompt. The \gls{LLM} receives the job description alongside all candidate profiles in the batch and returns a structured JSON response. The final prompt used is:
 
@@ -386,7 +439,9 @@ Candidate Profiles: {profiles_text}
 \end{verbatim}
 }
 
-This prompt contains explicit rules, notes and output format to ensure consistency. The prompt starts with a clear task definition and a precise fit level rules. This is followed by detailed instructions on the expected output format, including the required JSON structure and specific content for each field. By providing fields for must-haves, nice-to-haves, deal-breakers and reasoning, the prompt encourages the model to reason and explain its decisions rather than just outputting a label. Then extra notes are established to guide the model towards a more conservative and specific evaluation style. These notes were iteratively defined by inspecting model outputs and adjusting the prompt to address common issues. For example some rows have missing values in key features like Degree or Experience, and without explicit instructions the model would often ignore these and assume the candidate had a degree or relevant experience, leading to overly optimistic fit levels. By instructing the model to treat missing values as an absence of that feature, it produces more realistic assessments. Finaly both job descriptions and candidate profiles are included in the prompt. 
+This prompt contains explicit rules, notes and output format to ensure consistency. The prompt starts with a clear task definition and a precise fit level rules. This is followed by detailed instructions on the expected output format, including the required JSON structure and specific content for each field. By providing fields for must-haves, nice-to-haves, deal-breakers and reasoning, the prompt encourages the model to reason and explain its decisions rather than just outputting a label. 
+
+The extra notes are established to guide the model towards a more conservative and specific evaluation style. These notes were iteratively defined by inspecting model outputs and adjusting the prompt to address common issues. For example some rows have missing values in key features like Degree or Experience, and without explicit instructions the model would often ignore these and assume the candidate had a degree or relevant experience, leading to overly optimistic fit levels. By instructing the model to treat missing values as an absence of that feature, it produces more realistic assessments. Finally both job descriptions and candidate profiles are included in the prompt. 
 
 An example output for a single candidate is shown below:
  
@@ -713,9 +768,15 @@ already produces a measurable improvement compared to the baseline results.
 \subsection{Experiment Setting}
 \label{sec:exp_congestion_setting}
 \paragraph{Simulation arena.}
-All congestion experiments are conducted on the Window~7 application pool,
-which serves as the held-out test set (Section~\ref{sec:custom_split}). Users who submitted more than 45 applications in Window~7 are removedbefore the simulation begins, as their behaviour is not representative of
-genuine job seeking and would distort the congestion metrics. They are considered as outliers and this is done for simplicity.
+The congestion balancing experiments operate exclusively on Window~7, 
+the deployment window introduced in Section~\ref{sec:custom_split}. 
+Both the two-tower model and the recruiter-side model are trained and 
+selected using Windows~1--6 as described in 
+Sections~\ref{sec:exp_user} and~\ref{sec:exp_recruiter}; they are 
+applied here without any further fine-tuning. Window~7 thus serves as 
+a held-out production simulation: users, jobs and the application pool 
+are all drawn from this window, and the market-maker strategies are 
+evaluated on the resulting recommendation and shortlisting distributions.
 
  
 \paragraph{Threshold derivation.}
@@ -1382,17 +1443,17 @@ that the candidate penalty can only partially suppress.
     since neither applies a job-side penalty; the same holds for
     universes~2 and~4.}
     \label{tab:hybrid_job_results}
-    \begin{tabular}{@{}lcccc@{}}
+    \begin{tabular}{@{}lcccccc@{}}
         \toprule
         \textbf{Universe} & \textbf{Gini} & \textbf{Starved} &
-        \textbf{Safe} & \textbf{Congested} \\
+        \textbf{Safe} & \textbf{Congested} & $\bar{p}_{\text{TT}}$ & $\bar{p}_{\text{rec}}$\\
         \midrule
-        Historical Reality          & 0.8575 & 80.9\% & 15.8\% & 3.3\% \\
+        Historical Reality          & 0.8575 & 80.9\% & 15.8\% & 3.3\% & --- & ---\\
         \midrule
-        1: Bilateral (no penalties) & 0.9182 & 85.6\% & 11.1\% & 3.4\% \\
-        2: Job-side sigmoid         & 0.7276 & 67.4\% & 29.4\% & 3.2\% \\
-        3: Candidate-side sigmoid   & 0.9182 & 85.6\% & 11.1\% & 3.4\% \\
-        4: Both sigmoid             & 0.7276 & 67.4\% & 29.4\% & 3.2\% \\
+        1: Bilateral (no penalties) & 0.9182 & 85.6\% & 11.1\% & 3.4\% & 0.8966 & 0.8405\\
+        2: Job-side sigmoid         & 0.7276 & 67.4\% & 29.4\% & 3.2\% & 0.8671 & 0.8158\\
+        3: Candidate-side sigmoid   & 0.9182 & 85.6\% & 11.1\% & 3.4\% & 0.8966 & 0.8405\\
+        4: Both sigmoid             & 0.7276 & 67.4\% & 29.4\% & 3.2\% & 0.8671 & 0.8158\\
         \bottomrule
     \end{tabular}
 \end{table}
