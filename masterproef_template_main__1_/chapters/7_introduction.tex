@@ -42,3 +42,53 @@ The third contribution is a \textbf{hybrid congestion balancing strategy} that u
 
 \subsection{Outline of the following chapters}
 The remainder of this thesis is structured as follows. Chapter~\ref{chap:preliminaries} introduces the notation, background concepts and evaluation metrics used throughout. Chapters~\ref{chap:user_recommendation} and \ref{chap:recruiter_recommendation} describe both system components in detail. In Chapter~\ref{chap:congestion_balancing} both systems are integrated into a combined framework to mitigate congestion and improve recommendations. Chapter~\ref{chap:experiments} presents the experimental evaluation across all three. Chapter~\ref{chap:conclusion} summarises the findings and Chapter~\ref{chap:future} discusses limitations and avenues for future research. 
+
+
+\section{Related Work}
+\label{sec:prelim_related_work}
+
+The rapid advancement of digital labour platforms has shifted the matching paradigm from simple keyword search engines toward autonomous decision-making systems. As mentioned in Section~\ref{sec:intro:problem}, the job market is a two-sided reciprocal market characterized by rivalrous goods, hard capacity constraints, and heterogeneous preferences on both sides \cite{goda2024bestofbothapproachimprovematch, mashayekhi2023reconreducingcongestionjob}. A successful recommendation in this context is not merely one that elicits a click, but one that leads to a bilateral agreement where both the job seeker and the recruiter find the pairing optimal.
+
+\subsection{Reciprocal Recommendation Paradigms}
+The scientific literature classifies \gls{RRS} based on how they integrate the preferences of both parties. 
+
+\subsubsection{Aggregation and Match Prediction}
+The traditional approach, known as \gls{PtA}, trains separate models for each direction (user-to-job and job-to-user) and combines their scores using fusion functions like the harmonic mean or product \cite{goda2024bestofbothapproachimprovematch}. To address the error propagation inherent in \gls{PtA}, the recent Best-of-Both (BoB) framework leverages pseudo-match scores—a weighted average of sparse ground-truth labels and dense predictions—to train meta-models that directly output match likelihoods \cite{goda2024bestofbothapproachimprovematch}.
+
+%\subsubsection{Stability and Bandit Learning}
+%The theoretical foundation of \gls{RRS} often relies on stable matching theory. Modern research addresses unknown and dynamic preferences through multi-agent bandit learning, such as \gls{MMTS} \cite{Li2024_MMTS}. This allows platforms to learn preferences through interaction while converging toward a stable matching equilibrium that respects participant quotas \cite{Li2024_MMTS, StableMatching2025}.
+
+\subsection{Neural Architectures for Retrieval}
+As platforms scale to millions of users, the Two-Tower neural architecture has become the industrial standard for candidate retrieval \cite{Xiong_2025, yuan2024contextgnntwotowerrecommendationsystems}. 
+
+\subsubsection{Two-Tower Enhancements}
+Standard Two-Tower models suffer from "Late Interaction," where user and item features do not interact until the final dot product. Recent state-of-the-art enhancements include:
+\begin{itemize}
+    \item \textbf{Hierarchical Interaction-Enhanced Two-Tower (HIT):} Augments the paradigm with multi-head representers to project embeddings into multi-faceted interest dimensions \cite{yang2025hitmodelhierarchicalinteractionenhanced}.
+    \item \textbf{biLorentzFM:} Utilizes hyperbolic embeddings to capture the hierarchical nature of job markets (e.g., senior roles requiring specific junior experiences) \cite{biLorentzFM2025}.
+    \item \textbf{ContextGNN:} Fuses pair-wise representations for local interaction graphs with global Two-Tower representations for exploratory items \cite{yuan2024contextgnntwotowerrecommendationsystems}.
+\end{itemize}
+
+\subsection{Market Congestion and Distributional Equity}
+Market congestion occurs when recommendation policies concentrate attention on a tiny subset of popular job postings, leading to "orphan jobs" that receive zero applications \cite{01KAK08E4756SJAF6RCBJVGWXB, mashayekhi2023challengebasedsurveyerecruitmentrecommendation}. This concentration degrades the welfare of all job seekers and creates information overload and vacancy gaps for employers.
+
+%\subsubsection{Measuring Inequality}
+%To quantify this phenomenon, the research community has adopted the \textit{Gini coefficient} from economics to measure concentration in recommendation distributions \cite{Do2022, GiniFairness2021}. A Gini coefficient near 1 indicates extreme concentration, prompting the need for "market-maker" interventions that act as coordinates for the labor pool \cite{JoLA2025}.
+
+\subsubsection{Algorithmic Mitigation}
+Advanced strategies for mitigation include \textit{in-processing} methods 
+that modify the recommendation objective directly. The \textit{ReCon} model 
+integrates Optimal Transport (OT) theory to redistribute application flow 
+away from congested jobs \cite{mashayekhi2023reconreducingcongestionjob}. 
+\textit{JoLA} (Job Landscape Aware) introduces differentiable market share 
+approximations to specifically reduce the number of orphan job ads 
+\cite{01KAK08E4756SJAF6RCBJVGWXB}. \textit{FEIR} takes a complementary 
+fairness perspective, quantifying and reducing envy and inferiority in 
+recommendations of limited resources such as job positions 
+\cite{li2023feirquantifyingreducingenvy}.
+
+\subsection{Reasoning-Based Recruiter Suitability Modeling}
+A persistent challenge is data asymmetry: seeker behavioural signals are captured at scale, but recruiter decision signals (shortlisting, hiring) are often invisible or off-platform \cite{mashayekhi2023challengebasedsurveyerecruitmentrecommendation}.
+
+\subsubsection{LLM-Based Synthetic Feedback}
+To overcome data scarcity, state-of-the-art research leverages Large Language Models (LLMs) to generate synthetic labels for candidate suitability \cite{gan2024applicationllmagentsrecruitment}. These models possess high \textit{Algorithmic Fidelity}, enabling them to simulate expert professional judgments. Dominant methodologies involve \gls{CoT} prompting to extract explicit criteria (Must-Haves, Deal-Breakers) from job descriptions and reason through candidate fit \cite{wei2023chainofthoughtpromptingelicitsreasoning}.
