@@ -13,10 +13,15 @@ First, the dataset construction with negative sampling strategy is described in 
 Because the interaction log contains only positive examples, negative examples are constructed during dataset creation. For each positive (user, job) pair we sample a mixture of hard and easy negatives: a fraction of negatives are drawn from geographically close jobs while the remainder are sampled from distant jobs. This stratified negative sampling prevents the model from learning trivial separations based only on coarse attributes and ensures it distinguishes true preference from mere co-location. The specific sampling ratios and filtering heuristics used in experiments are reported in Section~\ref{sec:negative_sampling}.
 
 
-\section{Data Pipeline and Feature Engineering}
+\section{Feature Engineering}
 \label{sec:user_data_pipeline}
 
-The raw data must be preprocessed before it can be used by the two-tower model. The pipeline consists of two main stages: user feature processing and job feature processing. Both stages involve feature extraction, engineering and encoding to transform raw attributes into a vectorised format suitable for input into their respective towers. The design choices for each stage are described in the following sections.
+Feature engineering consists of two main stages: user feature 
+processing and job feature processing. Both stages involve feature 
+extraction, engineering and encoding to transform raw attributes 
+into a vectorised format suitable for input into their respective 
+towers. The design choices for each stage are described in the 
+following sections.
 \subsection{User Feature Processing}
 \label{sec:user_features_processing}
 
@@ -104,12 +109,9 @@ Job features undergo the same encoding and scaling process as user features: num
 \subsection{Text Embedding Dimension}
 \label{sec:text_embedding}
 
-As mentioned in the previous sections, both user and job towers incorporate a text embedding component to capture the semantic information contained in job titles and user career histories. The embeddings from the Qwen model are unit-normalised to ensure comparable similarity scores. 
+As mentioned in the previous sections, both user and job towers incorporate a text embedding component to capture the semantic information contained in job titles and user career histories. The embeddings are unit-normalised to ensure comparable similarity scores. 
 
-The Qwen3 model produces 1024-dimensional embeddings by default. Using the full 
-vector would cause the text signal to dominate the input to both towers, since all 
-other features combined contribute far fewer dimensions. The embedding is therefore 
-truncated to $d_{\text{text}}$ to ensure that the text signal contributes meaningfully but does not overshadow the structured features. The specific choice of $d_{\text{text}}$ is reported in Section~\ref{sec:exp_user_hyperparameters}.
+The output dimension of the text embedding is a critical hyperparameter. Using the full dimensional output --- 1024 dimensions for the Qwen3 model --- would cause the text signal to dominate the input to both towers, since all other features combined contribute far fewer dimensions. The embedding is therefore truncated to $d_{\text{text}}$. The specific choice is further discussed in Section~\ref{sec:exp_user_hyperparameters}.
 
 \section{Two-Tower Model Architecture}
 \label{sec:user_arch}
@@ -189,8 +191,4 @@ At inference time, recommendations are generated efficiently by precomputing the
  
 Either raw scores or sigmoid probabilities could be used for ranking. The raw dot product scores are used directly for ranking in Section~\ref{sec:exp_user_inference} because they preserve the relative distances in the embedding space, which is more meaningful for nearest-neighbour retrieval. However, the hybrid model described in Chapter~\ref{chap:congestion_balancing} uses the sigmoid probabilities for ranking because the recruiter-side model produces probability estimates, so using the same scale for both components simplifies the aggregation step.
  
-In Section~\ref{sec:exp_user_inference}, examples of generated 
-recommendations are provided, along with a qualitative discussion 
-of recommendation relevance, geographic coherence, and the contrast 
-between a user with a rich interaction history and one with no prior 
-interactions.
+In Section~\ref{sec:exp_user_inference} examples of the generated recommendations are provided, along with a qualitative discussion of the relevance of the jobs, the geographic coherence and the difference between a user with a rich interaction history and a user with no prior interactions.  
