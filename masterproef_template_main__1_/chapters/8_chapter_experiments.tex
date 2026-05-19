@@ -1,6 +1,6 @@
 \chapter{Experiments and Results}
 \label{chap:experiments}
-This chapter describes the experimental evaluation of the systems developed in previous chapters. First, the shared experiment settings are described in Section~\ref{sec:exp_settings} which includes dataset statistics, how the data is split for evaluation and production, and a summary of the hardware configuration which was used. Then, experiments are presented for the user-side recommender system (Section~\ref{sec:exp_user}), the recruiter-side recommender system (Section~\ref{sec:exp_recruiter}), and the congestion balancing strategies (Section~\ref{sec:exp_congestion}).
+This chapter describes the experimental evaluation of the systems developed in previous chapters. First, the shared experiment settings are described in Section~\ref{sec:exp_settings} which includes dataset statistics, how the temporal split is applied, and a summary of the hardware configuration which was used. Then, experiments are presented for the user-side recommender system (Section~\ref{sec:exp_user}), the recruiter-side recommender system (Section~\ref{sec:exp_recruiter}), and the congestion balancing strategies (Section~\ref{sec:exp_congestion}).
 
 \section{General Experiments Setting}
 \label{sec:exp_settings}
@@ -95,28 +95,22 @@ Rather than using the original within-window train/test labels provided
 by the dataset, a temporal split across windows is applied, as 
 illustrated in Figure~\ref{fig:custom_temporal_split}. Window~7 
 represents the target deployment period --- the future time window that 
-all models in this thesis are designed to serve. No model is trained on Window~7 data; it is reserved as the shared production and sanity check 
-window in which the full two-sided system --- both two-tower and recruiter models --- is evaluated. Windows~1--6 
+all models in this thesis are designed to serve. No model is trained on Window~7 data; it is reserved as the sanity check and production 
+window for all models. Windows~1--6 
 provide the historical data from which each component learns and is 
 developed, though the exact partitioning differs by component and is
 described in the respective experiment sections.
 
-Users marked \texttt{Split=Test} are excluded entirely (22,838 users). 
-These users made five or more applications during the withheld 4-day 
-test period of the original competition. Of these, 43\% have no 
-recorded interactions in the training period whatsoever, as their only 
-observable activity falls within the withheld period. Including them 
-would introduce users with structurally missing interaction records, 
-so they are excluded entirely.
+Users marked \texttt{Split=Test} in the original dataset are excluded 
+entirely (22,838 users). These users made five or more applications 
+during the withheld 4-day test period of each window. Of these, 43\% 
+have no recorded interactions in the 9-day training period whatsoever, 
+meaning their only observable activity falls within the withheld 
+portion. Including them would introduce users with incomplete or 
+entirely missing interaction records into the evaluation, so they 
+are excluded entirely.
 
-This design has three consequences. First, there is a strict temporal 
-boundary: no model sees any interaction from Window~7 during 
-training. Second, the evaluation is a genuine cold-start scenario --- 
-no user appears in both the training and evaluation sets. Third, using 
-all active users from each window group rather than filtering by 
-activity thresholds avoids biasing the evaluation towards 
-highly-engaged users. Table~\ref{tab:split_stats} shows the resulting 
-split statistics.
+An important consequence of this temporal split is that all users in Window~7 are cold-start users with no recorded interactions in the training period. This is a realistic reflection of the production setting, where every user at inference time is new to the model. This makes the evaluation more challenging but also more meaningful. Table~\ref{tab:split_stats} summarises the resulting dataset statistics for the historical and deployment periods after applying the temporal window split and removing the users labeled \texttt{Split=Test}. 
 
 \begin{table}[htbp]
     \centering
@@ -133,16 +127,6 @@ split statistics.
         \bottomrule
     \end{tabular}
 \end{table}
-
-The exact use of each window group differs by component. The two-tower 
-model is trained on Windows~1--4 and validated on Windows~5--6, with 
-Window~7 used for qualitative inference evaluation. The recruiter-side 
-model draws its \gls{LLM}-labelled training pairs from Windows~1--4, 
-applies group-based cross-validation with a held-out test set within that pool for model selection, and uses Window~7 for a qualitative sanity check. The 
-congestion balancing experiments operate exclusively on Window~7, 
-applying both trained models without further fine-tuning. The common 
-thread across all three components is that Window~7 remains unseen 
-during every training and model selection decision.
 
 \subsection{Hardware and Software Configuration}
 \label{sec:hardware}
