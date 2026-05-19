@@ -27,7 +27,7 @@ All experiments are conducted on the CareerBuilder Job Recommendation dataset~\c
 
 The extremely high sparsity --- fewer than one in 200,000 user-job pairs has a recorded interaction --- means that collaborative approaches relying on interaction density are infeasible. The two-tower architecture instead uses interactions as a training signal while generalising through user and job profile features, making it robust to sparse data.
 
-\subsection{Custom Train/Validation/Test Split}
+\subsection{Temporal Window Split}
 \label{sec:custom_split}
 
 \begin{figure}[ht]
@@ -35,61 +35,42 @@ The extremely high sparsity --- fewer than one in 200,000 user-job pairs has a r
     \begin{tikzpicture}[
         window/.style={
             draw, minimum width=1.2cm, minimum height=0.7cm,
-            font=\footnotesize, fill=white},
+            font=\footnotesize, fill=blue!20},
         deploy/.style={
             draw, minimum width=1.2cm, minimum height=0.7cm,
             font=\footnotesize, fill=orange!15},
         label_node/.style={font=\scriptsize\bfseries, align=center}
     ]
 
-    \node [window, fill=blue!20] (w1) at (0,0)   {W1};
-    \node [window, fill=blue!20] (w2) at (1.5,0) {W2};
-    \node [window, fill=blue!20] (w3) at (3,0)   {W3};
-    \node [window, fill=blue!20] (w4) at (4.5,0) {W4};
-    \node [window, fill=green!20] (w5) at (6.5,0) {W5};
-    \node [window, fill=green!20] (w6) at (8,0)   {W6};
+    \node [window] (w1) at (0,0)   {W1};
+    \node [window] (w2) at (1.5,0) {W2};
+    \node [window] (w3) at (3,0)   {W3};
+    \node [window] (w4) at (4.5,0) {W4};
+    \node [window] (w5) at (6,0)   {W5};
+    \node [window] (w6) at (7.5,0) {W6};
     \node [deploy]  (w7) at (9.5,0) {W7};
 
-    %% Temporal boundary
-    \draw [dashed, line width=1.5pt, red!80!black] (5.5, 1.0) -- (5.5, -2.8)
+    \draw [dashed, line width=1.5pt, red!80!black] (8.5, 1.0) -- (8.5, -2.8)
         node[below, font=\footnotesize\itshape, text=red!80!black]
         {Temporal Boundary};
 
-    %% Time arrow
-    \draw [-{Stealth}, thick] (-1, -0.55) -- (10.8, -0.55) node[right] {Time};
+    \draw [-{Stealth}, thick] (-1, -0.55) -- (11, -0.55) node[right] {Time};
 
-    %% Training bracket
+    %% Historical bracket (W1--W6)
     \draw [decorate, decoration={brace, amplitude=6pt}]
-        (-0.7, 0.55) -- (5.2, 0.55)
+        (-0.7, 0.55) -- (8.2, 0.55)
         node [midway, yshift=0.45cm, label_node, color=blue!70!black]
-        {Training Set};
-    \node [font=\scriptsize, color=gray!70!black] at (2.25, 1.45)
-        {Historical Data};
+        {Historical Data (W1--W6)};
 
-    %% Model development bracket (W5--W6 only)
-    \draw [decorate, decoration={brace, amplitude=6pt}]
-        (5.8, 0.55) -- (8.75, 0.55)
-        node [midway, yshift=0.45cm, label_node, color=green!50!black]
-        {Model Development};
+    %% Deployment label above W7
+    \node [label_node, color=orange!70!black] at (9.5, 1.1)
+        {Deployment (W7)};
 
-    %% Deployment bracket (W7)
-    \draw [decorate, decoration={brace, amplitude=6pt}]
-        (9.1, 0.55) -- (9.9, 0.55)
-        node [midway, yshift=0.45cm, label_node, color=orange!70!black]
-        {Deployment};
-
-    %% Bottom note — training
+    %% Bottom note — historical
     \node [draw, rounded corners, fill=gray!5, font=\tiny, align=left]
-        at (2.25, -1.85) {
-        \textbullet\ All users/jobs included \\
-        \textbullet\ Historical behaviour used for training
-    };
-
-    %% Bottom note — model development
-    \node [draw, rounded corners, fill=gray!5, font=\tiny, align=left]
-        at (7.15, -1.85) {
-        \textbullet\ No overlap with training users \\
-        \textbullet\ Validation and model selection
+        at (3.75, -1.85) {
+        \textbullet\ Training, validation and model selection \\
+        \textbullet\ Exact split varies by component
     };
 
     %% Bottom note — deployment
@@ -100,47 +81,68 @@ The extremely high sparsity --- fewer than one in 200,000 user-job pairs has a r
     };
 
     \end{tikzpicture}
-    \caption{Temporal split for the CareerBuilder dataset. Window~7 is the
-    target deployment window, unseen during training and model selection
-    across all chapters. Windows~1--4 form the primary training period;
-    Windows~5--6 are used for validation and model development. The exact
-    use of each window group varies by component and is described in each
-    experiment section.}
+    \caption{Temporal window split for the CareerBuilder dataset. 
+    Windows~1--6 form the historical period used for training, 
+    validation and model selection across all components; the exact 
+    partitioning within this period differs by component and is 
+    described in each experiment section. Window~7 is the shared 
+    deployment window, unseen during all training and model selection 
+    decisions.}
     \label{fig:custom_temporal_split}
 \end{figure}
 
-Window~7 represents the target deployment period — the future time window 
-that all models in this thesis are designed to serve. No model observes 
-any interaction from Window~7 during training or model selection, except for the qualitative inference evaluation in section \ref{sec:exp_user_inference}. It is 
-reserved exclusively as the production window in which the full two-sided 
-system operates. Windows~1--6 provide the historical data from which each 
-model learns and is evaluated, though the exact partitioning differs by 
-component and is described in the respective experiment sections.
+Rather than using the original within-window train/test labels provided 
+by the dataset, a temporal split across windows is applied, as 
+illustrated in Figure~\ref{fig:custom_temporal_split}. Window~7 
+represents the target deployment period --- the future time window that 
+all models in this thesis are designed to serve. No model is trained on Window~7 data; it is reserved as the shared production and sanity check 
+window in which the full two-sided system --- both two-tower and recruiter models --- is evaluated. Windows~1--6 
+provide the historical data from which each component learns and is 
+developed, though the exact partitioning differs by component and is
+described in the respective experiment sections.
 
-Table~\ref{tab:split_stats} shows the dataset statistics for each window 
-group.
+Users marked \texttt{Split=Test} are excluded entirely (22,838 users). 
+These users made five or more applications during the withheld 4-day 
+test period of the original competition. Of these, 43\% have no 
+recorded interactions in the training period whatsoever, as their only 
+observable activity falls within the withheld period. Including them 
+would introduce users with structurally missing interaction records, 
+so they are excluded entirely.
 
-
-Rather than using the original within-window train/test labels provided by the dataset, a temporal split across windows is applied (Figure~\ref{fig:custom_temporal_split}). Windows 1--4 form the training set and Windows 5--7 form the validation and test set, with Windows 5--6 used for validation and Window 7 reserved for final evaluation.
-
-Users marked \texttt{Split=Test} are excluded entirely (22,838 users). These users made five or more applications during the withheld 4-day test period of the original competition. Of these, 43\% have no recorded interactions in the training period whatsoever, as their only observable activity falls within the withheld test period. Including them would introduce users with structurally missing interaction records into the evaluation set, so they are excluded entirely.
-
-This design has three consequences. First, there is a strict temporal boundary: the model never sees any interaction from the evaluation period during training. Second, the evaluation is a genuine cold-start scenario — no user appears in both the training and evaluation sets. Third, using all active users from each window group (rather than filtering by activity thresholds) avoids biasing the evaluation towards highly-engaged users. Table~\ref{tab:split_stats} shows the resulting split sizes.
+This design has three consequences. First, there is a strict temporal 
+boundary: no model sees any interaction from Window~7 during 
+training. Second, the evaluation is a genuine cold-start scenario --- 
+no user appears in both the training and evaluation sets. Third, using 
+all active users from each window group rather than filtering by 
+activity thresholds avoids biasing the evaluation towards 
+highly-engaged users. Table~\ref{tab:split_stats} shows the resulting 
+split statistics.
 
 \begin{table}[htbp]
     \centering
-    \caption{Dataset split statistics after applying the custom temporal split.}
+    \caption{Dataset split statistics after applying the temporal 
+    window split.}
     \label{tab:split_stats}
     \begin{tabular}{lrrr}
         \toprule
-        \textbf{Split} & \textbf{Users} & \textbf{Jobs} & \textbf{Applications} \\
+        \textbf{Split} & \textbf{Users} & \textbf{Jobs} 
+                       & \textbf{Applications} \\
         \midrule
-        Training   (W1--W4) & 189,657 & 223,600 & 881,249  \\
-        Validation (W5--W6) &  78,428 &  86,196 & 367,038  \\
-        Test       (W7)     &  39,948 &  39,946 & 169,227  \\
+        Historical (W1--W6) & 268,085 & 309,796 & 1,248,287  \\
+        Deployment  (W7)     &  39,948 &  39,946 & 169,227  \\
         \bottomrule
     \end{tabular}
 \end{table}
+
+The exact use of each window group differs by component. The two-tower 
+model is trained on Windows~1--4 and validated on Windows~5--6, with 
+Window~7 used for qualitative inference evaluation. The recruiter-side 
+model draws its \gls{LLM}-labelled training pairs from Windows~1--4, 
+applies group-based cross-validation with a held-out test set within that pool for model selection, and uses Window~7 for a qualitative sanity check. The 
+congestion balancing experiments operate exclusively on Window~7, 
+applying both trained models without further fine-tuning. The common 
+thread across all three components is that Window~7 remains unseen 
+during every training and model selection decision.
 
 \subsection{Hardware and Software Configuration}
 \label{sec:hardware}
@@ -390,7 +392,6 @@ The recruiter-side experiments address two design choices that must be made befo
 \label{sec:exp_recruiter_datagen}
  
 Because no ground-truth recruiter feedback exists in the dataset, training labels must be generated synthetically. The method is described in Section~\ref{sec:recruiter_data_gen}; this section provides the implementation details specific to this experiment.
-
 The recruiter-side model uses a different window partitioning from the 
 two-tower model, reflecting the different nature of its training data. 
 Because recruiter labels are generated synthetically via \gls{LLM} 
@@ -399,11 +400,12 @@ require a temporal train/validation split in the same sense. Instead,
 \gls{LLM}-labelled pairs are drawn from Windows~1--4, and a 
 group-based cross-validation split by job identity is applied within 
 this pool (described in Section~\ref{sec:exp_recruiter_setting}). 
-A separate held-out sanity check set is generated from Windows~5--6 
-to verify that the model generalises to unseen jobs from a later time 
-period which is not used for training or model selection. Window~7 is not used for training or model selection; the final 
-model is applied to Window~7 candidates in the congestion balancing 
-simulation of Chapter~\ref{chap:congestion_balancing}.
+A separate held-out sanity check set is generated from Window~7 
+to verify that the final model generalises sensibly to the deployment 
+period. Window~7 is not used for training or model selection; the 
+sanity check is purely qualitative and the final model is applied to 
+Window~7 candidates in the congestion balancing simulation of 
+Chapter~\ref{chap:congestion_balancing}.
 
 \paragraph{Labeling setup}
 Labels are generated using the Qwen3.5 (35B) model served locally via the Ollama API. For computational feasibility, a sample of jobs is drawn from Windows~1--4; for each job, up to 20 applicants are evaluated in a single batched prompt. The \gls{LLM} receives the job description alongside all candidate profiles in the batch and returns a structured JSON response. The final prompt used is:
@@ -492,8 +494,13 @@ The resulting dataset contains \textbf{5,896} labeled pairs across \textbf{1511}
     \end{tabular}
 \end{table}
  
-\paragraph{Validation set}
-A separate held-out small labeled set is generated for the qualitative sanity check targeting a disjoint sample of jobs from Windows~5--6. This set contains only real applicants with their \gls{LLM} labels — no synthetic negatives are added — providing a clean probe of whether the model correctly ranks good fits above poor ones among actual candidates on completely unseen jobs.
+\paragraph{Sanity check set}
+A separate held-out set is generated for the qualitative sanity check, 
+targeting a disjoint sample of jobs from Window~7. This set contains 
+only real applicants with their \gls{LLM} labels --- no synthetic 
+negatives are added --- providing a clean probe of whether the model 
+correctly ranks good fits above poor ones among actual candidates on 
+completely unseen jobs from the deployment window.
  
 \subsection{Experiment Setting}
 \label{sec:exp_recruiter_setting}
@@ -669,7 +676,13 @@ The two-stage selection process yields a clear conclusion: \textbf{XGBoost train
 \subsubsection{Qualitative Sanity Check}
 \label{sec:exp_recruiter_sanity}
  
-To validate that the final combined model behaves sensibly in practice, three jobs are sampled from Windows~5--6 — jobs the model has never seen during training. The three cases are chosen to probe different aspects of model behaviour: generalisation to non-applicants (Job~1), within-pool differentiation among actual applicants (Job~2), and mixed ranking across both groups (Job~3). All scores are produced by the final XGBoost model trained on combined negatives.
+To validate that the final combined model behaves sensibly in practice, 
+three jobs are sampled from Window~7 --- jobs the model has never seen 
+during training or model selection. The three cases are chosen to probe 
+different aspects of model behaviour: generalisation to non-applicants 
+(Job~1), within-pool differentiation among actual applicants (Job~2), 
+and mixed ranking across both groups (Job~3). All scores are produced 
+by the final XGBoost model trained on combined negatives.
  
 \paragraph{Job 257565 — Accounts Receivable Clerk: non-applicant generalisation.}
 This job requires 1--2 years of business-to-business collections experience along with cash posting and basic Excel skills. Five random non-applicants are scored to test whether the model generalises to candidates it was not explicitly trained to rank (the combined model saw synthetic non-applicants during training, but not these specific individuals). Table~\ref{tab:sanity_ar_clerk} shows the results.
