@@ -1,80 +1,22 @@
 \chapter{User-Side Job Recommender System}
 \label{chap:user_recommendation}
 
-This chapter describes the job recommender system built for users, consisting of the data pipeline and the two-tower neural network architecture. The system learns dense representations of both users and jobs and uses their similarity to rank job opportunities for each individual user. This model is later used in Chapter~\ref{chap:congestion_balancing} as one of the two fundamental components for two-sided recommendations and mitigating congestion.
+This chapter describes the job recommender system built for users, consisting of the dataset contruction, the feature engineering, the two-tower neural network architecture and the training procedure. The system learns dense representations of both users and jobs and uses their similarity to rank job opportunities for each individual user. This model is later used in Chapter~\ref{chap:congestion_balancing} as one of the two fundamental components for reciprocal recommendations and mitigating congestion.
 
-A two-tower recommender is chosen because neural networks can handle the cold-start problem~\cite{rama2019deeplearningaddresscandidate} --- a user with no prior interaction history can still receive recommendations based on their profile features alone by using the learned user embedding. This property is essential given the temporal evaluation setup described in Chapter~\ref{chap:experiments}.
+A two-tower recommender is chosen because neural networks can handle the cold-start problem~\cite{rama2019deeplearningaddresscandidate} --- a user with no prior interaction history can still receive recommendations based on their profile features alone by using the learned user embedding. This property is essential given the temporal evaluation setup described in Section~\ref{sec:custom_split}.
 
-Section~\ref{sec:user_arch} describes the architecture of the model. Section~\ref{sec:user_data_pipeline} describes the data pipeline and feature engineering. Section~\ref{sec:user_training} describes the training procedure. All experimental results and hyperparameter choices are reported in Chapter~\ref{chap:experiments}.
+First, the dataset construction with negative sampling strategy is described in Section~\ref{sec:dataset_construction}. Then, the feature engineering is described in Section~\ref{sec:user_data_pipeline} followed by the architecture of the two-tower model in Section~\ref{sec:user_arch}. Finally, the training procedure is described in Section~\ref{sec:user_training} and in Section~\ref{sec:user_inference} the usage of the trained model is discussed. The methods are applied in practice and the specific design choices and hyperparameters are reported in Chapter~\ref{chap:experiments}.
 
-\section{Two-Tower Model Architecture}
-\label{sec:user_arch}
+\section{Dataset Construction with Negative Sampling}
+\label{sec:dataset_construction}
 
-The two-tower recommender consists of two separate neural networks. The user tower processes user features and the job tower processes job features. Both towers learn a dense vector representation of their respective input. The compatibility of a user-job pair is then measured as the dot product of these two vectors. The design allows job embeddings to be precomputed and cached, enabling efficient real-time recommendations for users. 
+Because the interaction log contains only positive examples, negative examples are constructed during dataset creation. For each positive (user, job) pair we sample a mixture of hard and easy negatives: a fraction of negatives are drawn from geographically close jobs while the remainder are sampled from distant jobs. This stratified negative sampling prevents the model from learning trivial separations based only on coarse attributes and ensures it distinguishes true preference from mere co-location. The specific sampling ratios and filtering heuristics used in experiments are reported in Section~\ref{sec:negative_sampling}.
 
-\subsection{User Tower}
-\label{sec:user_tower}
-
-The user tower is a multi-layer feedforward network that transforms the input user feature vector $\mathbf{x}_u$ into a $d$-dimensional embedding $\mathbf{e}_u$. Categorical input features are first passed through learnable embedding layers (see Section~\ref{sec:prelim_embeddings}), producing dense representations for each categorical attribute. These are concatenated with the numerical features to form the full input vector. This vector is then processed through a sequence of fully-connected layers with batch normalisation, ReLU activations and dropout regularisation.
-
-The layer progression narrows from a wide hidden representation down to the final $d$-dimensional output, acting as a bottleneck that forces the network to learn a compressed and meaningful summary of the user profile. The architecture is detailed in Algorithm~\ref{alg:user_tower}.
-
-\begin{algorithm}[H]
-\caption{User Tower Forward Pass}
-\label{alg:user_tower}
-\begin{algorithmic}[1]
-\Require Categorical features $\mathbf{c}_u$, numerical features $\mathbf{n}_u$
-\For{each categorical feature $c_k$ in $\mathbf{c}_u$}
-    \State $\mathbf{emb}_k \gets \text{Embedding}_{k}(c_k)$
-\EndFor
-\State $\mathbf{x}_u \gets [\mathbf{emb}_1, \ldots, \mathbf{emb}_K, \mathbf{n}_u]$ 
-\State $\mathbf{h}_1 \gets \text{Dropout}(\text{ReLU}(\text{BN}(\mathbf{W}_1 \mathbf{x}_u + \mathbf{b}_1)))$
-\State $\mathbf{h}_2 \gets \text{Dropout}(\text{ReLU}(\text{BN}(\mathbf{W}_2 \mathbf{h}_1 + \mathbf{b}_2)))$
-\State $\mathbf{e}_u \gets \mathbf{W}_3 \mathbf{h}_2 + \mathbf{b}_3$
-\Ensure User embedding $\mathbf{e}_u \in \mathbb{R}^d$
-\end{algorithmic}
-\end{algorithm}
-
-\subsection{Job Tower}
-\label{sec:job_tower}
-
-The job tower mirrors the user tower architecture exactly, processing job features $\mathbf{x}_j$ to produce a $d$-dimensional job embedding $\mathbf{e}_j$. The same pattern of categorical embeddings concatenated with numerical features, followed by the bottleneck \gls{MLP}, is applied. The only structural difference is the input dimension, which depends on the number of job-specific features. This symmetry is intentional: it ensures that user and job embeddings live in the same $d$-dimensional space, making the dot product a meaningful similarity measure. Below is the job tower architecture in Algorithm~\ref{alg:job_tower}.
-
-\begin{algorithm}[H]
-\caption{Job Tower Forward Pass}
-\label{alg:job_tower}
-\begin{algorithmic}[1]
-\Require Categorical features $\mathbf{c}_j$, numerical features $\mathbf{n}_j$
-\For{each categorical feature $c_k$ in $\mathbf{c}_j$}
-    \State $\mathbf{emb}_k \gets \text{Embedding}_{k}(c_k)$
-\EndFor
-\State $\mathbf{x}_j \gets [\mathbf{emb}_1, \ldots, \mathbf{emb}_K, \mathbf{n}_j]$ 
-\State $\mathbf{h}_1 \gets \text{Dropout}(\text{ReLU}(\text{BN}(\mathbf{W}_1 \mathbf{x}_j + \mathbf{b}_1)))$
-\State $\mathbf{h}_2 \gets \text{Dropout}(\text{ReLU}(\text{BN}(\mathbf{W}_2 \mathbf{h}_1 + \mathbf{b}_2)))$
-\State $\mathbf{e}_j \gets \mathbf{W}_3 \mathbf{h}_2 + \mathbf{b}_3$
-\Ensure Job embedding $\mathbf{e}_j \in \mathbb{R}^d$
-\end{algorithmic}
-\end{algorithm}
-
-\subsection{Prediction Layer}
-\label{sec:user_prediction}
-
-The final user-job compatibility score is computed as the dot product of the two learned embeddings:
-\begin{equation}
-s(\mathbf{e}_u, \mathbf{e}_j) = \mathbf{e}_u \cdot \mathbf{e}_j = \sum_{i=1}^{d} (\mathbf{e}_u)_i \cdot (\mathbf{e}_j)_i
-\end{equation}
-
-Higher scores indicate stronger predicted affinity between a user's preferences and a job's characteristics. At training time, this raw score is passed through a sigmoid to produce 
-a probability estimate, as the training objective is binary cross-entropy. At inference time, the raw score is used directly for ranking, as discussed in Section~\ref{sec:user_inference}.
-
-L2 normalisation of the output embeddings was considered as an alternative design. The impact of this choice on model performance is evaluated in the ablation study in Section~\ref{sec:exp_user_ablation}.
 
 \section{Data Pipeline and Feature Engineering}
 \label{sec:user_data_pipeline}
 
-The raw data must be preprocessed before it can be used by the two-tower model. The pipeline consists of two main stages: user feature processing and job feature processing. Both stages include text embedding as part of their respective pipelines. Specific sampling ratios and dataset construction details are described in Chapter~\ref{chap:experiments}.
-
-
+The raw data must be preprocessed before it can be used by the two-tower model. The pipeline consists of two main stages: user feature processing and job feature processing. Both stages involve feature extraction, engineering and encoding to transform raw attributes into a vectorised format suitable for input into their respective towers. The design choices for each stage are described in the following sections.
 \subsection{User Feature Processing}
 \label{sec:user_features_processing}
 
@@ -169,12 +111,70 @@ vector would cause the text signal to dominate the input to both towers, since a
 other features combined contribute far fewer dimensions. The embedding is therefore 
 truncated to $d_{\text{text}}$ to ensure that the text signal contributes meaningfully but does not overshadow the structured features. The specific choice of $d_{\text{text}}$ is reported in Section~\ref{sec:exp_user_hyperparameters}.
 
+\section{Two-Tower Model Architecture}
+\label{sec:user_arch}
+
+The two-tower recommender consists of two separate neural networks. The user tower processes user features and the job tower processes job features. Both towers learn a dense vector representation of their respective input. The compatibility of a user-job pair is then measured as the dot product of these two vectors. The design allows job embeddings to be precomputed and cached, enabling efficient real-time recommendations for users. 
+
+\subsection{User Tower}
+\label{sec:user_tower}
+
+The user tower is a multi-layer feedforward network that transforms the input user feature vector $\mathbf{x}_u$ into a $d$-dimensional embedding $\mathbf{e}_u$. Categorical input features are first passed through learnable embedding layers (see Section~\ref{sec:prelim_embeddings}), producing dense representations for each categorical attribute. These are concatenated with the numerical features to form the full input vector. This vector is then processed through a sequence of fully-connected layers with batch normalisation, ReLU activations and dropout regularisation.
+
+The layer progression narrows from a wide hidden representation down to the final $d$-dimensional output, acting as a bottleneck that forces the network to learn a compressed and meaningful summary of the user profile. The architecture is detailed in Algorithm~\ref{alg:user_tower}.
+
+\begin{algorithm}[H]
+\caption{User Tower Forward Pass}
+\label{alg:user_tower}
+\begin{algorithmic}[1]
+\Require Categorical features $\mathbf{c}_u$, numerical features $\mathbf{n}_u$
+\For{each categorical feature $c_k$ in $\mathbf{c}_u$}
+    \State $\mathbf{emb}_k \gets \text{Embedding}_{k}(c_k)$
+\EndFor
+\State $\mathbf{x}_u \gets [\mathbf{emb}_1, \ldots, \mathbf{emb}_K, \mathbf{n}_u]$ 
+\State $\mathbf{h}_1 \gets \text{Dropout}(\text{ReLU}(\text{BN}(\mathbf{W}_1 \mathbf{x}_u + \mathbf{b}_1)))$
+\State $\mathbf{h}_2 \gets \text{Dropout}(\text{ReLU}(\text{BN}(\mathbf{W}_2 \mathbf{h}_1 + \mathbf{b}_2)))$
+\State $\mathbf{e}_u \gets \mathbf{W}_3 \mathbf{h}_2 + \mathbf{b}_3$
+\Ensure User embedding $\mathbf{e}_u \in \mathbb{R}^d$
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Job Tower}
+\label{sec:job_tower}
+
+The job tower mirrors the user tower architecture exactly, processing job features $\mathbf{x}_j$ to produce a $d$-dimensional job embedding $\mathbf{e}_j$. The same pattern of categorical embeddings concatenated with numerical features, followed by the bottleneck \gls{MLP}, is applied. The only structural difference is the input dimension, which depends on the number of job-specific features. This symmetry is intentional: it ensures that user and job embeddings live in the same $d$-dimensional space, making the dot product a meaningful similarity measure. The architecture is detailed in Algorithm~\ref{alg:job_tower}." which matches the phrasing used for the user tower.
+
+\begin{algorithm}[H]
+\caption{Job Tower Forward Pass}
+\label{alg:job_tower}
+\begin{algorithmic}[1]
+\Require Categorical features $\mathbf{c}_j$, numerical features $\mathbf{n}_j$
+\For{each categorical feature $c_k$ in $\mathbf{c}_j$}
+    \State $\mathbf{emb}_k \gets \text{Embedding}_{k}(c_k)$
+\EndFor
+\State $\mathbf{x}_j \gets [\mathbf{emb}_1, \ldots, \mathbf{emb}_K, \mathbf{n}_j]$ 
+\State $\mathbf{h}_1 \gets \text{Dropout}(\text{ReLU}(\text{BN}(\mathbf{W}_1 \mathbf{x}_j + \mathbf{b}_1)))$
+\State $\mathbf{h}_2 \gets \text{Dropout}(\text{ReLU}(\text{BN}(\mathbf{W}_2 \mathbf{h}_1 + \mathbf{b}_2)))$
+\State $\mathbf{e}_j \gets \mathbf{W}_3 \mathbf{h}_2 + \mathbf{b}_3$
+\Ensure Job embedding $\mathbf{e}_j \in \mathbb{R}^d$
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Prediction Layer}
+\label{sec:user_prediction}
+
+The final user-job compatibility score is computed as the dot product of the two learned embeddings:
+\begin{equation}
+s(\mathbf{e}_u, \mathbf{e}_j) = \mathbf{e}_u \cdot \mathbf{e}_j = \sum_{i=1}^{d} (\mathbf{e}_u)_i \cdot (\mathbf{e}_j)_i
+\end{equation}
+
+Higher scores indicate stronger predicted affinity between a user's preferences and a job's characteristics. At training time, this raw score is passed through a sigmoid to produce 
+a probability estimate, as the training objective is binary cross-entropy. At inference time, the raw score is used directly for ranking, as discussed in Section~\ref{sec:user_inference}.
+
+L2 normalisation of the output embeddings was considered as an alternative design. The impact of this choice on model performance is evaluated in the ablation study in Section~\ref{sec:exp_user_ablation}.
+
 \section{Training Procedure}
 \label{sec:user_training}
-
-\subsection{Negative Sampling}
-\label{sec:user_neg_sampling}
-Because the dataset contains only positive interactions, negative examples must be constructed. Randomly sampled negatives drawn uniformly from the job pool are typically too easy and do not produce useful gradients — the model can trivially separate a nurse from a software engineer without learning anything about genuine preference. Hard negatives are therefore constructed by geographic stratification: for each positive pair, negatives are drawn from a mix of geographically close and distant jobs. This ensures the model is trained to distinguish true job-fit from mere co-location, which is especially important given that geographic signals are informative but should not dominate the learned representations. The specific sampling ratios used in practice are described in Section~\ref{sec:negative_sampling}.
 
 \subsection{Loss Function}
 The model is optimised using Binary Cross-Entropy with Logits loss, which combines a sigmoid activation with binary cross-entropy in a numerically stable form:
@@ -183,10 +183,14 @@ The model is optimised using Binary Cross-Entropy with Logits loss, which combin
 \end{equation}
 where $y_i \in \{0, 1\}$ is the ground truth label and $\hat{y}_i = s(\mathbf{e}_u, \mathbf{e}_j)$ is the raw dot product score. The sigmoid $\sigma$ maps the unbounded score to a probability during training. The model is optimised using the Adam optimiser with early stopping based on validation loss to prevent overfitting. Specific hyperparameter values are reported in Section~\ref{sec:exp_user_hyperparameters}.
 
-\subsection{Inference}
+\section{Usage at Inference Time}
 \label{sec:user_inference}
-At inference time, recommendations are generated efficiently by precomputing all job embeddings once and caching them in memory. For each user, only the user tower forward pass is executed, followed by a single matrix multiplication against the precomputed job matrix. This reduces per-user recommendation time to one matrix multiply regardless of the size of the job pool.
+At inference time, recommendations are generated efficiently by precomputing the output of the job tower for each job and caching them in memory. For each user, only the user tower forward pass is executed, followed by a single matrix multiplication against the precomputed job matrix. This reduces per-user recommendation time to one matrix multiply regardless of the size of the job pool.
  
-At inference, either raw scores or sigmoid probabilities could be used for ranking. The raw dot product scores are used directly for ranking because they preserve the relative distances in the embedding space, which is more meaningful for nearest-neighbour retrieval. However, the hybrid model described in Chapter~\ref{chap:congestion_balancing} uses the sigmoid probabilities for ranking because the recruiter-side model produces probability estimates, so using the same scale for both components simplifies the aggregation step.
+Either raw scores or sigmoid probabilities could be used for ranking. The raw dot product scores are used directly for ranking in Section~\ref{sec:exp_user_inference} because they preserve the relative distances in the embedding space, which is more meaningful for nearest-neighbour retrieval. However, the hybrid model described in Chapter~\ref{chap:congestion_balancing} uses the sigmoid probabilities for ranking because the recruiter-side model produces probability estimates, so using the same scale for both components simplifies the aggregation step.
  
-Because geographic preference is learned directly from the training signal through the stratified negative sampling strategy (Section~\ref{sec:negative_sampling}), no post-processing boost is applied at inference — jobs in the user's region surface naturally at the top of the ranking as a consequence of what the model has learned. In Section~\ref{sec:exp_user_ablation}, examples of user recommendations are provided to illustrate the model's ability to capture geographic and semantic preferences.
+In Section~\ref{sec:exp_user_inference}, examples of generated 
+recommendations are provided, along with a qualitative discussion 
+of recommendation relevance, geographic coherence, and the contrast 
+between a user with a rich interaction history and one with no prior 
+interactions.
