@@ -423,10 +423,7 @@ Chapter~\ref{chap:congestion_balancing}.
 
 \subsection{Dataset creation}
 \label{sec:exp_recruiter_datagen}
-Compared to the dataset creation for the two-tower model training, an extra step of data generation is needed.
-
-\subsubsection{Labels generation}
-The labeling procedure is described in
+Compared to the dataset creation for the two-tower model training, an extra step of data generation is needed. The labeling procedure is described in
 Section~\ref{sec:recruiter_data_gen}; this section covers the
 implementation details. Labels are generated using the Qwen3.5~(35B)
 model served locally via the Ollama API. For computational feasibility,
@@ -528,13 +525,6 @@ are applied during training inversely proportional to class frequency.
         \bottomrule
     \end{tabular}
 \end{table}
-
-A separate held-out set is generated for the qualitative sanity check,
-targeting a disjoint sample of jobs from Window~7. This set contains
-only real applicants with their LLM labels and no synthetic negatives,
-providing a clean probe of whether the model correctly ranks good fits
-above poor ones among actual candidates on entirely unseen jobs from
-the deployment window.
 
 \subsection{Training configuration}
 To evaluate generalisation to unseen jobs, all candidate-job pairs
