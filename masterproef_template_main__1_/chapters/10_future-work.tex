@@ -1,43 +1,80 @@
-\chapter{Future Work}
-\label{chap:future}
+\chapter{Limitations and Future Work}
+\label{ch:future-work}
 
-Future directions and improvements for this research.
-\subsection{Limitations}
-\label{sec:exp_user_limitations}
-Despite strong quantitative performance and qualitatively sensible recommendations for users with stable career histories, 3 structural limitations of the current 
-design are worth noting.
+While the proposed framework produces strong quantitative results and qualitatively sensible behaviour,
+several structural limitations constrain the current design. These are discussed per component below,
+together with the most natural directions for future work.
 
-\paragraph{Overfitting to the training distribution.}
-Figure~\ref{fig:trainval} reveals a growing divergence between training and validation loss after approximately epoch~5. While validation loss plateaus 
-around $0.27$, training loss continues to decrease to $0.20$, suggesting the model begins to overfit to the training windows. This is consistent with the 
-cold-start evaluation setup: the model is trained on Windows~1--4 and evaluated on entirely new users and jobs from Windows~5--7, meaning the distribution shift 
-between train and evaluation is structural rather than random. Dropout and batch normalisation partially mitigate this, but the gap suggests the model has 
-memorised aspects of the training user-job distribution that do not fully generalise. Possible mitigations include stronger regularisation, increased dropout rates, or data augmentation techniques such as feature masking during 
-training.
-\paragraph{Temporally flat job history representation.}
-The job history embedding is produced by encoding the three most recent job titles 
-as a single concatenated string and passing it through the Qwen encoder. This means 
-all three titles contribute equally to the resulting vector, regardless of how recent 
-they are and the duration of their employment. Recent jobs contain more signal about the user's current preferences and are more predictive of their next move, while older jobs may reflect past interests or even noise. The duration of each job is also relevant — a user with a 10-year tenure as a software engineer followed by a 3-month stint in retail likely has different preferences than a user with the opposite pattern. However, the CareerBuilder dataset does not provide employment duration in the user history, making this signal inaccessible to the current model.
+\section{User-Side Recommender}
 
-A natural extension would be to embed each title independently and compute a weighted 
-sum with recency weights, for example:
-\begin{equation}
-    \mathbf{e}_{\text{history}} = 0.5 \cdot \mathbf{e}_{t_1} 
-                                + 0.3 \cdot \mathbf{e}_{t_2} 
-                                + 0.2 \cdot \mathbf{e}_{t_3}
-\end{equation}
-where $\mathbf{e}_{t_1}$ is the embedding of the most recent title. This would 
-encode both the content and the direction of career movement into the user 
-representation. This limitation was not apparent in the two cases presented in 
-Section~\ref{sec:exp_user_inference}, as both users had coherent and stable 
-career histories. It is expected to surface most clearly in evaluation on users 
-with mixed or transitioning profiles.
-% TODO - add example of a user with a mixed/transitioning profile and how the current design fails to capture it
+The Two-Tower model is a strong baseline, but every aspect of its design --- the feature set, the
+network architecture, the training objective, and the hyperparameters --- represents a starting point
+rather than an optimised endpoint. More expressive architectures such as those with cross-attention or
+hierarchical interaction layers could capture richer user--job relationships. The feature engineering
+pipeline could be extended with additional signals, such as industry sector, contract type, or salary
+range, and the negative sampling strategy could be made adaptive rather than fixed. In short, the
+model provides a solid foundation, but substantial headroom for improvement remains across all of its
+components.
 
-\paragraph{City and State embedding sparsity.}
-City and state are encoded as categorical features with learned embeddings. Cities and states that appear rarely in Windows~1--4 have fewer training examples and therefore an undertrained embedding. For users located in such cities, the geographic signal 
-is weak and the model compensates by relying more heavily on the job history 
-representation — which then exposes the limitation above. This effect is expected 
-to be most pronounced for users outside major metropolitan areas.
-% TODO - add statistics on city frequency distribution and how many users are affected by this sparsity issue
+\section{Recruiter-Side Recommender}
+
+The recruiter-side component carries three limitations that are more fundamental in nature.
+
+\paragraph{LLM labels as a proxy for ground truth.}
+The model is trained to replicate the judgments of a large language model acting as a synthetic
+recruiter, not the decisions of actual human recruiters. LLM-generated labels are a proxy: they may
+reflect biases present in the model's training data, apply inconsistent implicit standards despite
+the structured Chain-of-Thought prompt, and fail to capture the contextual and interpersonal factors
+that influence real hiring decisions. Any downstream behaviour of the recruiter-side model therefore
+inherits these limitations. Access to real recruiter feedback --- shortlisting decisions, interview
+invitations, or hiring outcomes --- would be a transformative improvement and would allow the model
+to learn from ground truth rather than a simulation of it.
+
+\paragraph{Small training set.}
+The labelled dataset contains only 5{,}896 candidate--job pairs, a direct consequence of the
+computational cost of LLM-based labelling at scale. This limits the model's capacity and
+generalisability: the XGBoost classifier may not capture the full diversity of candidate--job
+combinations present in the broader CareerBuilder dataset, and performance on unusual or
+underrepresented job categories is difficult to assess. Scaling up the labelling pipeline ---
+through faster inference, batch optimisation, or distillation into a smaller labelling model ---
+would allow a substantially larger and more representative training set to be constructed.
+
+\paragraph{Prompt and feature engineering.}
+The Chain-of-Thought prompt used to generate labels was developed iteratively but remains a
+hand-crafted artefact. A more systematic prompt optimisation process, or the use of few-shot
+examples drawn from validated recruiter judgments, could improve label quality and consistency.
+Similarly, the feature engineering pipeline for the recruiter-side model, while carefully motivated,
+does not exhaust the space of useful signals. Richer semantic representations, structured extraction
+of job requirements, or features derived from the candidate's full application history rather than
+only their most recent titles could all improve the model's discriminative power.
+
+\section{Congestion Balancing Framework}
+
+\paragraph{Sequential rather than joint optimisation.}
+The hybrid framework operates as a two-phase sequential pipeline: Phase~1 determines which jobs
+users apply to, and Phase~2 re-ranks candidates within the resulting inboxes. The two phases are
+independent --- they do not communicate during execution and are not jointly optimised. As a
+consequence, any distributional biases introduced by Phase~1 are silently inherited by Phase~2
+with no corrective mechanism. A joint optimisation formulation --- for example, one that explicitly
+models the downstream shortlisting distribution when generating recommendations in Phase~1 --- could
+reduce this coupling and potentially achieve better market equilibrium with smaller individual
+quality costs.
+
+\paragraph{Dilution of the job-side penalty.}
+The job congestion penalty in Phase~1 acts only on the Two-Tower component of the combined score,
+which carries weight $\alpha = 0.5$. The recruiter probability term is congestion-unaware and pulls
+the combined score in the opposite direction, effectively halving the penalty's redistribution power
+relative to the standalone job-side experiment. The weighting parameter $\alpha$ therefore controls
+a fundamental trade-off between match quality and congestion reduction, and its optimal value is
+likely task- and dataset-dependent. Future work could explore adaptive or learned values of $\alpha$,
+or redesign the scoring function so that the congestion correction acts on the combined score directly
+rather than on one of its components in isolation.
+
+\section{Evaluation}
+
+The entire framework is evaluated through counterfactual simulation on historical application logs
+rather than in a live deployment. This means that behavioural feedback loops --- users adjusting
+their application behaviour in response to changed recommendations, or recruiters updating their
+screening criteria as candidate distributions shift --- are not captured. Real-world deployment would
+almost certainly produce effects not visible in the simulation, and a live A/B test or field
+experiment would be necessary to validate the framework's impact on actual labour market outcomes.
