@@ -1,11 +1,11 @@
-\chapter{Recruiter-Side Recommendation System}
+\chapter{Recruiter-Side Recommender System}
 \label{chap:recruiter_recommendation}
 
-This chapter describes the recruiter-side recommendation system, which predicts the suitability of a candidate for a given job posting from a recruiter's perspective. It complements the user-side system described in Chapter~\ref{chap:user_recommendation}: where the user-side model learns which jobs a seeker is likely to apply to, the recruiter-side model learns which candidates are genuinely qualified for a role. Together, the two scores can be combined to produce recommendations that are relevant to the seeker \emph{and} viable from the recruiter's perspective --- a candidate who scores well on both dimensions represents a strong bilateral match. The interplay between these scores is explored further in Chapter~\ref{chap:congestion_balancing}.
+This chapter describes the recruiter-side recommender system, which predicts the suitability of a candidate for a given job posting from a recruiter's perspective. It complements the user-side recommender system described in Chapter~\ref{chap:user_recommendation}: where the user-side model learns which jobs a seeker is likely to apply to, the recruiter-side model learns which candidates are genuinely qualified for a role. Together, the two scores can be combined to produce recommendations that are relevant to the seeker \emph{and} viable from the recruiter's perspective --- a candidate who scores well on both dimensions represents a strong bilateral match. The interplay between these scores is explored further in Chapter~\ref{chap:congestion_balancing}.
 
-The recruiter system is designed as a lightweight, interpretable model that combines heuristic features based on domain knowledge with semantic features derived from neural embeddings. This hybrid approach balances predictive performance with computational efficiency and explainability. While the model is not a recomender in the traditional sense (it does not directly produce ranked lists), it serves as a critical component in the overall recommendation pipeline by providing a suitability score that can be used to filter and rank candidates from the recruiter's perspective for the user-side recommendations.
+The recruiter system is designed as a lightweight, interpretable model that combines heuristic features based on domain knowledge with semantic features derived from neural embeddings. This hybrid approach balances predictive performance with computational efficiency and explainability.
 
-Section~\ref{sec:recruiter_data_gen} motivates and describes the synthetic label generation pipeline. Section~\ref{sec:recruiter_lightweight} describes the model architecture. Section~\ref{sec:recruiter_features} details the feature engineering pipeline. Section~\ref{sec:recruiter_training_proc} outlines the training procedure. Experiments and results are reported in Chapter~\ref{chap:experiments}.
+The chapter begins by motivating and describing the synthetic label generation pipeline (Section~\ref{sec:recruiter_data_gen}), since the absence of explicit recruiter feedback makes this a necessary foundation before any model can be trained. From there, the feature engineering pipeline is described in Section~\ref{sec:recruiter_features}, covering both the heuristic and semantic signals that form the input to the classifier. The architecture and rationale for the chosen model are presented in Section~\ref{sec:recruiter_lightweight}, followed by the training procedure in Section~\ref{sec:recruiter_training_proc}. Finally, Section~\ref{sec:recruiter_inference} describes how the trained model is applied at inference time, both for individual pairs and in the batch mode required by Chapter~\ref{chap:congestion_balancing}. Experiments and results are reported in Chapter~\ref{chap:experiments}.
 
 \section{Data Generation and Labeling}
 \label{sec:recruiter_data_gen}
@@ -33,23 +33,6 @@ Another dataset is constructed by also using the rows for which the \gls{LLM} ge
 Finally, a combined dataset is constructed by sampling an equal number of negatives from the \gls{LLM}-generated negatives and the random negatives. This dataset is used to train a model that can generalise to both the within-applicant-pool ranking scenario and the broader candidate-scoring context that arises during congestion balancing in Chapter~\ref{chap:congestion_balancing}.
 
 In Section~\ref{sec:exp_recruiter_negatives}, all three negative construction strategies are compared with XGBoost held fixed as the classifier. The results show that synthetic negatives yield the highest metrics, as expected given the easier task, while LLM negatives yield the lowest, reflecting the harder discrimination problem. The combined model — trained on an equal mix of LLM and synthetic negatives — achieves the best balance: it outperforms the LLM-only model and avoids the inflated metrics of the synthetic-only setting. The combined model is therefore the one carried forward into Chapter~\ref{chap:congestion_balancing}, as it generalises to both the within-applicant-pool ranking scenario and the broader candidate-scoring context that arises during congestion balancing.   
-
-\section{Lightweight Recommender Architecture}
-\label{sec:recruiter_lightweight}
-
-The recruiter-side model is a binary classifier that takes a feature vector $\mathbf{f} \in \mathbb{R}^{F}$ as input and outputs a suitability probability $\hat{y} \in [0,1]$. A lightweight architecture is chosen due to the fact that generating the dataset is time-consuming and the available data is limited. A more complex model, such as a two-tower neural network, would be prone to overfitting and would not provide significant performance gains given the limited data.
-
-\subsection{Model Selection}
-
-Several classifiers are considered as candidates: Logistic Regression, Random Forest, XGBoost, and a soft-voting ensemble of all three. Each is evaluated under the same group-based cross-validation protocol to ensure a fair comparison. This constitutes the first of two selection steps in the experimental evaluation: Section~\ref{sec:exp_recruiter_model_comparison} reports the full comparison; based on those results, \textbf{XGBoost} is selected as the final classifier and held fixed for all subsequent experiments.
-
-XGBoost is a gradient-boosted decision tree ensemble that builds an additive sequence of shallow trees \cite{Chen_2016}, each correcting the residual errors of the previous one. The predicted probability for a pair is:
-
-\begin{equation}
-    \hat{y} = \sigma\!\left(\sum_{k=1}^{T} f_k(\mathbf{f})\right)
-\end{equation}
-
-where $f_k$ is the $k$-th regression tree in the ensemble, $T$ is the total number of trees, and $\sigma$ is the sigmoid function. XGBoost is well suited to the tabular feature structure used here, handles missing values natively, and exposes feature importance scores that make the model's decisions interpretable.
 
 \section{Feature Engineering}
 \label{sec:recruiter_features}
@@ -86,6 +69,23 @@ This feature captures explicit keyword matches --- programming languages, domain
     \text{experience\_freshness} = \frac{e_u}{\text{current\_year} - \text{graduation\_year} + 1}
 \end{equation}
 
+Table~\ref{tab:recruiter_heuristic_features} summarises the heuristic features used in the model.
+\begin{table}[H]
+    \centering
+    \caption{Heuristic feature summary for the recruiter-side model.}
+    \label{tab:recruiter_heuristic_features}
+    \begin{tabular}{lp{7cm}}
+        \toprule
+        \textbf{Feature} & \textbf{Description} \\
+        \midrule
+        $e_u$ & Candidate's total years of recorded experience \\
+        $\delta_{\text{exp}}$ & Gap between candidate experience and the job requirement \\
+        tfidf\_overlap & TF-IDF cosine similarity between candidate and job text \\
+        degree\_match & Encoded degree alignment $\in \{-1, 0, 0.5, 1\}$ \\
+        exp\_freshness & Ratio of experience to years since graduation \\
+        \bottomrule
+    \end{tabular}
+\end{table}
 \subsection{Semantic Features}
 \label{sec:recruiter_semantic}
 
@@ -124,33 +124,41 @@ These documents are encoded using the all-MiniLM-L6-v2 sentence transformer, whi
 
 This provides a complementary semantic signal grounded in the complete candidate and job profiles rather than embeddings optimised for application prediction. 
 
-\subsection{Feature Summary}
-\label{sec:recruiter_feature_summary}
-
-Table~\ref{tab:recruiter_features} summarises the complete feature set. The total number of features is $F = 5 + d_{\text{pca}}$; the specific value of $d_{\text{pca}}$ and its effect on model performance are reported in Chapter~\ref{chap:experiments}.
+Table~\ref{tab:recruiter_semantic_features} summarises the semantic features. The total dimension contributed by the interaction matrix, dpcad_{\text{pca}}
+dpca​, and its effect on performance are reported in Chapter~\ref{chap:experiments}
 
 \begin{table}[H]
     \centering
-    \caption{Feature engineering summary for the recruiter-side model.}
-    \label{tab:recruiter_features}
-    \begin{tabular}{llp{6.5cm}}
+    \caption{Semantic feature summary for the recruiter-side model.}
+    \label{tab:recruiter_semantic_features}
+    \begin{tabular}{lp{7cm}}
         \toprule
-        \textbf{Feature} & \textbf{Type} & \textbf{Description} \\
+        \textbf{Feature} & \textbf{Description} \\
         \midrule
-        $e_u$ & Heuristic & Candidate's total years of recorded experience \\
-        $\delta_{\text{exp}}$ & Heuristic & Gap between candidate and required experience \\
-        tfidf\_overlap & Heuristic & TF-IDF cosine similarity between candidate and job text \\
-        Degree Match & Heuristic & Binary indicator for degree match \\
-        Experience Freshness & Heuristic & Normalised time since last experience update \\
-        cosine\_sim & Semantic & Qwen3 embedding cosine similarity \\
-        full\_profile\_cosine\_sim & Semantic & MiniLM full-profile cosine similarity \\
-        $\mathbf{p}_{uj}$ & Semantic & $d_{\text{pca}}$ PCA components of the embedding interaction matrix \\
-        % Add Degree Match and Experience Freshness but say (not used in final model) in the description
+        cosine\_sim & Qwen3 embedding cosine similarity \\
+        full\_profile\_cosine\_sim & MiniLM full-profile cosine similarity \\
+        $\mathbf{p}_{uj}$ & $d_{\text{pca}}$ PCA components of the embedding interaction matrix \\
         \bottomrule
     \end{tabular}
 \end{table}
 
 
+\section{Lightweight Recommender Architecture}
+\label{sec:recruiter_lightweight}
+
+The recruiter-side model is a binary classifier that takes a feature vector $\mathbf{f} \in \mathbb{R}^{F}$ as input and outputs a suitability probability $\hat{y} \in [0,1]$. A lightweight architecture is chosen due to the fact that generating the dataset is time-consuming and the available data is limited. A more complex model, such as a two-tower neural network, would be prone to overfitting and would not provide significant performance gains given the limited data.
+
+\subsection{Model Selection}
+
+Several classifiers are considered as candidates: Logistic Regression, Random Forest, XGBoost, and a soft-voting ensemble of all three. Each is evaluated under the same group-based cross-validation protocol to ensure a fair comparison. This constitutes the first of two selection steps in the experimental evaluation: Section~\ref{sec:exp_recruiter_model_comparison} reports the full comparison; based on those results, \textbf{XGBoost} is selected as the final classifier and held fixed for all subsequent experiments.
+
+XGBoost is a gradient-boosted decision tree ensemble that builds an additive sequence of shallow trees \cite{Chen_2016}, each correcting the residual errors of the previous one. The predicted probability for a pair is:
+
+\begin{equation}
+    \hat{y} = \sigma\!\left(\sum_{k=1}^{T} f_k(\mathbf{f})\right)
+\end{equation}
+
+where $f_k$ is the $k$-th regression tree in the ensemble, $T$ is the total number of trees, and $\sigma$ is the sigmoid function. XGBoost is well suited to the tabular feature structure used here, handles missing values natively, and exposes feature importance scores that make the model's decisions interpretable.
 
 \section{Training Procedure}
 \label{sec:recruiter_training_proc}
@@ -163,3 +171,13 @@ Model selection is carried out by 5-fold group cross-validation on the combined 
 
 \paragraph{Final model.}
 As mentioned before, based on cross-validation results, XGBoost is selected and retrained on the full training and validation set. The TF-IDF vectorizer, PCA transformer, and feature scaler are refitted on this set; all features are standardised to zero mean and unit variance before training. The trained model and all fitted transformers are serialised together so that inference replicates the exact same feature extraction pipeline. Final performance on the held-out test set is reported in Chapter~\ref{chap:experiments}.
+
+\section{Usage at Inference Time}
+\label{sec:recruiter_inference}
+% ==============================================================
+ 
+At inference time the model is applied in two modes depending on the context. In the single-pair mode, a feature vector $\mathbf{f}$ is assembled for a specific (user, job) pair, scaled with the fitted \texttt{StandardScaler}, and passed through the serialised XGBoost model to produce a suitability probability $\hat{y}$. This mode is used for qualitative inspection and sanity-checking.
+ 
+In the batch mode, the model scores all candidate--job pairs for a single job simultaneously. Because the job-side features (TF-IDF document, Qwen embedding, MiniLM embedding) are fixed across all candidates for a given job, they are computed once and reused. The candidate-side features are then extracted in a vectorised pass over all candidates, yielding a feature matrix $\mathbf{F} \in \mathbb{R}^{N \times F}$ that is scaled and scored in a single call to the classifier. This produces a probability estimate $\hat{y}_i$ for each of the $N$ candidates, ranking them by predicted suitability without per-pair iteration overhead. This batch mode is the one used by the congestion balancing system in Chapter~\ref{chap:congestion_balancing}, where the recruiter score serves as the second component of the bilateral match score.
+ 
+In Section~\ref{sec:exp_recruiter_sanity} examples of the model's output are provided for a sample of jobs from the deployment window, together with a qualitative discussion of whether the ranking of actual applicants aligns with expectations given their profiles.
