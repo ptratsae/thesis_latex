@@ -149,7 +149,7 @@ The recruiter-side model is a binary classifier that takes a feature vector $\ma
 
 \subsection{Model selection}
 
-Several classifiers are considered as candidates: Logistic Regression, Random Forest, XGBoost, and a soft-voting ensemble of all three. Each is evaluated under the same group-based cross-validation protocol to ensure a fair comparison. This constitutes the first of two selection steps in the experimental evaluation: Section~\ref{sec:exp_recruiter_model_comparison} reports the full comparison; based on those results, \textbf{XGBoost} is selected as the final classifier and held fixed for all subsequent experiments.
+Several classifiers are considered as candidates: Logistic Regression, Random Forest, XGBoost, and a soft-voting ensemble of all three. Each is evaluated under the same group-based cross-validation protocol to ensure a fair comparison. Section~\ref{sec:exp_recruiter_model_comparison} reports the full comparison; based on those results, XGBoost is selected as the final classifier and held fixed for all subsequent experiments.
 
 XGBoost is a gradient-boosted decision tree ensemble that builds an additive sequence of shallow trees \cite{Chen_2016}, each correcting the residual errors of the previous one. The predicted probability for a pair is:
 

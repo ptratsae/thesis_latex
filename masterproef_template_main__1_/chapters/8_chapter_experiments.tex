@@ -156,14 +156,7 @@ Window~7 serves as the qualitative evaluation window, where the model
 is applied to entirely new users and jobs as it would be in production. This way we keep the temporal window split described in Section~\ref{sec:custom_split}.
 
 \subsection{Dataset creation}
-
-\paragraph{Subsampling}
-\label{sec:subsampling}
-From the 189,657 users in the training set, a random sample of 25,000 users per window is drawn to create a manageable training set of 100,000 users. With a median of 2 applications per user, this results in approximately 200,000 positive user-job pairs for training. The validation set is not subsampled and contains all 78,428 users having approximately 156,856 positive user-job pairs for validation. 
-
-\paragraph{Negative sampling strategy}
-\label{sec:negative_sampling}
-For each positive pair $(u, j^+)$, four negatives are sampled according 
+From the 189,657 users in the training set, a random sample of 25,000 users per window is drawn to create a manageable training set of 100,000 users. With a median of 2 applications per user, this results in approximately 200,000 positive user-job pairs for training. The validation set is not subsampled and contains all 78,428 users having approximately 156,856 positive user-job pairs for validation. For each positive pair $(u, j^+)$, four negatives are sampled according 
 to a \textbf{2:1:1 ratio}:
 \begin{itemize}
     \item \textbf{2 cross-state negatives}: jobs from states other than the user's own state, sampled from the same temporal window. These teach the model that geographic fit is a genuine signal.
@@ -423,13 +416,16 @@ Chapter~\ref{chap:congestion_balancing}.
 
 \subsection{Dataset creation}
 \label{sec:exp_recruiter_datagen}
-Compared to the dataset creation for the two-tower model training, an extra step of data generation is needed. The labeling procedure is described in
-Section~\ref{sec:recruiter_data_gen}; this section covers the
-implementation details. Labels are generated using the Qwen3.5~(35B)
-model served locally via the Ollama API. For computational feasibility,
-a sample of jobs is drawn from Windows~1--4; for each job, up to 20
-applicants are evaluated in a single batched prompt. The final prompt
-used is:
+Unlike the two-tower model, which derives its training signal directly
+from observed applications, the recruiter-side model requires an
+additional labeling step before any dataset can be constructed. The
+labeling procedure is described in Section~\ref{sec:recruiter_data_gen};
+this section covers the implementation details.
+
+Labels are generated using the Qwen3.5~(35B) model served locally via
+the Ollama API. For computational feasibility, a sample of jobs is drawn
+from Windows~1--4; for each job, up to 20 applicants are evaluated in a
+single batched prompt. The final prompt used is:
 
 {\small
 \begin{verbatim}
@@ -525,6 +521,8 @@ are applied during training inversely proportional to class frequency.
         \bottomrule
     \end{tabular}
 \end{table}
+
+The negative sampling is not described here as in Section~ref{exp:} because this is an experiment which has been done (see Section~ref{}).
 
 \subsection{Training configuration}
 To evaluate generalisation to unseen jobs, all candidate-job pairs
