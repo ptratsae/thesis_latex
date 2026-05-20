@@ -134,48 +134,70 @@ An important consequence of this temporal split is that all users in Window~7 ar
 All experiments are run on the Artificial Intelligence and Data Analytics Research Group (AIDA) high-performance computing cluster via SSH. Training is performed on a single NVIDIA A40 GPU (46~GB VRAM). The software stack uses Python with PyTorch as the deep learning framework, scikit-learn for the lightweight recruiter-side models, and the Sentence Transformers library for Qwen3 text embeddings.
 
 % ============================================================
-\section{User-Side Recommendation Experiments}
-\label{sec:exp_user}
+\section{User-Side Job Recommender System Experiments}\label{sec:exp_user}
 % ============================================================
  
-\subsection{Experiment Goal}
+\subsection{Experiment goal}
 \label{sec:exp_user_goal}
 The goal of the user-side experiments is to train and evaluate a 
 two-tower model that can rank relevant jobs highly for cold-start users 
---- users with no interaction history in the training period. 
-Windows~1--4 are used for training, Windows~5--6 for validation, and 
-Window~7 serves as the qualitative evaluation window, where the model 
-is applied to entirely new users and jobs as it would be in production. 
+--- users with no interaction history in the training period.  
 Success is measured primarily by \gls{AUC-ROC}, as this metric is least 
 sensitive to the candidate pool size of the validation set. The practical 
 utility of the model is additionally assessed qualitatively at inference 
 time by inspecting recommendations for a sample of Window~7 users against 
 the full Window~7 job pool.
+
+\subsection{Experiment setting}
+\label{sec:exp_user_setting}
+
+\paragraph{Data Split}
+Windows~1--4 are used for training, Windows~5--6 for validation, and 
+Window~7 serves as the qualitative evaluation window, where the model 
+is applied to entirely new users and jobs as it would be in production. This way we keep the temporal window split described in Section~\ref{sec:custom_split}.
  
-\subsection{Subsampling and Negative Sampling Strategy}
-\label{sec:negative_sampling}
+\paragraph{Subsampling}
+\label{sec:subsampling}
 From the 189,657 users in the training set, a random sample of 25,000 users per window is drawn to create a manageable training set of 100,000 users. With a median of 2 applications per user, this results in approximately 200,000 positive user-job pairs for training. The validation set is not subsampled and contains all 78,428 users having approximately 156,856 positive user-job pairs for validation. 
 
-Because the training data contains only positive interactions (jobs a user applied to), negative examples must be constructed explicitly. A random negative sampling approach — drawing jobs uniformly at random — would produce trivially easy negatives: a software engineer from Texas would be contrasted with nursing jobs in Maine, and the model could separate them on geography or title alone without learning meaningful preference signals.
- 
-The negative sampling strategy is therefore designed to produce \emph{hard} and \emph{realistic} negatives. For each positive pair $(u, j^+)$, four negatives are sampled according to a \textbf{2:1:1 ratio}:
+\paragraph{Negative sampling strategy}
+\label{sec:negative_sampling}
+For each positive pair $(u, j^+)$, four negatives are sampled according 
+to a \textbf{2:1:1 ratio}:
 \begin{itemize}
     \item \textbf{2 cross-state negatives}: jobs from states other than the user's own state, sampled from the same temporal window. These teach the model that geographic fit is a genuine signal.
     \item \textbf{1 same-state negative}: a job from the user's state but a different city, active in the same window. This forces the model to look beyond state-level location and discriminate on career content.
     \item \textbf{1 same-city negative}: a job posted in the user's city but one the user did not apply to. These are the hardest negatives, as they share the user's location and are still unapplied to, pressuring the model to learn semantic fit.
 \end{itemize}
  
-The 2:1:1 strategy ensures the training distribution is representative of the real inference setting, where the model must rank jobs across the entire country, and resolves this clustering artefact as demonstrated in Section~\ref{sec:exp_user_inference}. 
+The 2:1:1 ratio reflects the geographic structure of the real inference 
+setting: when ranking a user against the full job pool, the vast majority 
+of candidates are in other states, a smaller fraction share the user's 
+state, and only a handful are in the same city. Training with a matching 
+distribution ensures the model learns to discriminate at each geographic 
+granularity rather than exploiting an artificial balance. The effect of 
+this is confirmed qualitatively in Section~\ref{sec:exp_user_inference}.
 
 \subsection{Hyperparameters and Training Settings}
 \label{sec:exp_user_hyperparameters}
-The model is trained for a maximum of 50 epochs with early stopping (patience~= 5) based on validation loss. The Adam optimiser is used with a learning rate of $10^{-3}$ and a batch size of 1024. The output embedding dimension $d$ is set to 64.
 
-Table~\ref{tab:tower_input_dims} shows the resulting input dimension breakdown for 
-each tower. Text accounts for approximately 51\% of the user tower input and 76\% of 
-the job tower input — large enough to carry the semantic signal but not so large as 
-to suppress the structured features.
+Each categorical feature is mapped to a 16-dimensional embedding and 
+the text embedding is truncated to $d_{\text{text}} = 100$. 
+Table~\ref{tab:tower_input_dims} shows the resulting input dimension 
+breakdown: text accounts for approximately 51\% of the user tower 
+input and 76\% of the job tower input — large enough to carry the 
+semantic signal without suppressing the structured features.
 
+Both towers share the same MLP structure: two hidden layers of 512 and 
+256 units, followed by the $d$-dimensional output layer, giving a 
+202→512→256→64 reduction for the user tower and 134→512→256→64 for 
+the job tower. Batch normalisation and ReLU are applied after each 
+hidden layer, with dropout rates of 0.3 and 0.2 for the first and 
+second hidden layer respectively. The output dimension is $d = 64$.
+
+The model is trained for a maximum of 50 epochs with early stopping 
+(patience~= 5) based on validation loss, using the Adam optimiser 
+with a learning rate of $10^{-3}$ and a batch size of 1024.
 \begin{table}[htbp]
     \centering
     \caption{Input dimension breakdown for each tower after feature encoding.}
@@ -190,12 +212,14 @@ to suppress the structured features.
         \bottomrule
     \end{tabular}
 \end{table}
-\subsection{Ablation Study}
+\subsection{Ablation study}
 \label{sec:exp_user_ablation}
  
 To determine the optimal model configuration, a systematic ablation study is conducted comparing two design choices: whether to include location features (city and state) and whether to apply L2 normalisation to the output embeddings. All configurations are trained with the 2:1:1 negative sampling strategy described in Section~\ref{sec:negative_sampling}, with early stopping (patience~= 5). Table~\ref{tab:ablation_user} reports the results at the best validation checkpoint for each configuration.
  
-A note on interpreting the ranking metrics: Hit@K, Recall@K and NDCG@K are computed against the validation set's balanced candidate pool (positive and sampled negative jobs per user) rather than the full job catalogue. For example if a user has applied to 2 jobs, the metrics are computed against a pool of 2 positive jobs and 8 sampled negative jobs using the negative sampling strategy discussed in Section~\ref{sec:negative_sampling}. As discussed in Section~\ref{sec:prelim_metrics}, this makes their absolute values considerably more optimistic than what would be observed at full-scale inference. AUC-ROC is therefore used as the primary comparison criterion, as it is less sensitive to this pool-size effect. This caveat applies equally to the final model results in Section~\ref{sec:user_results}.
+A note on interpreting the ranking metrics: Hit@K, Recall@K and NDCG@K are computed against the validation set's balanced candidate pool (positive and sampled negative jobs per user) rather than the full job catalogue. For example if a user has applied to 2 jobs, the metrics are computed against a pool of 2 positive jobs and 8 sampled negative jobs using the negative sampling strategy discussed in Section~\ref{sec:negative_sampling}. As discussed in Section~\ref{sec:prelim_metrics}, this makes their absolute values considerably more optimistic than what would be observed at full-scale inference. AUC-ROC is therefore used as the primary comparison criterion, as it is less sensitive to this pool-size effect. As noted in Section~\ref{sec:exp_user_ablation}, ranking metrics are 
+computed against the balanced candidate pool and their absolute values 
+should be interpreted accordingly; AUC-ROC remains the primary indicator.
  
 \begin{table}[htbp]
     \centering
@@ -265,6 +289,7 @@ Table~\ref{tab:final_results_user} reports the validation set results at the bes
     \end{tabular}
 \end{table}
  
+A full breakdown of all ablation metrics is provided in Table~\ref{app:tab:full_ablation} in the Appendix.
 \subsection{Qualitative Inference Evaluation}
 \label{sec:exp_user_inference}
  
@@ -317,7 +342,7 @@ This user is based in Deer Park, TX, holds a high school diploma and has 18 year
 \end{table}
 
 \paragraph{User 831532 — cold-start robustness with no job history.}
-This user is based in Philadelphia, PA, holds a high school diploma and has only 2 years of recorded experience, with no job history entries in the dataset. This represents a genuine cold-start scenario: the model has no career trajectory to draw on and must rely entirely on profile features. Despite this, the top-10 recommendations are geographically coherent across the PA/NJ/DE tri-state area — the natural labour market for a Philadelphia resident — and semantically consistent with the applied-to jobs, which include residential youth care and community support roles. Notably, one of the three jobs the user actually applied to in Window~7 (Residential Youth Care Workers Needed, Conshohocken PA) appears at rank~7 in the recommendation list, despite being ranked against approximately 40,000 jobs. This result illustrates the value of the two-tower architecture in cold-start conditions: even without job history, the combination of location, education and basic profile features is sufficient to produce meaningful recommendations. A full breakdown of all ablation configurations across all metrics is provided in Table~\ref{app:tab:full_ablation} in the Appendix.
+This user is based in Philadelphia, PA, holds a high school diploma and has only 2 years of recorded experience, with no job history entries in the dataset. This represents a genuine cold-start scenario: the model has no career trajectory to draw on and must rely entirely on profile features. Despite this, the top-10 recommendations are geographically coherent across the PA/NJ/DE tri-state area — the natural labour market for a Philadelphia resident — and semantically consistent with the applied-to jobs, which include residential youth care and community support roles. Notably, one of the three jobs the user actually applied to in Window~7 (Residential Youth Care Workers Needed, Conshohocken PA) appears at rank~7 in the recommendation list, despite being ranked against approximately 40,000 jobs. This result illustrates the value of the two-tower architecture in cold-start conditions: even without job history, the combination of location, education and basic profile features is sufficient to produce meaningful recommendations. 
  
 \begin{table}[H]
     \centering

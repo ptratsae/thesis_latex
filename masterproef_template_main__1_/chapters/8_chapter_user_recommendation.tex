@@ -1,7 +1,7 @@
 \chapter{User-Side Job Recommender System}
 \label{chap:user_recommendation}
 
-This chapter describes the job recommender system built for users, consisting of the dataset contruction, the feature engineering, the two-tower neural network architecture and the training procedure. The system learns dense representations of both users and jobs and uses their similarity to rank job opportunities for each individual user. This model is later used in Chapter~\ref{chap:congestion_balancing} as one of the two fundamental components for reciprocal recommendations and mitigating congestion.
+This chapter describes the job recommender system built for users, consisting of the dataset construction, the feature engineering, the two-tower neural network architecture and the training procedure. The system learns dense representations of both users and jobs and uses their similarity to rank job opportunities for each individual user. This model is later used in Chapter~\ref{chap:congestion_balancing} as one of the two fundamental components for reciprocal recommendations and mitigating congestion.
 
 A two-tower recommender is chosen because neural networks can handle the cold-start problem~\cite{rama2019deeplearningaddresscandidate} --- a user with no prior interaction history can still receive recommendations based on their profile features alone by using the learned user embedding. This property is essential given the temporal evaluation setup described in Section~\ref{sec:custom_split}.
 
@@ -106,7 +106,7 @@ Job features undergo the same encoding and scaling process as user features: num
     \end{tablenotes}
 \end{table}
 
-\subsection{Text Embedding Dimension}
+\subsection{Embedding Dimension}
 \label{sec:text_embedding}
 
 As mentioned in the previous sections, both user and job towers incorporate a text embedding component to capture the semantic information contained in job titles and user career histories. The embeddings are unit-normalised to ensure comparable similarity scores. 
@@ -144,8 +144,7 @@ The layer progression narrows from a wide hidden representation down to the fina
 \subsection{Job Tower}
 \label{sec:job_tower}
 
-The job tower mirrors the user tower architecture exactly, processing job features $\mathbf{x}_j$ to produce a $d$-dimensional job embedding $\mathbf{e}_j$. The same pattern of categorical embeddings concatenated with numerical features, followed by the bottleneck \gls{MLP}, is applied. The only structural difference is the input dimension, which depends on the number of job-specific features. This symmetry is intentional: it ensures that user and job embeddings live in the same $d$-dimensional space, making the dot product a meaningful similarity measure. The architecture is detailed in Algorithm~\ref{alg:job_tower}." which matches the phrasing used for the user tower.
-
+The job tower mirrors the user tower architecture exactly, processing job features $\mathbf{x}_j$ to produce a $d$-dimensional job embedding $\mathbf{e}_j$. The same pattern of categorical embeddings concatenated with numerical features, followed by the bottleneck \gls{MLP}, is applied. The only structural difference is the input dimension, which depends on the number of job-specific features. This symmetry is intentional: it ensures that user and job embeddings live in the same $d$-dimensional space, making the dot product a meaningful similarity measure. The architecture is detailed in Algorithm~\ref{alg:job_tower}.
 \begin{algorithm}[H]
 \caption{Job Tower Forward Pass}
 \label{alg:job_tower}
