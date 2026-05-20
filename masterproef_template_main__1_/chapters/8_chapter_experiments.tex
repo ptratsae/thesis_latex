@@ -151,11 +151,12 @@ the full Window~7 job pool.
 \subsection{Experiment setting}
 \label{sec:exp_user_setting}
 
-\paragraph{Data Split}
 Windows~1--4 are used for training, Windows~5--6 for validation, and 
 Window~7 serves as the qualitative evaluation window, where the model 
 is applied to entirely new users and jobs as it would be in production. This way we keep the temporal window split described in Section~\ref{sec:custom_split}.
- 
+
+\subsection{Dataset creation}
+
 \paragraph{Subsampling}
 \label{sec:subsampling}
 From the 189,657 users in the training set, a random sample of 25,000 users per window is drawn to create a manageable training set of 100,000 users. With a median of 2 applications per user, this results in approximately 200,000 positive user-job pairs for training. The validation set is not subsampled and contains all 78,428 users having approximately 156,856 positive user-job pairs for validation. 
@@ -254,7 +255,7 @@ Table~\ref{app:tab:full_ablation} in the Appendix.
 \label{sec:user_results}
  
 The final model is trained \textbf{with location features and without L2 normalisation}, as determined by the ablation study in previous section.  Figure~\ref{fig:trainval} shows the 
-training and validation loss curves across epochs.
+training and validation loss curves across epochs. Table~\ref{tab:final_results_user} reports the validation set results at the best checkpoint.
 
 \begin{figure}[htbp]
     \centering
@@ -264,8 +265,6 @@ The best validation checkpoint is saved at epoch~19. Training continues for
 5 further epochs (patience~= 5) before early stopping halts at epoch~24.}
     \label{fig:trainval}
 \end{figure}
-
-Table~\ref{tab:final_results_user} reports the validation set results at the best checkpoint.
  
 \begin{table}[H]
     \centering
@@ -404,41 +403,41 @@ This user is based in Philadelphia, PA, holds a high school diploma and has only
     \end{tabular}
 \end{table}
 
-\section{Recruiter-Side Recommendation Experiments}
+\section{Recruiter-side recommendation experiments}
 \label{sec:exp_recruiter}
 % ============================================================
  
-\subsection{Experiment Goal}
+\subsection{Experiment goal}
 \label{sec:exp_recruiter_goal}
  
 The recruiter-side experiments address two design choices that must be made before a final model can be deployed. The first is \textbf{classifier selection}: given the engineered feature set described in Section~\ref{sec:recruiter_features}, which model family best exploits it? The second is \textbf{negative strategy selection}: given the chosen classifier, does the choice of negative construction — \gls{LLM}-evaluated hard negatives from the applicant pool, synthetically sampled non-applicants or a combination of both — have a measurable effect on ranking quality, and which strategy yields the more useful model? These two questions are answered sequentially in Sections~\ref{sec:exp_recruiter_model_comparison} and~\ref{sec:exp_recruiter_negatives}. Success is assessed both quantitatively via the metrics introduced in Section~\ref{sec:prelim_classification}, and qualitatively through sanity checks.
  
-\subsection{Data Generation}
-\label{sec:exp_recruiter_datagen}
- 
-Because no ground-truth recruiter feedback exists in the dataset, training labels must be generated synthetically. The method is described in Section~\ref{sec:recruiter_data_gen}; this section provides the implementation details specific to this experiment.
-The recruiter-side model uses a different window partitioning from the 
-two-tower model, reflecting the different nature of its training data. 
-Because recruiter labels are generated synthetically via \gls{LLM} 
-evaluation rather than observed from user behaviour, the model does not 
-require a temporal train/validation split in the same sense. Instead, 
-\gls{LLM}-labelled pairs are drawn from Windows~1--4, and a 
-group-based cross-validation split by job identity is applied within 
-this pool (described in Section~\ref{sec:exp_recruiter_setting}). 
-A separate held-out sanity check set is generated from Window~7 
-to verify that the final model generalises sensibly to the deployment 
-period. Window~7 is not used for training or model selection; the 
-sanity check is purely qualitative and the final model is applied to 
-Window~7 candidates in the congestion balancing simulation of 
-Chapter~\ref{chap:congestion_balancing}.
+\subsection{Experiment setting}
+\label{sec:exp_recruiter_setting}
 
-\paragraph{Labeling setup}
-Labels are generated using the Qwen3.5 (35B) model served locally via the Ollama API. For computational feasibility, a sample of jobs is drawn from Windows~1--4; for each job, up to 20 applicants are evaluated in a single batched prompt. The \gls{LLM} receives the job description alongside all candidate profiles in the batch and returns a structured JSON response. The final prompt used is:
+LLM-labelled pairs are drawn from Windows~1--4, these pairs are split into a training, validation and test set.
+Window~7 is not used for training or model selection; it serves
+exclusively as the deployment window for the qualitative sanity check
+and the congestion balancing simulation of
+Chapter~\ref{chap:congestion_balancing}. 
+
+\subsection{Dataset creation}
+\label{sec:exp_recruiter_datagen}
+Compared to the dataset creation for the two-tower model training, an extra step of data generation is needed.
+
+\subsubsection{Labels generation}
+The labeling procedure is described in
+Section~\ref{sec:recruiter_data_gen}; this section covers the
+implementation details. Labels are generated using the Qwen3.5~(35B)
+model served locally via the Ollama API. For computational feasibility,
+a sample of jobs is drawn from Windows~1--4; for each job, up to 20
+applicants are evaluated in a single batched prompt. The final prompt
+used is:
 
 {\small
 \begin{verbatim}
-Task: You are an HR recruiter. Evaluate how well each person fits the job
-based on their profile and the job description.
+Task: You are an HR recruiter. Evaluate how well each person fits the
+job based on their profile and the job description.
 (IMPORTANT: Treat each job-user pair independently.)
 
 Assign a fit level:
@@ -466,12 +465,19 @@ Candidate Profiles: {profiles_text}
 \end{verbatim}
 }
 
-This prompt contains explicit rules, notes and output format to ensure consistency. The prompt starts with a clear task definition and a precise fit level rules. This is followed by detailed instructions on the expected output format, including the required JSON structure and specific content for each field. By providing fields for must-haves, nice-to-haves, deal-breakers and reasoning, the prompt encourages the model to reason and explain its decisions rather than just outputting a label. 
-
-The extra notes are established to guide the model towards a more conservative and specific evaluation style. These notes were iteratively defined by inspecting model outputs and adjusting the prompt to address common issues. For example some rows have missing values in key features like Degree or Experience, and without explicit instructions the model would often ignore these and assume the candidate had a degree or relevant experience, leading to overly optimistic fit levels. By instructing the model to treat missing values as an absence of that feature, it produces more realistic assessments. Finally both job descriptions and candidate profiles are included in the prompt. 
+The prompt enforces consistency through three mechanisms: explicit
+fit level rules that remove threshold ambiguity, a structured JSON
+output format that requires the model to state must-haves, deal-breakers
+and a reasoning trace before assigning a label, and targeted notes
+addressing failure modes observed during iterative prompt development.
+The most significant of these was the treatment of missing values:
+without explicit instruction, the model would assume absent profile
+fields indicated average candidates rather than missing information,
+producing overly optimistic fit levels. Responses that fail JSON
+parsing or contain unexpected fit level values are discarded.
 
 An example output for a single candidate is shown below:
- 
+
 \begin{listing}[H]
 \begin{minted}{json}
 {
@@ -493,12 +499,16 @@ An example output for a single candidate is shown below:
 \caption{Example LLM JSON output for a single candidate-job evaluation.}
 \label{lst:llm_json_output}
 \end{listing}
- 
-The structured output format enforces consistency: every response contains an explicit must-haves assessment, a reasoning trace, and a fit level drawn from a fixed four-value vocabulary. Responses that fail JSON parsing or contain unexpected fit level values are discarded.
- 
-\paragraph{Label distribution.}
-The resulting dataset contains \textbf{5,896} labeled pairs across \textbf{1511} unique jobs. Table~\ref{tab:recruiter_label_dist} shows the fit level distribution. The negative class (Poor and Very Poor Fit) accounts for 54.1\% of pairs, slightly outnumbering positives. This reflects the conservative evaluation style enforced by the prompt: missing values in profile fields are treated as absent features, and the model is instructed to be strict (see Section~\ref{sec:exp_recruiter_datagen}). Poor Fit is the single most frequent label at 41.9\%, consistent with many applicants lacking one or more of the explicit must-haves extracted from the job description. Class weights are still applied during training to ensure each class contributes proportionally to the loss, with weights set inversely proportional to class frequency.
- 
+
+The resulting dataset contains 5,896 labeled pairs across 1,511 unique
+jobs. Table~\ref{tab:recruiter_label_dist} shows the fit level
+distribution. The negative class accounts for 54.1\% of pairs,
+slightly outnumbering positives — a direct consequence of the strict
+evaluation style: missing profile fields are treated as absent features
+and Poor Fit is the most frequent label at 41.9\%, consistent with
+many applicants lacking one or more stated must-haves. Class weights
+are applied during training inversely proportional to class frequency.
+
 \begin{table}[htbp]
     \centering
     \caption{Label distribution of the LLM-generated dataset.}
@@ -518,51 +528,28 @@ The resulting dataset contains \textbf{5,896} labeled pairs across \textbf{1511}
         \bottomrule
     \end{tabular}
 \end{table}
- 
-\paragraph{Sanity check set}
-A separate held-out set is generated for the qualitative sanity check, 
-targeting a disjoint sample of jobs from Window~7. This set contains 
-only real applicants with their \gls{LLM} labels --- no synthetic 
-negatives are added --- providing a clean probe of whether the model 
-correctly ranks good fits above poor ones among actual candidates on 
-completely unseen jobs from the deployment window.
- 
-\subsection{Experiment Setting}
-\label{sec:exp_recruiter_setting}
- 
-\paragraph{Data split}
-To evaluate generalisation to unseen jobs, a group-based split by job identity is used rather than a random instance split. All unique jobs are randomly shuffled and partitioned into 80\% for cross-validation and final model training, and 20\% held-out test; all candidate-job pairs for a given job land in the same partition. The test set is used only once, after the final model has been chosen.
- 
-\paragraph{Negative sampling variants}
-Three negative construction strategies are compared to isolate the effect of negative type:
-\begin{itemize}
-    \item \textbf{LLM negatives}: Poor and Very Poor Fit applicants as labeled by the \gls{LLM} — hard negatives from the real applicant pool.
-    \item \textbf{Synthetic negatives}: non-applicants sampled randomly from the broader user pool, filtered so that their job history shares no keywords with the job title — easy negatives.
-    \item \textbf{Combined negatives}: an equal 50/50 mix of LLM and synthetic negatives (1,352 of each), exposing the model to both hard and easy discrimination during training.
-\end{itemize}
-All variants use the same positive set. Each variant is evaluated on a held-out test set of the same 20\% of jobs, but the test pairs differ by strategy: for the LLM-negative model the test negatives are Poor/Very Poor Fit applicants; for the synthetic model they are random non-applicants; for combined, a mix of both. This means each model is tested in its own operating regime rather than against a single shared test set. Table~\ref{tab:recruiter_dataset_sizes} summarises the resulting dataset sizes.
 
-\begin{table}[H]
-    \centering
-    \caption{Dataset composition for each negative construction strategy. The positive set is identical across all three variants.}
-    \label{tab:recruiter_dataset_sizes}
-    \begin{tabular}{lrrrr}
-        \toprule
-        \textbf{Strategy} & \textbf{Positives} & \textbf{LLM Negatives} & \textbf{Synthetic Negatives} & \textbf{Total} \\
-        \midrule
-        LLM (Poor / Very Poor Fit)       & 2,705 &  3,191 &      0 &  5,896 \\
-        Synthetic (non-applicants) & 2,705 &      0 & 2,705 &  5,410 \\
-        Combined       & 2,705 &  1,352 &  1,352 &  5,409 \\
-        \bottomrule
-    \end{tabular}
-\end{table}
- 
-\paragraph{Training configuration}
-Group 5-fold cross-validation is used for model selection, ensuring jobs are not split across folds. All four candidate classifiers (Logistic Regression, Random Forest, XGBoost, soft-voting ensemble) are evaluated under the same protocol. All features are standardised using a \texttt{StandardScaler} fitted on each training fold only, to prevent data leakage into the validation fold. \gls{TF-IDF} is likewise fitted on the training fold's job texts within each fold and then used to transform both the training and validation fold. \gls{PCA} is also refitted per fold on the training partition of the interaction matrix. The final model is retrained on the full 80\% pool with \gls{TF-IDF}, \gls{PCA}, and the scaler all fitted on that same 80\%, and all artifacts are serialised for inference.
- 
-\paragraph{Evaluation metrics}
-Performance is reported using Accuracy, Precision, Recall, F1-score, and AUC-ROC as defined in Section~\ref{sec:prelim_metrics}. AUC-ROC is the primary model selection criterion. In the second stage of the experiment (negative strategy comparison), the same metrics are used to compare the final XGBoost model trained on each negative strategy, combined with a qualitative sanity check on different test sets to assess real-world ranking quality.
- 
+A separate held-out set is generated for the qualitative sanity check,
+targeting a disjoint sample of jobs from Window~7. This set contains
+only real applicants with their LLM labels and no synthetic negatives,
+providing a clean probe of whether the model correctly ranks good fits
+above poor ones among actual candidates on entirely unseen jobs from
+the deployment window.
+
+\subsection{Training configuration}
+To evaluate generalisation to unseen jobs, all candidate-job pairs
+belonging to a given job are assigned exclusively to one partition.
+Jobs are randomly partitioned into 80\% for cross-validation and final
+model training, and a held-out test set of 20\% used only once after
+the final model has been chosen.
+
+Model selection uses group 5-fold cross-validation, with jobs kept
+intact across folds. Within each fold, the TF-IDF vectorizer, PCA
+transformer, and feature scaler are fitted exclusively on the fold's
+training portion and applied to the fold's validation portion to
+prevent leakage. The final model is retrained on the full 80\% pool
+with all transformers refitted on that same set. 
+
 \subsection{Stage 1: Classifier Selection}
 \label{sec:exp_recruiter_model_comparison}
  
@@ -693,12 +680,9 @@ Noteworthy is the emergence of \texttt{full\_profile\_cosine\_sim} (0.0\% $\righ
     \end{tabular}
 \end{table}
  
-\subsubsection{Final Model}
-\label{sec:exp_recruiter_final}
+\paragraph{Final model results.} The two-stage selection process yields a clear conclusion: \textbf{XGBoost trained on combined negatives} is the final recruiter-side model. It achieves the best balance between the two extremes, generalises to both the within-applicant-pool ranking scenario and the broader candidate-scoring context in congestion balancing, and outperforms the LLM-only model on a verified test set. This model is serialised and used as the recruiter-side suitability scorer in Chapter~\ref{chap:congestion_balancing}.
  
-The two-stage selection process yields a clear conclusion: \textbf{XGBoost trained on combined negatives} is the final recruiter-side model. It achieves the best balance between the two extremes, generalises to both the within-applicant-pool ranking scenario and the broader candidate-scoring context in congestion balancing, and outperforms the LLM-only model on a verified test set. This model is serialised and used as the recruiter-side suitability scorer in Chapter~\ref{chap:congestion_balancing}.
- 
-\subsubsection{Qualitative Sanity Check}
+\subsection{Qualitative Inference Evaluation}
 \label{sec:exp_recruiter_sanity}
  
 To validate that the final combined model behaves sensibly in practice, 
@@ -707,7 +691,7 @@ during training or model selection. The three cases are chosen to probe
 different aspects of model behaviour: generalisation to non-applicants 
 (Job~1), within-pool differentiation among actual applicants (Job~2), 
 and mixed ranking across both groups (Job~3). All scores are produced 
-by the final XGBoost model trained on combined negatives.
+by the final XGBoost model trained on combined negatives. 
  
 \paragraph{Job 257565 — Accounts Receivable Clerk: non-applicant generalisation.}
 This job requires 1--2 years of business-to-business collections experience along with cash posting and basic Excel skills. Five random non-applicants are scored to test whether the model generalises to candidates it was not explicitly trained to rank (the combined model saw synthetic non-applicants during training, but not these specific individuals). Table~\ref{tab:sanity_ar_clerk} shows the results.
