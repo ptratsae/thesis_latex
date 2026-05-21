@@ -61,212 +61,6 @@ Table~\ref{app:tab:full_ablation} reports the complete set of metrics for all fo
     \end{tabular}
 \end{table}
 
-\section{Market-Maker Qualitative Sanity Check — Full Recommendation Tables}
-\label{app:sanity_check_full}
-\addcontentsline{toc}{section}{Market-Maker Qualitative Sanity Check — Full Recommendation Tables}
- 
-This appendix reports the full top-10 recommendation lists for the two users
-examined in Section~\ref{sec:exp_job_congestion} across all market-maker
-strategies. The historical universe is omitted for both users as it contains
-only the jobs each user actually applied to (one job for User~668904, three
-for User~831532), all with a placeholder score of 0.0 since no model is
-involved. New Prob is the modified ranking probability after market-maker
-adjustment; Orig Prob is the raw Two-Tower sigmoid probability before any
-modification.
- 
-\subsection*{User 668904 — Finance Profile, Houston TX}
- 
-\begin{table}[htbp]
-    \centering
-    \footnotesize
-    \caption{Full top-10 recommendations for User~668904 — Free Market.}
-    \label{app:tab:668904_free_market}
-    \begin{tabular}{@{}clp{7cm}r@{}}
-        \toprule
-        \textbf{Rank} & \textbf{New Prob} & \textbf{Job Title (City, State)} & \textbf{Orig Prob} \\
-        \midrule
-        1  & 0.729 & Senior Accounts Payable Specialist (Houston, TX)        & 0.989 \\
-        2  & 0.729 & Accounting Payable / Receivable Specialist (Houston, TX) & 0.989 \\
-        3  & 0.729 & Accounting Assistant (Houston, TX)                       & 0.988 \\
-        4  & 0.729 & Accounts Payable (Houston, TX)                           & 0.988 \\
-        5  & 0.729 & Accounting Clerk — AR (Houston, TX)                      & 0.987 \\
-        6  & 0.729 & Accounts Payable Clerk (Houston, TX)                     & 0.987 \\
-        7  & 0.728 & Part Time Bookkeeper (Houston, TX)                       & 0.987 \\
-        8  & 0.728 & Accounting Clerk (Houston, TX)                           & 0.987 \\
-        9  & 0.728 & Collection and Reimbursement Processor (Houston, TX)     & 0.986 \\
-        10 & 0.728 & AP Accountant (Houston, TX)                              & 0.986 \\
-        \bottomrule
-    \end{tabular}
-\end{table}
- 
-\begin{table}[htbp]
-    \centering
-    \footnotesize
-    \caption{Full top-10 recommendations for User~668904 — Market Maker Linear.}
-    \label{app:tab:668904_linear}
-    \begin{tabular}{@{}clp{7cm}r@{}}
-        \toprule
-        \textbf{Rank} & \textbf{New Prob} & \textbf{Job Title (City, State)} & \textbf{Orig Prob} \\
-        \midrule
-        1  & 0.748 & Tax Accountant (Houston, TX)                                          & 0.977 \\
-        2  & 0.747 & Financial Accountant (Houston, TX)                                    & 0.975 \\
-        3  & 0.747 & Junior Accountant (Houston, TX)                                       & 0.974 \\
-        4  & 0.747 & Accounting Analyst — Tubular Accounting (Houston, TX)                 & 0.973 \\
-        5  & 0.746 & JIB Accountant (Houston, TX)                                          & 0.970 \\
-        6  & 0.746 & Joint Interest Accountant (Houston, TX)                               & 0.968 \\
-        7  & 0.746 & Reporting/GAAP Accountant (Houston, TX)                               & 0.967 \\
-        8  & 0.746 & Attention Public Accountants! Audit Mgr \$100K--\$115K (Houston, TX)  & 0.966 \\
-        9  & 0.745 & Retail Accountant (Houston, TX)                                       & 0.964 \\
-        10 & 0.745 & Senior Payroll Analyst (Houston, TX)                                  & 0.964 \\
-        \bottomrule
-    \end{tabular}
-\end{table}
- 
-\begin{table}[htbp]
-    \centering
-    \footnotesize
-    \caption{Full top-10 recommendations for User~668904 — Market Maker Quadratic.}
-    \label{app:tab:668904_quadratic}
-    \begin{tabular}{@{}clp{7cm}r@{}}
-        \toprule
-        \textbf{Rank} & \textbf{New Prob} & \textbf{Job Title (City, State)} & \textbf{Orig Prob} \\
-        \midrule
-        1  & 0.748 & Document Controller 4 (Houston, TX)                      & 0.848 \\
-        2  & 0.742 & Energy Quantitative Analyst (Houston, TX)                 & 0.817 \\
-        3  & 0.739 & Accounts Payable Supervisor (Houston, TX)                 & 0.979 \\
-        4  & 0.739 & Jr.\ Accountant (Houston, TX)                             & 0.979 \\
-        5  & 0.739 & Accounts Payable Specialist (Kingwood, TX)                & 0.979 \\
-        6  & 0.739 & Senior Accountant (Houston, TX)                           & 0.978 \\
-        7  & 0.738 & Tax Accountant (Houston, TX)                              & 0.977 \\
-        8  & 0.738 & Junior Accounts Payable Clerk (Houston, TX)               & 0.977 \\
-        9  & 0.738 & Accounting Professional (Houston, TX)                     & 0.976 \\
-        10 & 0.738 & Payroll Specialist (Houston, TX)                          & 0.975 \\
-        \bottomrule
-    \end{tabular}
-\end{table}
- 
-\begin{table}[htbp]
-    \centering
-    \footnotesize
-    \caption{Full top-10 recommendations for User~668904 — Market Maker Sigmoid.}
-    \label{app:tab:668904_sigmoid}
-    \begin{tabular}{@{}clp{7cm}r@{}}
-        \toprule
-        \textbf{Rank} & \textbf{New Prob} & \textbf{Job Title (City, State)} & \textbf{Orig Prob} \\
-        \midrule
-        1  & 0.756 & Tax Accountant (Houston, TX)                                          & 0.977 \\
-        2  & 0.755 & Accounting Analyst — Tubular Accounting (Houston, TX)                 & 0.973 \\
-        3  & 0.754 & Reporting/GAAP Accountant (Houston, TX)                               & 0.967 \\
-        4  & 0.753 & Attention Public Accountants! Audit Mgr \$100K--\$115K (Houston, TX)  & 0.966 \\
-        5  & 0.753 & Senior Payroll Administrator (Houston, TX)                            & 0.966 \\
-        6  & 0.753 & Retail Accountant (Houston, TX)                                       & 0.964 \\
-        7  & 0.753 & Senior Payroll Analyst (Houston, TX)                                  & 0.964 \\
-        8  & 0.753 & Domestic Tax Analyst (Houston, TX)                                    & 0.962 \\
-        9  & 0.753 & Corporate Tax Administrator (Houston, TX)                             & 0.962 \\
-        10 & 0.752 & Accounting Manager (Houston, TX)                                      & 0.958 \\
-        \bottomrule
-    \end{tabular}
-\end{table}
- 
-\subsection*{User 831532 — Cold-Start Profile, Philadelphia PA}
- 
-\begin{table}[htbp]
-    \centering
-    \footnotesize
-    \caption{Full top-10 recommendations for User~831532 — Free Market.
-    $\dagger$~Indicates a job the user actually applied to in Window~7.}
-    \label{app:tab:831532_free_market}
-    \begin{tabular}{@{}clp{7cm}r@{}}
-        \toprule
-        \textbf{Rank} & \textbf{New Prob} & \textbf{Job Title (City, State)} & \textbf{Orig Prob} \\
-        \midrule
-        1  & 0.728 & Customer Service Representative (Broomall, PA)                        & 0.985 \\
-        2  & 0.728 & Nanny / Childcare / Teacher (Madison, NJ)                             & 0.983 \\
-        3  & 0.727 & Concierge / Receptionist (Madison, NJ)                                & 0.981 \\
-        4  & 0.727 & Store Management (Christiana, DE)                                     & 0.979 \\
-        5  & 0.726 & Shelter Staff Weekend \& Substitute (Wilmington, DE)                  & 0.975 \\
-        6  & 0.726 & Community Life Assistant (Broomall, PA)                               & 0.974 \\
-        7  & 0.726 & Residential Youth Care Workers Needed$^\dagger$ (Conshohocken, PA)    & 0.973 \\
-        8  & 0.726 & Medical Reimbursement Collections Associate (Moorestown, NJ)          & 0.972 \\
-        9  & 0.725 & Daycare / Nursery Worker (Wilmington, DE)                             & 0.971 \\
-        10 & 0.725 & Store Management (Cherry Hill, NJ)                                    & 0.971 \\
-        \bottomrule
-    \end{tabular}
-\end{table}
- 
-\begin{table}[htbp]
-    \centering
-    \footnotesize
-    \caption{Full top-10 recommendations for User~831532 — Market Maker Linear.
-    $\dagger$~Indicates a job the user actually applied to in Window~7.}
-    \label{app:tab:831532_linear}
-    \begin{tabular}{@{}clp{7cm}r@{}}
-        \toprule
-        \textbf{Rank} & \textbf{New Prob} & \textbf{Job Title (City, State)} & \textbf{Orig Prob} \\
-        \midrule
-        1  & 0.726 & Shelter Staff Weekend \& Substitute (Wilmington, DE)                  & 0.975 \\
-        2  & 0.726 & Home Health Aides for Home Care (Langhorne, PA)                       & 0.865 \\
-        3  & 0.726 & Residential Youth Care Workers Needed$^\dagger$ (Conshohocken, PA)    & 0.973 \\
-        4  & 0.726 & Store Management (Christiana, DE)                                     & 0.979 \\
-        5  & 0.725 & Daycare / Nursery Worker (Wilmington, DE)                             & 0.971 \\
-        6  & 0.725 & Store Management (Cherry Hill, NJ)                                    & 0.971 \\
-        7  & 0.725 & Customer Service Openings (Middletown, NJ)                            & 0.749 \\
-        8  & 0.725 & HVAC (Wilmington, DE)                                                 & 0.858 \\
-        9  & 0.725 & Certified Nursing Assistant CNA (Hammonton, NJ)                       & 0.967 \\
-        10 & 0.725 & Reconveyance Representative (Mount Laurel, NJ)                        & 0.967 \\
-        \bottomrule
-    \end{tabular}
-\end{table}
- 
-\begin{table}[htbp]
-    \centering
-    \footnotesize
-    \caption{Full top-10 recommendations for User~831532 — Market Maker Quadratic.
-    $\dagger$~Indicates a job the user actually applied to in Window~7.}
-    \label{app:tab:831532_quadratic}
-    \begin{tabular}{@{}clp{7cm}r@{}}
-        \toprule
-        \textbf{Rank} & \textbf{New Prob} & \textbf{Job Title (City, State)} & \textbf{Orig Prob} \\
-        \midrule
-        1  & 0.728 & Loss Prevention Openings (Middletown, NJ)                             & 0.742 \\
-        2  & 0.726 & Shelter Staff Weekend \& Substitute (Wilmington, DE)                  & 0.975 \\
-        3  & 0.725 & Store Management (Cherry Hill, NJ)                                    & 0.971 \\
-        4  & 0.725 & Store Management (Christiana, DE)                                     & 0.979 \\
-        5  & 0.725 & Certified Nursing Assistant CNA (Hammonton, NJ)                       & 0.967 \\
-        6  & 0.725 & Reconveyance Representative (Mount Laurel, NJ)                        & 0.967 \\
-        7  & 0.725 & Nanny / Childcare / Teacher (Madison, NJ)                             & 0.983 \\
-        8  & 0.725 & Safety Coordinator (Mount Laurel, NJ)                                 & 0.966 \\
-        9  & 0.724 & Care Managers Nursing Aide (Moorestown, NJ)                           & 0.966 \\
-        10 & 0.724 & Teller (Media, PA)                                                    & 0.966 \\
-        \bottomrule
-    \end{tabular}
-\end{table}
- 
-\begin{table}[htbp]
-    \centering
-    \footnotesize
-    \caption{Full top-10 recommendations for User~831532 — Market Maker Sigmoid.
-    $\dagger$~Indicates a job the user actually applied to in Window~7.}
-    \label{app:tab:831532_sigmoid}
-    \begin{tabular}{@{}clp{7cm}r@{}}
-        \toprule
-        \textbf{Rank} & \textbf{New Prob} & \textbf{Job Title (City, State)} & \textbf{Orig Prob} \\
-        \midrule
-        1  & 0.730 & CHHA — Hammonton Area (Vineland, NJ)                                  & 0.843 \\
-        2  & 0.729 & Certified Home Health Aides Burlington County (Medford, NJ)           & 0.836 \\
-        3  & 0.727 & Store Management (Christiana, DE)                                     & 0.979 \\
-        4  & 0.726 & Water Operator 3+ yrs exp (Ledgewood, NJ)                             & 0.825 \\
-        5  & 0.726 & Shelter Staff Weekend \& Substitute (Wilmington, DE)                  & 0.975 \\
-        6  & 0.726 & Residential Youth Care Workers Needed$^\dagger$ (Conshohocken, PA)    & 0.973 \\
-        7  & 0.725 & Store Management (Cherry Hill, NJ)                                    & 0.971 \\
-        8  & 0.725 & Customer Service Openings (Middletown, NJ)                            & 0.749 \\
-        9  & 0.725 & Certified Nursing Assistant CNA (Hammonton, NJ)                       & 0.967 \\
-        10 & 0.725 & Reconveyance Representative (Mount Laurel, NJ)                        & 0.967 \\
-        \bottomrule
-    \end{tabular}
-
-\end{table}
-
 \section{Feature Importance}
 \label{app:exp_recruiter_feature_importance}
 \addcontentsline{toc}{section}{Feature Importance}
@@ -307,7 +101,211 @@ Among the scalar features, the pattern differs by model family. In Logistic Regr
         \bottomrule
     \end{tabular}
 \end{table}
+\section{Market-Maker Qualitative Sanity Check — Full Recommendation Tables}
+\label{app:sanity_check_full}
+\addcontentsline{toc}{section}{Market-Maker Qualitative Sanity Check — Full
+Recommendation Tables}
 
+This appendix reports the full top-10 recommendation lists for the two users
+examined in Section~\ref{sec:exp_job_congestion_sanity} across all market-maker
+strategies. The historical universe is omitted for both users as it contains
+only the jobs each user actually applied to (one job for User~668904, three
+for User~831532), all with a placeholder score of 0.0 since no model is
+involved. New Prob is the modified ranking probability after market-maker
+adjustment; Orig Prob is the raw Two-Tower sigmoid probability before any
+modification.
+
+\subsection*{User 668904 — Finance Profile, Houston TX}
+
+\begin{table}[htbp]
+    \centering
+    \footnotesize
+    \caption{Full top-10 recommendations for User~668904 — Free Market.}
+    \label{app:tab:668904_free_market}
+    \begin{tabular}{@{}clp{7.5cm}r@{}}
+        \toprule
+        \textbf{Rank} & \textbf{New Prob} & \textbf{Job Title (City, State)} & \textbf{Orig Prob} \\
+        \midrule
+        1  & 0.729 & Senior Accounts Payable Specialist (Houston, TX)         & 0.989 \\
+        2  & 0.729 & Accounting Payable / Receivable Specialist (Houston, TX) & 0.989 \\
+        3  & 0.729 & Accounting Assistant (Houston, TX)                       & 0.988 \\
+        4  & 0.729 & Accounts Payable (Houston, TX)                           & 0.988 \\
+        5  & 0.729 & Accounting Clerk — AR (Houston, TX)                      & 0.987 \\
+        6  & 0.729 & Accounts Payable Clerk (Houston, TX)                     & 0.987 \\
+        7  & 0.728 & Part Time Bookkeeper (Houston, TX)                       & 0.987 \\
+        8  & 0.728 & Accounting Clerk (Houston, TX)                           & 0.987 \\
+        9  & 0.728 & Collection and Reimbursement Processor (Houston, TX)     & 0.986 \\
+        10 & 0.728 & AP Accountant (Houston, TX)                              & 0.986 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+    \centering
+    \footnotesize
+    \caption{Full top-10 recommendations for User~668904 — Market Maker Linear.}
+    \label{app:tab:668904_linear}
+    \begin{tabular}{@{}clp{7.5cm}r@{}}
+        \toprule
+        \textbf{Rank} & \textbf{New Prob} & \textbf{Job Title (City, State)} & \textbf{Orig Prob} \\
+        \midrule
+        1  & 0.751 & Senior Accountant (Houston, TX)                                          & 0.978 \\
+        2  & 0.751 & Tax Accountant (Houston, TX)                                             & 0.977 \\
+        3  & 0.750 & Financial Accountant (Houston, TX)                                       & 0.975 \\
+        4  & 0.750 & Junior Accountant (Houston, TX)                                          & 0.974 \\
+        5  & 0.750 & Document Controller 4 (Houston, TX)                                      & 0.848 \\
+        6  & 0.750 & Accounting Analyst — Tubular Accounting (Houston, TX)                    & 0.973 \\
+        7  & 0.749 & JIB Accountant (Houston, TX)                                             & 0.970 \\
+        8  & 0.749 & Joint Interest Accountant (Houston, TX)                                  & 0.968 \\
+        9  & 0.749 & Reporting/GAAP Accountant (Houston, TX)                                  & 0.967 \\
+        10 & 0.749 & Attention Public Accountants! Audit Mgr \$100K--\$115K (Houston, TX)     & 0.966 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+    \centering
+    \footnotesize
+    \caption{Full top-10 recommendations for User~668904 — Market Maker Quadratic.}
+    \label{app:tab:668904_quadratic}
+    \begin{tabular}{@{}clp{7.5cm}r@{}}
+        \toprule
+        \textbf{Rank} & \textbf{New Prob} & \textbf{Job Title (City, State)} & \textbf{Orig Prob} \\
+        \midrule
+        1  & 0.750 & Document Controller 4 (Houston, TX)                      & 0.848 \\
+        2  & 0.744 & Energy Quantitative Analyst (Houston, TX)                 & 0.817 \\
+        3  & 0.740 & Accounts Payable Supervisor (Houston, TX)                 & 0.979 \\
+        4  & 0.740 & Jr.\ Accountant (Houston, TX)                             & 0.979 \\
+        5  & 0.740 & Accounts Payable Specialist (Kingwood, TX)                & 0.979 \\
+        6  & 0.740 & Senior Accountant (Houston, TX)                           & 0.978 \\
+        7  & 0.739 & Payroll Sales Manager (Kingwood, TX)                      & 0.793 \\
+        8  & 0.739 & Tax Accountant (Houston, TX)                              & 0.977 \\
+        9  & 0.739 & Junior Accounts Payable Clerk (Houston, TX)               & 0.977 \\
+        10 & 0.739 & Accounting Professional (Houston, TX)                     & 0.976 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+    \centering
+    \footnotesize
+    \caption{Full top-10 recommendations for User~668904 — Market Maker Sigmoid.}
+    \label{app:tab:668904_sigmoid}
+    \begin{tabular}{@{}clp{7.5cm}r@{}}
+        \toprule
+        \textbf{Rank} & \textbf{New Prob} & \textbf{Job Title (City, State)} & \textbf{Orig Prob} \\
+        \midrule
+        1  & 0.763 & Account Director (Houston, TX)                                           & 0.921 \\
+        2  & 0.763 & Senior Tax Analyst (Houston, TX)                                         & 0.953 \\
+        3  & 0.762 & CPA with Big 4 Experience (Houston, TX)                                  & 0.950 \\
+        4  & 0.762 & Financial Analyst (Houston, TX)                                          & 0.950 \\
+        5  & 0.762 & Plant Cost Accountant (Houston, TX)                                      & 0.915 \\
+        6  & 0.761 & Oracle Financials (Houston, TX)                                          & 0.946 \\
+        7  & 0.761 & Senior JIB Accountant (Houston, TX)                                      & 0.944 \\
+        8  & 0.761 & Cost Accountant — International Company (Houston, TX)                    & 0.911 \\
+        9  & 0.760 & Auditor (Houston, TX)                                                    & 0.941 \\
+        10 & 0.760 & Senior Auditor (Houston, TX)                                             & 0.940 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsection*{User 831532 — Cold-Start Profile, Philadelphia PA}
+
+\begin{table}[htbp]
+    \centering
+    \footnotesize
+    \caption{Full top-10 recommendations for User~831532 — Free Market.
+    $\dagger$~Indicates a job the user actually applied to in Window~7.}
+    \label{app:tab:831532_free_market}
+    \begin{tabular}{@{}clp{7.5cm}r@{}}
+        \toprule
+        \textbf{Rank} & \textbf{New Prob} & \textbf{Job Title (City, State)} & \textbf{Orig Prob} \\
+        \midrule
+        1  & 0.728 & Customer Service Representative (Broomall, PA)                        & 0.985 \\
+        2  & 0.728 & Nanny / Childcare / Teacher (Madison, NJ)                             & 0.983 \\
+        3  & 0.727 & Concierge / Receptionist (Madison, NJ)                                & 0.981 \\
+        4  & 0.727 & Store Management (Christiana, DE)                                     & 0.979 \\
+        5  & 0.726 & Shelter Staff (Weekend \& Substitute) (Wilmington, DE)                & 0.975 \\
+        6  & 0.726 & Community Life Assistant (Broomall, PA)                               & 0.974 \\
+        7  & 0.726 & Residential Youth Care Workers Needed$^\dagger$ (Conshohocken, PA)    & 0.973 \\
+        8  & 0.726 & Medical Reimbursement Collections Associate (Moorestown, NJ)          & 0.972 \\
+        9  & 0.725 & Daycare / Nursery Worker (Wilmington, DE)                             & 0.971 \\
+        10 & 0.725 & Store Management (Cherry Hill, NJ)                                    & 0.971 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+    \centering
+    \footnotesize
+    \caption{Full top-10 recommendations for User~831532 — Market Maker Linear.
+    $\dagger$~Indicates a job the user actually applied to in Window~7.}
+    \label{app:tab:831532_linear}
+    \begin{tabular}{@{}clp{7.5cm}r@{}}
+        \toprule
+        \textbf{Rank} & \textbf{New Prob} & \textbf{Job Title (City, State)} & \textbf{Orig Prob} \\
+        \midrule
+        1  & 0.729 & Loss Prevention Openings (Middletown, NJ)                             & 0.742 \\
+        2  & 0.727 & Central Sterile Supply Technician (Hamilton, NJ)                      & 0.856 \\
+        3  & 0.727 & Loss Prevention Openings (Lawrenceville, NJ)                          & 0.729 \\
+        4  & 0.727 & Store Management (Christiana, DE)                                     & 0.979 \\
+        5  & 0.727 & Nanny / Childcare / Teacher (Madison, NJ)                             & 0.983 \\
+        6  & 0.726 & Shelter Staff (Weekend \& Substitute) (Wilmington, DE)                & 0.975 \\
+        7  & 0.726 & Residential Youth Care Workers Needed$^\dagger$ (Conshohocken, PA)    & 0.973 \\
+        8  & 0.725 & Daycare / Nursery Worker (Wilmington, DE)                             & 0.971 \\
+        9  & 0.725 & Store Management (Cherry Hill, NJ)                                    & 0.971 \\
+        10 & 0.725 & CHHA — Hammonton Area (Vineland, NJ)                                  & 0.843 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+    \centering
+    \footnotesize
+    \caption{Full top-10 recommendations for User~831532 — Market Maker Quadratic.
+    $\dagger$~Indicates a job the user actually applied to in Window~7.}
+    \label{app:tab:831532_quadratic}
+    \begin{tabular}{@{}clp{7.5cm}r@{}}
+        \toprule
+        \textbf{Rank} & \textbf{New Prob} & \textbf{Job Title (City, State)} & \textbf{Orig Prob} \\
+        \midrule
+        1  & 0.729 & Loss Prevention Openings (Middletown, NJ)                             & 0.742 \\
+        2  & 0.727 & Store Management (Christiana, DE)                                     & 0.979 \\
+        3  & 0.727 & Nanny / Childcare / Teacher (Madison, NJ)                             & 0.983 \\
+        4  & 0.726 & Shelter Staff (Weekend \& Substitute) (Wilmington, DE)                & 0.975 \\
+        5  & 0.726 & Residential Youth Care Workers Needed$^\dagger$ (Conshohocken, PA)    & 0.973 \\
+        6  & 0.725 & Daycare / Nursery Worker (Wilmington, DE)                             & 0.971 \\
+        7  & 0.725 & Store Management (Cherry Hill, NJ)                                    & 0.971 \\
+        8  & 0.725 & Certified Nursing Assistant CNA (Hammonton, NJ)                       & 0.967 \\
+        9  & 0.724 & Reconveyance Representative (Mount Laurel, NJ)                        & 0.967 \\
+        10 & 0.724 & Safety Coordinator (Mount Laurel, NJ)                                 & 0.967 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+    \centering
+    \footnotesize
+    \caption{Full top-10 recommendations for User~831532 — Market Maker Sigmoid.
+    $\dagger$~Indicates a job the user actually applied to in Window~7.}
+    \label{app:tab:831532_sigmoid}
+    \begin{tabular}{@{}clp{7.5cm}r@{}}
+        \toprule
+        \textbf{Rank} & \textbf{New Prob} & \textbf{Job Title (City, State)} & \textbf{Orig Prob} \\
+        \midrule
+        1  & 0.733 & Pharmacy Technician (West Deptford, NJ)                               & 0.795 \\
+        2  & 0.730 & Certified Home Health Aides (Linwood, NJ)                             & 0.779 \\
+        3  & 0.729 & Loss Prevention Openings (Middletown, NJ)                             & 0.742 \\
+        4  & 0.728 & Nanny / Childcare / Teacher (Madison, NJ)                             & 0.983 \\
+        5  & 0.727 & CNA's (Long Branch, NJ)                                               & 0.767 \\
+        6  & 0.727 & Store Management (Christiana, DE)                                     & 0.979 \\
+        7  & 0.726 & Loss Prevention Openings (Lawrenceville, NJ)                          & 0.729 \\
+        8  & 0.726 & Shelter Staff (Weekend \& Substitute) (Wilmington, DE)                & 0.975 \\
+        9  & 0.726 & Residential Youth Care Workers Needed$^\dagger$ (Conshohocken, PA)    & 0.973 \\
+        10 & 0.725 & Daycare / Nursery Worker (Wilmington, DE)                             & 0.971 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
 \end{appendices}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
