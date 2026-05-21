@@ -524,7 +524,9 @@ are applied during training inversely proportional to class frequency.
 
 The negative sampling is not described here as in Section~ref{exp:} because this is an experiment which has been done (see Section~ref{}).
 
-\subsection{Training configuration}
+\subsection{Training configuration and hyperparameters}
+\label{sec:exp_recruiter_training_config}
+
 To evaluate generalisation to unseen jobs, all candidate-job pairs
 belonging to a given job are assigned exclusively to one partition.
 Jobs are randomly partitioned into 80\% for cross-validation and final
@@ -532,35 +534,41 @@ model training, and a held-out test set of 20\% used only once after
 the final model has been chosen.
 
 Model selection uses group 5-fold cross-validation, with jobs kept
-intact across folds. Within each fold, the TF-IDF vectorizer, PCA
+intact across folds. Within each fold, the \gls{TF-IDF} vectorizer, \gls{PCA}
 transformer, and feature scaler are fitted exclusively on the fold's
 training portion and applied to the fold's validation portion to
-prevent leakage. The final model is retrained on the full 80\% pool
-with all transformers refitted on that same set. 
+prevent leakage. Performance is reported using Accuracy, Precision,
+Recall, F1-score, and \gls{AUC-ROC} as defined in
+Section~\ref{sec:prelim_metrics}, with \gls{AUC-ROC} as the primary
+selection criterion. Table~\ref{tab:recruiter_hyperparams} lists the
+hyperparameters used for each candidate classifier.
+
+\begin{table}[htbp]
+    \centering
+    \caption{Hyperparameters for each candidate classifier.}
+    \label{tab:recruiter_hyperparams}
+    \begin{tabular}{p{3.4cm}p{8.6cm}}
+        \toprule
+        \textbf{Model} & \textbf{Hyperparameters} \\
+        \midrule
+        Logistic Regression & \texttt{max\_iter=1000},\newline \texttt{class\_weight=balanced},\newline \texttt{solver=lbfgs} \\
+        \midrule
+        Random Forest       & \texttt{n\_estimators=100},\newline \texttt{class\_weight=balanced} \\
+        \midrule
+        XGBoost & \texttt{n\_estimators=100},\newline \texttt{max\_depth=5}, \newline
+          \texttt{learning\_rate=0.1}\\
+        \midrule
+        Ensemble            & Soft-voting over all three classifiers \\
+        \bottomrule
+    \end{tabular}
+\end{table}
 
 \subsection{Stage 1: Classifier Selection}
 \label{sec:exp_recruiter_model_comparison}
  
-All four candidate classifiers are compared on the \gls{LLM}-negative dataset, holding the training data fixed so that the only variable is the model type. The choice of this dataset is motivated by the fact that this is a harder classification task compared to the synthetic negative dataset. Table~\ref{tab:recruiter_results_cv} reports 5-fold cross-validation results; Table~\ref{tab:recruiter_results_test} reports the held-out test set performance of the selected model.
+All four candidate classifiers are compared on the dataset with \gls{LLM} negatives only. This way only the model type is varied. The choice of this dataset is motivated by the fact that this is the hardest classification task among the three strategies, as all negatives are drawn from the real applicant pool rather than from randomly sampled non-applicants. Table~\ref{tab:recruiter_results_cv} reports 5-fold cross-validation results; Table~\ref{tab:recruiter_results_test} reports the held-out test set performance of the selected model.
 
-The Ensemble achieves the highest cross-validation AUC (0.696), but the gap over XGBoost (0.690) is 0.006 — well within the standard deviation of both models (0.017 and 0.019 respectively). This difference is not statistically meaningful. Random Forest is similarly tied on AUC (0.691) but has markedly lower Recall (0.528 vs.\ 0.588 for XGBoost), meaning it misses a larger fraction of genuinely qualified candidates. In a recruitment context, missing good candidates is the more costly error. XGBoost is therefore selected as the final classifier: it matches the Ensemble on AUC within noise, outperforms Random Forest on Recall, and provides native feature importance scores that support the interpretability of the model.
-
-\begin{table}[htbp]
-    \centering
-    \small
-    \caption{Recruiter-side model comparison (5-fold cross-validation, LLM negatives). Mean $\pm$ standard deviation across folds.}
-    \label{tab:recruiter_results_cv}
-    \begin{tabular}{lrrrrr}
-        \toprule
-        \textbf{Model} & \textbf{Accuracy} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} & \textbf{AUC} \\
-        \midrule
-        Logistic Regression & $0.598 \pm 0.009$ & $0.554 \pm 0.027$ & $0.589 \pm 0.054$ & $0.569 \pm 0.024$ & $0.638 \pm 0.017$ \\
-        Random Forest       & $0.637 \pm 0.013$ & $0.619 \pm 0.036$ & $0.528 \pm 0.052$ & $0.567 \pm 0.021$ & $0.691 \pm 0.012$ \\
-        XGBoost             & $0.642 \pm 0.012$ & $0.610 \pm 0.024$ & $0.588 \pm 0.047$ & $0.597 \pm 0.021$ & $0.690 \pm 0.019$ \\
-        Ensemble            & $0.646 \pm 0.013$ & $0.619 \pm 0.032$ & $0.579 \pm 0.048$ & $0.596 \pm 0.019$ & $0.696 \pm 0.017$ \\
-        \bottomrule
-    \end{tabular}
-\end{table}
+XGBoost achieves the highest F1 (0.597) and outperforms Logistic Regression across all metrics by a clear margin. Compared to Random Forest, XGBoost has substantially higher Recall (0.588 vs.\ 0.528) — an important difference in a recruitment context where missing genuinely qualified candidates is costly. The Ensemble achieves a marginally higher AUC (0.696 vs.\ 0.690), but the gap is well within the standard deviation of both models and does not represent a meaningful difference. XGBoost is therefore selected as the final classifier: it achieves the best F1, matches the Ensemble on AUC within noise. The final XGBoost model achieves an AUC of 0.724 on the held-out test set, confirming that cross-validation performance generalises to unseen jobs. A feature importance analysis across all three classifiers is provided in Appendix~\ref{app:exp_recruiter_feature_importance}.
 
 \begin{table}[htbp]
     \centering
@@ -577,81 +585,18 @@ The Ensemble achieves the highest cross-validation AUC (0.696), but the gap over
 \end{table}
 
 
-\subsubsection{Feature Importance}
-\label{sec:exp_recruiter_feature_importance}
 
-\paragraph{Interaction matrix PCA}
-The embedding interaction matrix $\mathbf{m}_{uj} \in \mathbb{R}^{2d_{\text{text}}}$ has 200 dimensions. \gls{PCA} is applied to reduce the interaction matrix to $d_{\text{pca}} = 80$ components, retaining 92.9\% of the total variance. This compression is justified on two grounds. First, the Hadamard product and absolute difference of the same pair of embeddings share significant covariance structure, meaning a large fraction of the 200 dimensions are redundant — a finding confirmed by the high variance retention at only 40\% of the original dimensionality. Second, reducing the feature space lowers the risk of XGBoost fitting to noise in the interaction dimensions, even with 5,896 training pairs.
-
-\paragraph{Feature importance analysis}
-Table~\ref{tab:recruiter_feature_importance} shows the normalised feature 
-importance for each of the three base classifiers on the last cross-validation 
-fold. The \gls{PCA} interaction components dominate across all models — 
-accounting for 69.2\%, 83.2\%, and 85.6\% of total importance in Logistic 
-Regression, Random Forest, and XGBoost respectively. This confirms that the 
-element-wise interaction between user and job Qwen embeddings captures the 
-majority of the discriminative signal, validating the design choice of computing 
-the full interaction matrix rather than relying solely on scalar cosine similarity.
-
-Among the scalar features, the pattern differs by model family. In Logistic Regression, the Qwen cosine similarity (12.6\%) is the second most important feature, suggesting the linear model benefits from the direct scalar similarity signal. In Random Forest and XGBoost, \texttt{tfidf\_overlap} ranks higher than cosine similarity, suggesting that tree-based models extract more value from explicit keyword matching once the dominant PCA signal is accounted for. \texttt{TotalYearsExperience} ranks consistently across all three models. Both \texttt{degree\_match} and \texttt{full\_profile\_cosine\_sim} contribute negligibly across all classifiers --- under 2.6\% in the best case, and zero in XGBoost --- indicating they are subsumed by the PCA interaction and TF-IDF features. Despite their low importance, both features are retained in the final model. XGBoost's built-in regularisation already suppresses low-importance features during training, so removing them would not meaningfully change performance. Retaining them also preserves consistency with the feature engineering pipeline described in Section~\ref{sec:recruiter_features} and avoids the need for a separate retraining run to confirm that the delta is negligible.
-
-\begin{table}[htbp]
-    \centering
-    \caption{Normalised feature importance across classifiers (last cross-validation 
-    fold). PCA interaction components are aggregated into a single row.}
-    \label{tab:recruiter_feature_importance}
-    \begin{tabular}{lrrr}
-        \toprule
-        \textbf{Feature} & \textbf{Logistic Reg.} & \textbf{Random Forest} 
-                         & \textbf{XGBoost} \\
-        \midrule
-        Interaction PCA (aggregated) & 69.2\% & 83.2\% & 85.6\% \\
-        Qwen cosine similarity       & 12.6\% &  3.8\% &  1.9\% \\
-        Total years experience       &  7.7\% &  3.3\% &  3.5\% \\
-        TF-IDF overlap               &  5.5\% &  6.5\% &  5.2\% \\
-        Experience freshness         &  1.3\% &  2.2\% &  1.3\% \\
-        Experience delta             &  0.7\% &  0.6\% &  1.7\% \\
-        Degree match       &  2.6\% &  0.3\% &  0.8\% \\
-        MiniLM full-profile similarity &  0.4\% &  0.1\% &  0.0\% \\
-        \bottomrule
-    \end{tabular}
-\end{table}
 \subsection{Stage 2: Negative Strategy Selection}
 \label{sec:exp_recruiter_negatives}
  
 Having established XGBoost as the strongest classifier, the model type is now held fixed and the negative construction strategy is varied. Table~\ref{tab:recruiter_neg_comparison} reports XGBoost test set performance for each strategy, where each model is evaluated on a test set constructed with the same negative type as its training data.
  
 \subsubsection{Synthetic vs.\ LLM negatives}
-The most striking result is the gap between the synthetic and LLM models: AUC 0.852 vs.\ 0.724, a difference of 0.128. This gap is primarily a task-difficulty effect, not a quality difference. The synthetic model is tested on random non-applicants, who by construction are unlikely to match the job on any meaningful feature; almost any signal separates them from strong applicants. The LLM model is tested on poor-fit applicants from the real pool --- candidates who self-selected to apply despite a mismatch. These share the same self-selection signal as positives, forcing the model to rely on deeper feature differences. The lower AUC correctly reflects the genuine difficulty of that discrimination task.
+The first interesting but expected result is the gap between the synthetic and LLM models: \gls{AUC} 0.852 vs.\ 0.724, a difference of 0.128. This gap is a task-difficulty effect. The synthetic model is tested on random non-applicants, who by construction are unlikely to match the job on any meaningful feature; almost any signal separates them from strong applicants. The LLM model is tested on poor-fit applicants from the real pool --- candidates who self-selected to apply despite a mismatch. These share the same self-selection signal as positives, forcing the model to rely on deeper feature differences. The lower \gls{AUC} correctly reflects the genuine difficulty of that discrimination task.
  
 \subsubsection{Combined as the best choice}
-The combined model achieves AUC 0.755 on a mixed test set with equal proportions of LLM and synthetic negatives, outperforming the LLM-only model (0.724) but underperforming the synthetic-only model (0.852). Crucially, in the congestion balancing context of Chapter~\ref{chap:congestion_balancing}, the model must score candidates who may not have applied to the job at all --- which is precisely the synthetic scenario. A model trained exclusively on LLM negatives has never seen that setting and may not generalise well to it. The combined model handles both regimes and achieves the best verified performance across them.
- 
-Table~\ref{tab:recruiter_fi_strategies} shows XGBoost feature importances across all three training strategies, revealing a gradient rather than a simple redistribution. The PCA interaction components decrease steadily from LLM to synthetic (85.6\% $\rightarrow$ 81.4\%), but drop sharply in the combined setting (61.6\%) --- a reduction of 24\% relative to LLM-only. Qwen cosine similarity moves in the opposite direction: negligible at 1.9\% for LLM, modest at 3.8\% for synthetic, then jumping to 17.2\% in combined, becoming the second most important feature. TF-IDF overlap roughly doubles from LLM to synthetic (5.2\% $\rightarrow$ 9.3\%) and increases further in combined (10.3\%).
- 
-An interpretation is that the PCA components are specialised for hard within-pool discrimination, capturing subtle co-feature patterns that matter when positive and negative examples lie close together in feature space. When synthetic negatives enter the training mix, easier separations also need to be learned, and for these a scalar cosine similarity or keyword overlap is sufficient. The model converges on cosine similarity as a robust cross-regime signal.
- 
-Noteworthy is the emergence of \texttt{full\_profile\_cosine\_sim} (0.0\% $\rightarrow$ 3.2\% in combined). The LLM model assigns it zero importance --- within-pool fine-grained differences are better captured by the Qwen interaction. When non-applicants enter training, the MiniLM full-profile similarity provides a useful coarse-grained signal for filtering obvious mismatches, and the model begins to exploit it.
- 
-\begin{table}[H]
-    \centering
-    \caption{XGBoost feature importance across all three negative training strategies (last cross-validation fold). PCA components are aggregated into a single row.}
-    \label{tab:recruiter_fi_strategies}
-    \begin{tabular}{lrrr}
-        \toprule
-        \textbf{Feature} & \textbf{LLM only} & \textbf{Synthetic only} & \textbf{Combined} \\
-        \midrule
-        Interaction PCA (aggregated) & 85.6\% & 81.4\% & 61.6\% \\
-        Qwen cosine similarity       &  1.9\% &  3.8\% & 17.2\% \\
-        TF-IDF overlap               &  5.2\% &  9.3\% & 10.3\% \\
-        Experience delta             &  1.7\% &  1.2\% &  4.0\% \\
-        Full-profile cosine sim.     &  0.0\% &  1.3\% &  3.2\% \\
-        Total years experience       &  3.5\% &  0.8\% &  2.2\% \\
-        Degree match                 &  0.8\% &  1.3\% &  1.1\% \\
-        Experience freshness         &  1.3\% &  1.0\% &  0.5\% \\
-        \bottomrule
-    \end{tabular}
-\end{table}
+The combined model achieves \gls{AUC} 0.755 on a mixed test set with equal proportions of LLM and synthetic negatives, outperforming the LLM-only model (0.724) but underperforming the synthetic-only model (0.852). Crucially, in the congestion balancing context of Chapter~\ref{chap:congestion_balancing}, the model must score candidates who may not have applied to the job at all --- which is precisely the synthetic scenario. A model trained exclusively on LLM negatives has never seen that setting and may not generalise well to it. The combined model handles both regimes and achieves the best verified performance across them.
+
  
 \begin{table}[H]
     \centering
@@ -668,7 +613,8 @@ Noteworthy is the emergence of \texttt{full\_profile\_cosine\_sim} (0.0\% $\righ
     \end{tabular}
 \end{table}
  
-\paragraph{Final model results.} The two-stage selection process yields a clear conclusion: \textbf{XGBoost trained on combined negatives} is the final recruiter-side model. It achieves the best balance between the two extremes, generalises to both the within-applicant-pool ranking scenario and the broader candidate-scoring context in congestion balancing, and outperforms the LLM-only model on a verified test set. This model is serialised and used as the recruiter-side suitability scorer in Chapter~\ref{chap:congestion_balancing}.
+The two-stage selection process yields a clear conclusion: \textbf{XGBoost trained on combined negatives} is the final recruiter-side model. It achieves the best balance between the two extremes, generalises to both the within-applicant-pool ranking scenario and the broader candidate-scoring context in congestion balancing, and outperforms the LLM-only model on a verified test set. This model is serialised and used as a recruiter-side suitability scorer
+and candidate ranker in Chapter~\ref{chap:congestion_balancing}.
  
 \subsection{Qualitative Inference Evaluation}
 \label{sec:exp_recruiter_sanity}
