@@ -396,7 +396,7 @@ This user is based in Philadelphia, PA, holds a high school diploma and has only
     \end{tabular}
 \end{table}
 
-\section{Recruiter-side recommendation experiments}
+\section{Recruiter-side candidate recommender system experiments}
 \label{sec:exp_recruiter}
 % ============================================================
  
@@ -777,60 +777,52 @@ The congestion balancing experiments pursue three goals in sequence. The first
 is to demonstrate that both forms of congestion described in
 Chapter~\ref{chap:congestion_balancing} are genuinely present in the data,
 before any intervention is applied and to form a baseline for the subsequent experiments. The second is to show that the job-side and
-user-side market-maker strategies each independently reduce their respective
-form of congestion while preserving acceptable match quality. The third is toshow that the dual-sided hybrid pipeline from
-Section~\ref{sec:hybrid_strategy} addresses both forms simultaneously, and
-that the bilateral scoring alone — without explicit congestion penalties —
-already produces a measurable improvement compared to the baseline results.
+candidate-side market-maker strategies each independently reduce their respective
+form of congestion while preserving acceptable match quality. The third is to show that the dual-sided hybrid strategy from
+Section~\ref{sec:hybrid_strategy} addresses both forms simultaneously.
  
 \subsection{Experiment Setting}
 \label{sec:exp_congestion_setting}
 \paragraph{Simulation arena.}
 The congestion balancing experiments operate exclusively on Window~7, 
 the deployment window introduced in Section~\ref{sec:custom_split}. 
-Both the two-tower model and the recruiter-side model are trained and 
-selected using Windows~1--6 as described in 
-Sections~\ref{sec:exp_user} and~\ref{sec:exp_recruiter}; they are 
+Both the Two-Tower model and the recruiter-side model are 
 applied here without any further fine-tuning. Window~7 thus serves as 
-a held-out production simulation: users, jobs and the application pool 
-are all drawn from this window, and the market-maker strategies are 
+a held-out production simulation and also as baseline comparison. The market-maker strategies are 
 evaluated on the resulting recommendation and shortlisting distributions.
 
- 
-\paragraph{Threshold derivation.}
-A key design decision is that the zone thresholds $\tau_{\min}$ and
-$\tau_{\max}$ — which define the boundary between starved, safe, and congested
-entities — are derived exclusively from the historical Windows~1--6 data, not
-from Window~7. This mirrors realistic deployment conditions: in practice, a
-platform can only observe past behaviour when configuring its market-maker, and
-must apply the resulting thresholds to future traffic without knowing the future
-distribution in advance. The thresholds are therefore not optimised against any
-validation objective; they are a principled reading of what the historical
-market looked like, translated into concrete zone boundaries.
- 
-For the job side, the lower threshold $\tau_{\min}^{\text{job}} = 2$ is set to
-the median number of applications per job in Windows~1--6, and the upper
-threshold $\tau_{\max}^{\text{job}} = 9$ is set to the 90th percentile. This
-means the safe zone captures what a typical job in the historical market
-received, while jobs above the 90th percentile are flagged as congested. For
-the candidate side, the thresholds $\tau_{\min}^{\text{cand}} = 1$ and
-$\tau_{\max}^{\text{cand}} = 5$ are set to reflect the recruiter's screen
-capacity of top-5: a candidate who has never been shortlisted is starved, and a candidate who has been shortlisted more than five times is accumulating more
-attention than a single recruiter screens per job.
  
 \paragraph{Parameter values.}
 Tables~\ref{tab:job_mm_params} and~\ref{tab:cand_mm_params} list the
 market-maker parameter values used in all congestion experiments. As with the
 thresholds, these are design choices rather than optimised hyperparameters:
 the boost and penalty magnitudes are set to be on the same $[0,1]$ probability
-scale as the base scores they modify, and the shape parameters ($\gamma_p$,
-$\kappa_p$, $k$) are chosen so that each functional form reaches its maximum
-penalty at approximately the hard cap. Figure~\ref{fig:modification_functions} illustrates the three functional
-forms over the congestion range. The sigmoid curve reaches its maximum
-penalty earliest, making it the most aggressive redistributor for moderately
-congested jobs. The quadratic curve is initially lenient but accelerates
-once congestion becomes severe. The linear curve descends at a constant
-rate and reaches its maximum only at the hard cap.
+scale as the base scores they modify. Because both sides share the same lower
+threshold $\tau_{\min} = 2$, the starved zone spans an identical range of two
+units on both sides, and the boost parameters ($\gamma_b$, $\kappa_b$, $k_b$)
+are consequently the same for both the job-side and candidate-side
+market-makers. The penalty shape parameters ($\gamma_p$, $\kappa_p$, $k_p$)
+differ between the two sides because the congested zones have different ranges:
+the job-side hard cap is $H^{\text{job}}=50$, giving a penalty range of 40
+units beyond $\tau_{\max}^{\text{job}}=9$, whereas the candidate-side hard cap
+is $H^{\text{cand}}=10$, giving a penalty range of only 3 units beyond
+$\tau_{\max}^{\text{cand}}=6$. In both cases the penalty parameters are
+calibrated so that the smooth penalty reaches $P=-0.25$ at $H-1$ (i.e.\
+49 applications for the job side, 9 shortlists for the candidate side).
+At $H$ itself, a penalty of $-\infty$ is applied, effectively
+removing the entity from consideration entirely.
+
+Figures~\ref{fig:modification_functions} and~\ref{fig:modification_functions_cand}
+illustrate the three functional forms for the job side and candidate side
+respectively. On the job side, where the congested zone spans 40 units, the
+three curves diverge clearly: the sigmoid descends steeply and saturates near
+its maximum penalty well before the hard cap, making it the most aggressive
+redistributor for moderately congested jobs; the quadratic starts slowly but
+accelerates as congestion grows; and the linear descends at a constant rate,
+reaching its maximum only at $H^{\text{job}}-1 = 49$. On the candidate side,
+the compressed range of 3 units causes all three curves to converge rapidly
+to $-0.25$, leaving little practical difference between them beyond the speed
+of initial descent.
 
 \begin{table}[htbp]
     \centering
@@ -842,51 +834,71 @@ rate and reaches its maximum only at the hard cap.
         \toprule
         \textbf{Parameter} & \textbf{Value} & \textbf{Description} \\
         \midrule
-        $\tau_{\min}^{\text{job}}$ & 2    & Starved threshold (applications) \\
-        $\tau_{\max}^{\text{job}}$ & 9   & Congested threshold (applications) \\
-        $H^{\text{job}}$           & 50   & Hard cap; job removed from rankings \\
-        $B$                        & 0.25 & Maximum boost magnitude \\
-        $P$                        & 0.25 & Maximum penalty magnitude \\
-        $\gamma_b$ (linear)        & 0.11  & Boost rate per application below $\tau_{\min}$ \\
-        $\gamma_p$ (linear)        & 0.006 & Penalty rate per application beyond $\tau_{\max}$ \\
-        $\kappa_b$ (quadratic)     & 0.06  & Quadratic boost scaling parameter \\
-        $\kappa_p$ (quadratic)     & 0.001 & Quadratic penalty scaling parameter \\
-        $k_b$ (sigmoid)            & 1.4   & Sigmoid steepness (boost side) \\
-        $k_p$ (sigmoid)            & 0.25  & Sigmoid steepness (penalty side) \\
+        $\tau_{\min}^{\text{job}}$ & 2         & Starved threshold (applications) \\
+        $\tau_{\max}^{\text{job}}$ & 9         & Congested threshold (applications) \\
+        $H^{\text{job}}$           & 50        & Hard cap; job removed from rankings \\
+        $B$                        & 0.25      & Maximum boost \\
+        $P$                        & -0.25      & Maximum penalty \\
+        $\gamma_b$ (linear)        & 0.125     & Boost rate per application below $\tau_{\min}$ \\
+        $\gamma_p$ (linear)        & 0.0060976     & Penalty rate per application beyond $\tau_{\max}$ \\
+        $\kappa_b$ (quadratic)     & 0.0660     & Quadratic boost scaling parameter \\
+        $\kappa_p$ (quadratic)     & 0.000148721  & Quadratic penalty scaling parameter \\
+        $k_b$ (sigmoid)            & 2.55      & Sigmoid steepness (boost side) \\
+        $k_p$ (sigmoid)            & 0.15      & Sigmoid steepness (penalty side) \\
         \bottomrule
     \end{tabular}
 \end{table}
- 
+
 \begin{table}[htbp]
     \centering
-    \caption{Market-maker parameter values for user-side congestion mitigation.
-    Base scores are XGBoost shortlisting probabilities in $[0,1]$.}
+    \caption{Market-maker parameter values for candidate-side congestion mitigation.
+    Base scores are XGBoost shortlisting probabilities in $[0,1]$. The boost
+    parameters are identical to the job side as both share the same starved
+    zone range. Only penalty parameters are re-calibrated for the compressed
+    candidate-side congested zone.}
     \label{tab:cand_mm_params}
     \begin{tabular}{@{}llp{7.5cm}@{}}
         \toprule
         \textbf{Parameter} & \textbf{Value} & \textbf{Description} \\
         \midrule
-        $\tau_{\min}^{\text{cand}}$ & 2    & Starved threshold (shortlists) \\
-        $\tau_{\max}^{\text{cand}}$ & 6    & Congested threshold (shortlists) \\
-        $H^{\text{cand}}$           & 10   & Hard cap; candidate removed from shortlisting \\
-        $B$                         & 0.25 & Maximum boost magnitude \\
-        $P$                         & 0.25 & Maximum penalty magnitude \\
-        
-        $\gamma_p$ (linear)         & 0.083 & Penalty rate per shortlist beyond $\tau_{\max}$ \\
-        $\kappa_p$ (quadratic)      & 0.028 & Quadratic penalty scaling parameter \\
-        $k$ (sigmoid)               & 1.0 & Sigmoid steepness \\
+        $\tau_{\min}^{\text{cand}}$ & 2      & Starved threshold (shortlists) \\
+        $\tau_{\max}^{\text{cand}}$ & 6      & Congested threshold (shortlists) \\
+        $H^{\text{cand}}$           & 10     & Hard cap; candidate removed from shortlisting \\
+        $B$                         & 0.25   & Maximum boost \\
+        $P$                         & -0.25   & Maximum penalty \\
+        $\gamma_b$ (linear)         & 0.125  & Boost rate per shortlist below $\tau_{\min}$ \\
+        $\gamma_p$ (linear)         & 0.084  & Penalty rate per shortlist beyond $\tau_{\max}$ \\
+        $\kappa_b$ (quadratic)      & 0.066  & Quadratic boost scaling parameter \\
+        $\kappa_p$ (quadratic)      & 0.029  & Quadratic penalty scaling parameter \\
+        $k_b$ (sigmoid)             & 2.55   & Sigmoid steepness (boost side) \\
+        $k_p$ (sigmoid)             & 1.7634   & Sigmoid steepness (penalty side) \\
+        $s$                         & 5      & Number of top candidates shortlisted per job inbox \\
         \bottomrule
     \end{tabular}
 \end{table}
 
 \begin{figure}
     \centering
-    \includegraphics[width=\textwidth]{images/modification_functions.png}
+    \includegraphics[width=\textwidth]{images/modification_functions_job.png}
     \caption{The three modification functions $\delta(c)$ plotted over the
-    application count range $[0, H^{\text{job}}]$. Zone boundaries at
+    application count range $[0, H^{\text{job}}-1]$. The smooth penalty
+    functions reach $-0.25$ at 49 applications; at $H^{\text{job}}=50$ a
+    sentinel penalty of $-\infty$ is applied. Zone boundaries at
     $\tau_{\min}=2$ and $\tau_{\max}=9$ are shown as dashed vertical lines.}
     \label{fig:modification_functions}
 \end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\textwidth]{images/modification_functions_candidate.png}
+    \caption{The three modification functions $\delta(c)$ plotted over the
+    shortlist count range $[0, H^{\text{cand}}-1]$. The smooth penalty
+    functions reach $-0.25$ at 9 shortlists; at $H^{\text{cand}}=10$ a
+    sentinel penalty of $-\infty$ is applied. Zone boundaries at
+    $\tau_{\min}=2$ and $\tau_{\max}=6$ are shown as dashed vertical lines.}
+    \label{fig:modification_functions_cand}
+\end{figure}
+
 
 \paragraph{Simulation mechanics.}
 For the job-side and hybrid experiments, Two-Tower recommendations and
@@ -898,8 +910,7 @@ between strategy runs. The weighting parameter $\alpha = 0.5$ is used in
 all hybrid experiments for simplicity, giving equal weight to the Two-Tower and recruiter signals.
  
 \paragraph{Metrics.}
-Congestion is measured using the Gini coefficient $G$ (lower is more equal)
-and the percentage of entities in each zone (starved, safe, congested) as
+Congestion is measured using the Gini coefficient $G$ and the percentage of entities in each zone (starved, safe, congested) as
 defined in Section~\ref{sec:prelim_zones}. To assess whether congestion
 reduction comes at the cost of match quality, the average Two-Tower probability
 $\bar{p}_{\text{TT}}$ and average recruiter probability $\bar{p}_{\text{rec}}$
@@ -1359,6 +1370,7 @@ standalone job-side experiments
 \end{enumerate}
 
 \subsubsection{Bilateral scoring baseline}
+\label{sec:hybrid_bilateral_baseline}
 Table~\ref{tab:hybrid_job_results} shows that bilateral scoring alone
 already improves over the pure Two-Tower free market from
 Section~\ref{sec:exp_job_congestion}: the job-side Gini drops from
@@ -1395,7 +1407,7 @@ concentrates applications — and therefore recruiter attention — more
 unevenly than organic behaviour.
 
 \subsubsection{Ablation: isolating each penalty}
-
+\label{sec:hybrid_ablation}
 \paragraph{Job-side penalty only.}
 Adding the job-side sigmoid penalty reduces the job Gini substantially
 from 0.9182 to 0.7276, and grows the safe zone from 11.1\% to 29.4\%.
@@ -1448,6 +1460,7 @@ Phase~1 is a more powerful lever for candidate equity than re-ranking
 within fixed inboxes in Phase~2.
 
 \subsubsection{Full dual-sided market-maker}
+\label{sec:full_pipeline}
 Universe~4 combines both penalties and achieves the best results across
 all metrics. On the job side, the Gini and zone fractions are identical
 to universe~2 (0.7276, 29.4\% safe) — as expected, since the candidate
