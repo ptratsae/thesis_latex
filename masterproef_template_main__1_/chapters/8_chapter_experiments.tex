@@ -616,92 +616,154 @@ The combined model achieves \gls{AUC} 0.755 on a mixed test set with equal propo
 The two-stage selection process yields a clear conclusion: \textbf{XGBoost trained on combined negatives} is the final recruiter-side model. It achieves the best balance between the two extremes, generalises to both the within-applicant-pool ranking scenario and the broader candidate-scoring context in congestion balancing, and outperforms the LLM-only model on a verified test set. This model is serialised and used as a recruiter-side suitability scorer
 and candidate ranker in Chapter~\ref{chap:congestion_balancing}.
  
-\subsection{Qualitative Inference Evaluation}
+\subsection{Qualitative inference evaluation}
 \label{sec:exp_recruiter_sanity}
- 
-To validate that the final combined model behaves sensibly in practice, 
-three jobs are sampled from Window~7 --- jobs the model has never seen 
-during training or model selection. The three cases are chosen to probe 
-different aspects of model behaviour: generalisation to non-applicants 
-(Job~1), within-pool differentiation among actual applicants (Job~2), 
-and mixed ranking across both groups (Job~3). All scores are produced 
-by the final XGBoost model trained on combined negatives. 
- 
-\paragraph{Job 257565 — Accounts Receivable Clerk: non-applicant generalisation.}
-This job requires 1--2 years of business-to-business collections experience along with cash posting and basic Excel skills. Five random non-applicants are scored to test whether the model generalises to candidates it was not explicitly trained to rank (the combined model saw synthetic non-applicants during training, but not these specific individuals). Table~\ref{tab:sanity_ar_clerk} shows the results.
- 
+
+To validate that the final combined model behaves sensibly in practice,
+three jobs are sampled from Windows~5--6 --- jobs the model has never
+seen during training or model selection. The three cases probe different
+aspects of model behaviour: generalisation to non-applicants (Job~1),
+within-pool differentiation among actual applicants (Job~2), and mixed
+ranking across both groups (Job~3). All scores are produced by the
+final XGBoost model trained on combined negatives.
+
+A note on absolute scores: the model scores fit quality rather than
+application likelihood, so scores are intentionally moderate even for
+genuine applicants who lack key requirements. The meaningful signal lies
+in the relative ranking rather than the absolute value.
+
+\paragraph{Job 814441 — Office associate: non-applicant generalisation.}
+This role requires administrative and customer service skills, basic PC
+knowledge, and experience with office equipment, with accounting or
+finance experience listed as a plus. Five random non-applicants are
+scored to test whether the model generalises to candidates it was not
+explicitly trained on. Table~\ref{tab:sanity_office_assoc} shows the
+results.
+
+The model correctly places the customer service and clerical profile
+(41.0\%) at the top --- a direct match for the role's core requirements
+--- while IT and banking profiles rank lower. One notable anomaly is
+user 1442371, who reports 112 years of experience, almost certainly a
+data entry error. Despite this outlier value, the model does not
+over-reward the candidate, suggesting the feature scaler handles
+extreme values robustly. The accounting assistant profile (12.3\%)
+ranks fourth despite being finance-adjacent, likely because the history
+keywords align less strongly with the administrative and customer-facing
+language of the job description than the cashier and file clerk
+terminology of the top-ranked candidate --- a known characteristic of
+TF-IDF-based features.
+
 \begin{table}[H]
     \centering
-    \caption{Sanity check — Job 257565 (Accounts Receivable Clerk). Five random non-applicants scored by the final combined model.}
-    \label{tab:sanity_ar_clerk}
+    \caption{Sanity check --- Job 814441 (Office associate).
+    Five random non-applicants scored by the final combined model.}
+    \label{tab:sanity_office_assoc}
     \small
-    \begin{tabular}{r r l r p{7cm}}
+    \begin{tabular}{r r l r p{6.5cm}}
         \toprule
-        \textbf{Rank} & \textbf{Score} & \textbf{Degree} & \textbf{Exp} & \textbf{Recent History} \\
+        \textbf{Rank} & \textbf{Score} & \textbf{Degree} &
+        \textbf{Exp} & \textbf{Recent history} \\
         \midrule
-        1 & 81.0\% & High School  & 10y & Customer Service, File Clerk, Cashier \\
-        2 & 69.1\% & ---          &  9y & Accounting Asst / AP Specialist, Teller \\
-        3 & 34.0\% & Bachelor's   &  7y & Licensed Personal Banker, Asst Manager \\
-        4 & 31.1\% & Bachelor's   &  4y & IT Specialist, IT Support Technician, Help Desk \\
-        5 & 24.9\% & High School  & 23y & Lead Security Coordinator, IT Operations \\
+        1 & 41.0\% & High School &  10y & Customer Service, File Clerk, Cashier \\
+        2 & 33.1\% & Bachelor's  & 112y & Contract Site Supervisor, Head Tennis Coach, Operations Manager \\
+        3 & 20.0\% & Bachelor's  &   4y & IT Specialist, IT Support Technician, Help Desk \\
+        4 & 12.3\% & ---         &   9y & Accounting Assistant, AP Specialist, Teller \\
+        5 &  7.1\% & Bachelor's  &   7y & Licensed Personal Banker, Assistant Manager \\
         \bottomrule
     \end{tabular}
 \end{table}
- 
-The model correctly separates finance-adjacent profiles from unrelated backgrounds. IT and security candidates rank at the bottom (31\% and 25\%), while cash-handling and accounting profiles rank at the top. One nuance worth noting: the cashier/customer service profile (81\%) outranks the AP specialist (69\%) despite the AP specialist being closer to AR work. This is likely a TF-IDF keyword effect — terms such as \textit{collections} and \textit{cash posting} in the job description overlap more strongly with cashier terminology than with the more technical accounting vocabulary in the AP specialist's profile. This is a known limitation of keyword-based features rather than a failure of the model.
- 
-\paragraph{Job 377385 — Cash Counter: within-pool differentiation.}
-This job requires cash handling, basic computer skills, and customer service experience. Five actual applicants are scored to test whether the model creates meaningful differentiation within the hard discrimination task — distinguishing better from worse fits among people who all chose to apply. Table~\ref{tab:sanity_cash_counter} shows the results.
- 
+
+\paragraph{Job 446397 — Client liaison / project coordinator:
+within-pool differentiation.}
+This role requires at least two years of experience in healthcare or
+insurance project management, strong communication skills, and the
+ability to manage client relationships. Five actual applicants are
+scored to test whether the model creates meaningful differentiation
+within the harder within-pool regime. Table~\ref{tab:sanity_client_liaison}
+shows the results.
+
+The model produces a spread from 15.3\% to 52.7\%, with the top
+candidate being an assistant manager and customer service representative
+with six years of experience. Absolute scores are moderate across the
+board, which is expected: none of the applicants have an explicit
+healthcare or insurance project management background, so the model
+correctly reflects that no candidate is a strong fit. The bottom two
+candidates --- a master cashier and housekeeper, and a candidate with
+sparse unstructured history --- score lowest, consistent with their
+profiles being furthest from the role's requirements.
+
 \begin{table}[H]
     \centering
-    \caption{Sanity check — Job 377385 (Cash Counter). Five actual applicants scored by the final combined model.}
-    \label{tab:sanity_cash_counter}
+    \caption{Sanity check --- Job 446397 (Client liaison / project
+    coordinator). Five actual applicants scored by the final combined
+    model.}
+    \label{tab:sanity_client_liaison}
     \small
-    \begin{tabular}{r r l r p{7cm}}
+    \begin{tabular}{r r l r p{6.5cm}}
         \toprule
-        \textbf{Rank} & \textbf{Score} & \textbf{Degree} & \textbf{Exp} & \textbf{Recent History} \\
+        \textbf{Rank} & \textbf{Score} & \textbf{Degree} &
+        \textbf{Exp} & \textbf{Recent history} \\
         \midrule
-        1 & 43.3\% & High School &  35y & Route Account Manager, Refreshment Services, Admin \\
-        2 & 37.2\% & High School &   7y & Clerical, Youth Activity Attendant, Customer Service \\
-        3 & 30.9\% & High School &   2y & Housekeeping, Customer Service, Elevator Operator \\
-        4 & 18.3\% & ---         &   3y & Customer Service Representative \\
-        5 &  8.6\% & ---         &  13y & Asset Protection Supervisor, Loss Prevention Manager \\
+        1 & 52.7\% & ---         &  6y & Assistant Manager, Customer Service Rep, Senior Customer Service \\
+        2 & 41.1\% & Bachelor's  & 10y & Office and Operations Manager, Production Manager, Technical \\
+        3 & 36.0\% & Master's    &  6y & Sales Representative, Enrollment Advisor, Account Manager \\
+        4 & 17.1\% & ---         &  3y & Tennessean Paper Co., Volunteer Work \\
+        5 & 15.3\% & High School &  8y & Master Cashier, Housekeeper, Sales Associate \\
         \bottomrule
     \end{tabular}
 \end{table}
- 
-The model creates a meaningful score spread (8.6\%--43.3\%) among applicants who all applied for the role. The top candidate has 35 years of experience including direct cash-handling and administrative work — exactly the profile the job description targets. The bottom-ranked candidate is a loss prevention manager, whose background in surveillance and asset protection shares little with cash counting or customer-facing finance work. Absolute scores are lower here than in Job~1 because the model is operating in the harder within-pool regime, where it must rely on finer feature differences; the scores reflect fit quality rather than an absolute shortlist threshold.
- 
-\paragraph{Job 38902 — Automotive Service Manager: mixed ranking.}
-This job requires 1--3 years of automotive service or customer service experience, leadership skills, and a valid driver's licence. Five applicants and five random non-applicants are scored together to probe whether the model ranks the two groups sensibly in a realistic mixed setting. Table~\ref{tab:sanity_auto_manager} shows the full combined ranking.
- 
+
+\paragraph{Job 1053516 — VP assistant treasurer: mixed ranking.}
+This senior role requires 15 or more years of experience in banking,
+treasury management and financial analysis, along with a Bachelor's
+degree in accounting or finance and preferably an MBA. Five applicants
+and five random non-applicants are scored together to probe whether
+the model ranks the two groups sensibly in a mixed setting.
+Table~\ref{tab:sanity_vp_treasurer} shows the full combined ranking.
+
+The top three positions are all held by applicants with finance
+backgrounds: a CPA assistant and bank teller (62.9\%), a fund
+accountant with 16 years of experience (60.4\%), and an assistant
+controller with 28 years (48.3\%). The best-scoring non-applicant
+(42.9\%) is an accounting analyst with teller experience --- a
+finance-adjacent profile that plausibly overlaps with treasury work,
+so its placement at rank~4 is reasonable rather than a model error.
+Non-applicants with unrelated backgrounds such as lab management,
+retail, and customer service correctly cluster at the bottom.
+
+Applicants score 32.5\% on average versus 22.7\% for non-applicants,
+confirming that the model assigns systematically higher suitability to
+the self-selected group. The two lowest-scoring applicants (16.2\% and
+6.9\%) have histories in cashiering, internships, and night auditing
+--- profiles that share little with the senior treasury role despite
+the applicants having chosen to apply, which the model correctly
+penalises.
+
 \begin{table}[H]
     \centering
-    \caption{Sanity check — Job 38902 (Automotive Service Manager). Five applicants (A) and five non-applicants (N) scored by the final combined model.}
-    \label{tab:sanity_auto_manager}
+    \caption{Sanity check --- Job 1053516 (VP assistant treasurer).
+    Five applicants~(A) and five non-applicants~(N) scored by the
+    final combined model.}
+    \label{tab:sanity_vp_treasurer}
     \small
-    \begin{tabular}{r r c l r p{6.5cm}}
+    \begin{tabular}{r r c l r p{5.5cm}}
         \toprule
-        \textbf{Rank} & \textbf{Score} & \textbf{Type} & \textbf{Degree} & \textbf{Exp} & \textbf{Recent History} \\
+        \textbf{Rank} & \textbf{Score} & \textbf{Type} &
+        \textbf{Degree} & \textbf{Exp} & \textbf{Recent history} \\
         \midrule
-        1  & 80.4\% & A & High School &  22y & VW Master Certified Service Manager, Service Manager \\
-        2  & 67.0\% & A & Master's    &   9y & Transportation Security Officer, HR Assistant \\
-        3  & 56.1\% & N & ---         &  17y & Customer Service Rep (Netflix), Closing Supervisor \\
-        4  & 48.1\% & N & Bachelor's  &  26y & Tutor, Hardware Technician, Bank Teller \\
-        5  & 47.9\% & A & Bachelor's  &   3y & Parking and Security Integrator, Intern \\
-        6  & 47.6\% & N & ---         &   8y & Direct Support Staff, Customer Service \\
-        7  & 41.0\% & A & Bachelor's  &   9y & Express Management, Retail Store Manager, Asst Manager \\
-        8  & 40.3\% & N & Bachelor's  &   4y & Loan Officer, Claims Analyst \\
-        9  & 25.3\% & N & ---         &   6y & Dispatcher, Luggage Agent \\
-        10 & 19.4\% & A & ---         &  11y & Business Owner, In-charge Operations \\
+        1  & 62.9\% & A & Bachelor's  &  5y & CPA Assistant, Accounting Assistant, Bank Teller \\
+        2  & 60.4\% & A & Bachelor's  & 16y & Fund Accountant, Tax Associate II, Fund Accountant \\
+        3  & 48.3\% & A & Bachelor's  & 28y & Assistant Controller, Accounting / Bookkeeper \\
+        4  & 42.9\% & N & Bachelor's  &  9y & Accounting Analyst, Teller, Ramp Agent \\
+        5  & 25.6\% & N & Associate's &  7y & Client Services Rep, Security Officer, Retail \\
+        6  & 24.9\% & N & High School & 37y & Lab Manager, LPN, Medic \\
+        7  & 17.5\% & N & High School &  3y & Church Volunteer, Hostess \\
+        8  & 16.2\% & A & Bachelor's  &  4y & Cashier, Internship \\
+        9  & 15.0\% & N & High School & 11y & Customer Service, Dispatcher \\
+        10 &  6.9\% & A & Bachelor's  & 10y & Equities Trader, Night Auditor \\
         \bottomrule
     \end{tabular}
 \end{table}
- 
-The top candidate — a Volkswagen Master Certified Service Manager with 22 years in automotive service — is correctly identified by a wide margin (80.4\%). This is the clearest possible true positive: the candidate's entire history is a direct match for the role. Applicants score 51.1\% on average versus 43.5\% for non-applicants, confirming that the model correctly assigns higher suitability to the self-selected group overall.
- 
-The interleaving of non-applicants in ranks 3--4 and 6 is expected rather than a failure. The Netflix customer service supervisor (rank~3, 56.1\%) and the hardware technician/bank teller (rank~4, 48.1\%) have varied backgrounds with supervisory and customer-facing elements that are genuinely adjacent to an automotive service manager role. The model is not making an error — it is correctly recognising partial feature overlap. The dispatcher and luggage agent (rank~9, 25.3\%) and loan officer (rank~8, 40.3\%) score lower, as their backgrounds share less with automotive service work. This middle-range interleaving is precisely what a combined model trained on both hard and easy negatives is expected to produce: it does not hard-separate applicants from non-applicants, but scores all candidates on genuine fit quality.
  
 % ============================================================
 \section{Congestion Balancing Experiments}

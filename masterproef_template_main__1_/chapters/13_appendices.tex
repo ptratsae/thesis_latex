@@ -3,7 +3,7 @@
 \label{app:ablation_full}
 \addcontentsline{toc}{section}{Full Ablation Study Results}
 
-Table~\ref{app:tab:full_ablation} reports the complete set of metrics for all four ablation configurations at their respective best validation checkpoints. The main text (Section~\ref{sec:exp_user_ablation}) reports only AUC for brevity; this table additionally includes all ranking metrics at $K \in \{1, 3, 5, 10\}$. As noted in Section~\ref{sec:exp_user_ablation}, all ranking metrics are computed against the balanced validation candidate pool and are therefore optimistic relative to full-scale inference.
+Table~\ref{app:tab:full_ablation} reports the complete set of metrics for all four ablation configurations at their respective best validation checkpoints. Section~\ref{sec:exp_user_ablation} only reports  AUC for brevity; this table additionally includes all ranking metrics at $K \in \{1, 3, 5, 10\}$. As noted in Section~\ref{sec:exp_user_ablation}, all ranking metrics are computed against the balanced validation candidate pool and are therefore optimistic relative to full-scale inference.
 
 \begin{table}[htbp]
     \centering
@@ -267,6 +267,46 @@ modification.
 
 \end{table}
 
+\section{Feature Importance}
+\label{app:exp_recruiter_feature_importance}
+\addcontentsline{toc}{section}{Feature Importance}
+
+\paragraph{Interaction matrix PCA}
+The embedding interaction matrix $\mathbf{m}_{uj} \in \mathbb{R}^{2d_{\text{text}}}$ has 200 dimensions. \gls{PCA} is applied to reduce the interaction matrix to $d_{\text{pca}} = 80$ components, retaining 92.9\% of the total variance. This compression is justified on two grounds. First, the Hadamard product and absolute difference of the same pair of embeddings share significant covariance structure, meaning a large fraction of the 200 dimensions are redundant — a finding confirmed by the high variance retention at only 40\% of the original dimensionality. Second, reducing the feature space lowers the risk of XGBoost fitting to noise in the interaction dimensions, even with 5,896 training pairs.
+
+\paragraph{Feature importance analysis}
+Table~\ref{tab:recruiter_feature_importance} shows the normalised feature 
+importance for each of the three base classifiers on the last cross-validation 
+fold. The \gls{PCA} interaction components dominate across all models — 
+accounting for 69.2\%, 83.2\%, and 85.6\% of total importance in Logistic 
+Regression, Random Forest, and XGBoost respectively. This confirms that the 
+element-wise interaction between user and job Qwen embeddings captures the 
+majority of the discriminative signal, validating the design choice of computing 
+the full interaction matrix rather than relying solely on scalar cosine similarity.
+
+Among the scalar features, the pattern differs by model family. In Logistic Regression, the Qwen cosine similarity (12.6\%) is the second most important feature, suggesting the linear model benefits from the direct scalar similarity signal. In Random Forest and XGBoost, \texttt{tfidf\_overlap} ranks higher than cosine similarity, suggesting that tree-based models extract more value from explicit keyword matching once the dominant PCA signal is accounted for. \texttt{TotalYearsExperience} ranks consistently across all three models. Both \texttt{degree\_match} and \texttt{full\_profile\_cosine\_sim} contribute negligibly across all classifiers --- under 2.6\% in the best case, and zero in XGBoost --- indicating they are subsumed by the PCA interaction and TF-IDF features. Despite their low importance, both features are retained in the final model. XGBoost's built-in regularisation already suppresses low-importance features during training, so removing them would not meaningfully change performance. Retaining them also preserves consistency with the feature engineering pipeline described in Section~\ref{sec:recruiter_features} and avoids the need for a separate retraining run to confirm that the delta is negligible.
+
+\begin{table}[htbp]
+    \centering
+    \caption{Normalised feature importance across classifiers (last cross-validation 
+    fold). PCA interaction components are aggregated into a single row.}
+    \label{tab:recruiter_feature_importance}
+    \begin{tabular}{lrrr}
+        \toprule
+        \textbf{Feature} & \textbf{Logistic Reg.} & \textbf{Random Forest} 
+                         & \textbf{XGBoost} \\
+        \midrule
+        Interaction PCA (aggregated) & 69.2\% & 83.2\% & 85.6\% \\
+        Qwen cosine similarity       & 12.6\% &  3.8\% &  1.9\% \\
+        Total years experience       &  7.7\% &  3.3\% &  3.5\% \\
+        TF-IDF overlap               &  5.5\% &  6.5\% &  5.2\% \\
+        Experience freshness         &  1.3\% &  2.2\% &  1.3\% \\
+        Experience delta             &  0.7\% &  0.6\% &  1.7\% \\
+        Degree match       &  2.6\% &  0.3\% &  0.8\% \\
+        MiniLM full-profile similarity &  0.4\% &  0.1\% &  0.0\% \\
+        \bottomrule
+    \end{tabular}
+\end{table}
 
 \end{appendices}
 
