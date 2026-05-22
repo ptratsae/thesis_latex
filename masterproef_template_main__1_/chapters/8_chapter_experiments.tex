@@ -987,7 +987,7 @@ Table~\ref{tab:job_mm_results} compares all strategies on Window~7. The first
 notable finding is that the free-market Two-Tower recommender makes congestion
 \emph{worse} than the historical baseline: the Gini rises from 0.8575 to
 0.9625 and the starved fraction increases from 80.9\% to 90.8\%. This is
-expected --- the Two-Tower model optimises for relevance and will confidently
+expected as the Two-Tower model optimises for relevance and will confidently
 direct many users towards the same popular jobs, amplifying the feedback loop
 rather than correcting it. This result motivates the market-maker intervention
 directly: an uncorrected recommender is not a neutral system; it actively
@@ -1003,11 +1003,9 @@ sigmoid strategy achieves the best overall balance: it has the lowest Gini
 (46.2\%). The linear strategy ranks second on Gini (0.5849) and starved
 fraction (63.4\%), outperforming the quadratic on both metrics. The quadratic
 strategy has the highest Gini (0.5994) and the largest starved fraction
-(74.2\%), which is explained by its design: the quadratic penalty is lenient
-on mildly congested jobs but becomes aggressive on heavily congested ones,
-pulling down the extreme tail while doing less to help the mildly
-under-applied. The linear strategy, by contrast, applies a steady uniform
-penalty that redistributes traffic more evenly across the full congested range.
+(74.2\%).
+
+These differences follow directly from the shape of each penalty function (Figure~\ref{fig:modification_functions}) and are clearly visible in the application distributions (Figure~\ref{fig:all_universes_job_congestion}). The free-market panel confirms the pathological concentration described above: a massive spike at zero and a heavy tail extending well beyond 50 applications, with 623 jobs exceeding this threshold. All three market-maker strategies successfully suppress this extreme tail, though a large zero spike persists across all panels, reflecting jobs that received no recommendations regardless of strategy. The quadratic strategy produces the longest tail because its penalty is lenient near $\tau_{\max}$ and only accelerates later, allowing traffic to bleed through gradually into the congested zone. The linear strategy produces a shorter tail by descending at a constant rate, while the sigmoid produces the smallest tail due to its steep descent and early saturation of the penalty. A further consequence of this steepness is visible in the distributions as a local maximum just beyond $\tau_{\max}=9$: the faster the penalty ramps up beyond the threshold, the more sharply it discourages further applications, causing jobs to accumulate just past the boundary. This effect is most visible under the sigmoid, but nearly absent under the quadratic, which instead spreads traffic more evenly across the congested range. The same logic applies to the starved zone: the sigmoid's steep boost function rapidly elevates jobs out of starvation, while the linear and quadratic boosts are more gradual, leaving more jobs starved under those strategies. Finally, the congested fraction remains low and stable across all strategies (2.1--2.4\%), confirming that the market-maker genuinely redistributes traffic toward the safe zone rather than simply pushing it from congested into the void.
 
 The match quality cost is modest across all strategies. The average Two-Tower
 probability drops from 0.9537 under free market to between 0.8837 and 0.8963
@@ -1038,31 +1036,6 @@ of applied candidates is largely preserved despite the redistribution.
     \end{tabular}
 \end{table}
 
-Figure~\ref{fig:job_mm_grid} visualises the application distributions produced
-by each strategy. The free-market panel confirms the pathological concentration
-described above: a massive spike at zero and a heavy tail extending well beyond
-50 applications (623 jobs exceed this threshold and are not shown). All three
-market-maker strategies successfully suppress the extreme tail, but a large
-zero spike persists across all panels --- reflecting jobs that simply received
-no recommendations regardless of strategy.
-
-A consistent but strategy-dependent feature across the market-maker panels is
-a local maximum just beyond $\tau_{\max}=9$. The effect is most pronounced
-under the sigmoid strategy and clearly visible under linear, but nearly absent
-under quadratic. This pattern is explained by the steepness of the penalty
-near $\tau_{\max}$: the faster the penalty ramps up beyond the threshold, the
-more sharply it discourages further applications, causing jobs to accumulate
-just past the boundary rather than spreading further into the congested zone.
-The quadratic penalty, being lenient near $\tau_{\max}$ and only accelerating
-later, allows traffic to bleed through more gradually and produces the most
-even distribution across the congested range.
-
-The three strategies differ primarily in how aggressively they truncate the
-tail. The sigmoid achieves the earliest truncation and the largest safe zone,
-consistent with its lowest Gini; the linear produces a broad gradual decay;
-and the quadratic sits between the two but with the most even spread through
-the congested zone due to its lenient-then-aggressive penalty profile.
-
 \begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth]{images/all_universes_job_congestion_grid.png}
@@ -1077,112 +1050,98 @@ the congested zone due to its lenient-then-aggressive penalty profile.
 
 \subsubsection{Qualitative Inference Evaluation}
 \label{sec:exp_job_congestion_sanity}
-To verify that the aggregate improvements translate to sensible individual
+To verify that the market-maker strategies produce sensible individual
 recommendations, the same two users from Section~\ref{sec:exp_recruiter_sanity}
 are examined across all four algorithmic universes. Their profiles are
-summarised in Tables~\ref{tab:user668904_profile}
-and~\ref{tab:user831532_profile}.
-
-\textbf{User 668904 — strong career signal.} In the historical universe this
-user has a single entry, the one job they actually applied to, since the
-historical pool contains only real applications. The free-market Two-Tower
-recommendations are strikingly homogeneous: all ten slots are filled with
-minor variants of the same accounts-payable role in Houston (AP Specialist,
-AP Clerk, AP Accountant, Payroll Specialist), all with original probabilities
-between 0.986 and 0.989. This illustrates the congestion problem directly:
-the model is highly confident about one narrow job cluster and floods it.
-
-The linear strategy breaks this homogeneity by redirecting the user toward
-slightly less congested but equally relevant roles: Senior Accountant, Tax
-Accountant, and Financial Accountant appear at the top, with original
-probabilities of 0.97--0.98. Document Controller 4 surfaces at rank~5 with
-an original probability of 0.848, boosted due to its low application count
-but still plausible given the user's document control background.
-
-The quadratic strategy amplifies this effect: Document Controller 4 rises
-to rank~1 and Energy Quantitative Analyst to rank~2, both with original
-probabilities below 0.85, because these jobs had near-zero applications and
-received the maximum boost. From rank~3 onward the list returns to the
-standard AP cluster. This illustrates the quadratic's lenient-then-aggressive
-profile: low-application jobs receive disproportionate boosts, but moderately
-congested jobs are left largely undisturbed.
-
-The sigmoid strategy produces the most aggressive redistribution: Account
-Director, Senior Tax Analyst, and CPA roles appear at the top, all within
-the finance domain but more senior and specialised. Original probabilities
-range from 0.91 to 0.95, lower than the free-market cluster but still high.
-The sigmoid's steeper initial penalty suppresses the entire popular AP cluster
-in favour of roles that received fewer applications overall.
-
-\textbf{User 831532 — cold-start user.} This user has no job history and
-only two years of experience, making the Two-Tower model rely entirely on
-location and basic profile features. The free-market recommendations are
-geographically coherent across the PA/NJ/DE tri-state area and semantically
-consistent around community care and support roles (discussed in
-Section~\ref{sec:exp_recruiter_sanity}).
-
-The market-maker strategies introduce more diversity but with visible costs
-for this user. Under both the linear and quadratic strategies, Loss Prevention
-openings (Middletown, NJ, original probability 0.742) is boosted to rank~1,
-having accumulated few applications by the time this user is processed. This
-is semantically distant from the user's care-adjacent profile. The linear
-strategy further surfaces a Central Sterile Supply Technician at rank~2
-(original probability 0.856), displacing the coherent care cluster to ranks
-4 and below. The quadratic strategy, despite also placing Loss Prevention at
-rank~1, returns more cleanly to the care cluster from rank~2 onward, with
-Nanny/Childcare, Shelter Staff, and Residential Youth Care all present in
-the top ten. The sigmoid strategy surfaces Pharmacy Technician and Certified
-Home Health Aides at ranks~1--2 --- roles that, while lower in base
-probability (0.79 and 0.78), are arguably the most semantically coherent
-with the user's care-adjacent profile, and Loss Prevention appears only at
-rank~3.
-
-The contrast between the two users reveals the market-maker's inherent
-trade-off. When the Two-Tower model has high confidence --- a clear career
-signal and many relevant jobs in the pool --- the penalty only redirects the
-user toward equally relevant alternatives, and the match quality cost is
-negligible. When model confidence is lower --- a cold-start user with minimal
-profile signal --- boosted low-application jobs can surface that are less
-semantically coherent. This is consistent with the aggregate match quality
-drop observed in Table~\ref{tab:job_mm_results}: the reduction in average
-Two-Tower probability is concentrated among users for whom the base model is
-less certain. The market-maker optimises for distributional fairness at the
-market level, not for individual relevance, and this distinction is most
-visible at the user level for cold-start profiles.
-
+summarised in Tables~\ref{tab:user668904_profile} and~\ref{tab:user831532_profile}.
+Full top-10 recommendation lists are provided in Appendix~\ref{app:sanity_check_full};
 Tables~\ref{tab:sanity_668904} and~\ref{tab:sanity_831532} show the top-3
-recommendations for each user across all universes. Full top-10 lists are
-provided in Appendix~\ref{app:sanity_check_full}.
+per universe for reference, with application counts included to make the
+penalty mechanism transparent. The applications per job are the total applications after simulation.
+
+\textbf{User 668904 — clear career signal.} This user has 18 years of
+finance experience with a background in accounts payable and administrative
+roles. For the free-market strategy discussion see Section~\ref{sec:exp_user_inference}.
+
+The market-maker strategies broaden this list while preserving semantic
+coherence across all three functional forms. Under linear and sigmoid, the
+penalty suppresses the heavily-applied AP cluster and surfaces roles
+squarely within the user's finance domain --- Senior Accountant, Tax
+Accountant, Financial Accountant, Senior Tax Analyst, CPA, Auditor ---
+all with high original probabilities (0.921--0.978). The sigmoid surfaces
+more senior and specialised roles, consistent with its more aggressive
+penalty. Under quadratic, the top two slots are occupied by Document
+Controller~4 and Energy Quantitative Analyst, with lower original
+probabilities of 0.848 and 0.817 respectively. Both had 0~prior
+applications at ranking time, earning them the maximum possible boost
+under the quadratic penalty and displacing higher-scoring finance roles.
+Overall, for a user with a strong career signal all three strategies
+successfully diversify the recommendation list without sacrificing domain
+relevance.
+
+\textbf{User 831532 — no job history.} This user has no job history and
+only two years of experience. The free-market recommendations for this user
+were already examined in Section~\ref{sec:exp_user_inference}.
+
+The market-maker strategies maintain geographic coherence across the
+PA/NJ/DE tri-state area but introduce semantic variation with mixed results.
+Under linear and quadratic, Loss Prevention Openings (Middletown, NJ) rises
+to rank~1 with 0~prior applications and an original probability of only
+0.742 --- a role semantically distant from the user's care-adjacent profile,
+promoted purely by its maximum boost. However, ranks~2 and~3 under quadratic
+recover well, returning Store Management and Nanny/Childcare with high
+original probabilities (0.979 and 0.983) and moderate application counts
+(21 and 25), reflecting the quadratic's leniency further from the starved 
+boundary. Under linear, ranks~2 and~3 are also displaced by low-application
+jobs (Central Sterile Supply Technician and a second Loss Prevention role,
+both with 1--2~applications), making the linear top-3 the least coherent
+for this user. The sigmoid demotes this role to
+rank~3 and places Pharmacy Technician and Certified Home Health Aides at
+ranks~1--2, which are lower in base probability but considerably more
+coherent with the user's profile. In all strategies, the core care cluster
+(Shelter Staff, Youth Care Workers, Childcare) remains present in the top
+ten, suggesting the market-maker introduces additional noise around the
+recommendations rather than displacing them entirely.
+
+The contrast between the two users illustrates the fundamental trade-off:
+when the base model is confident and the candidate pool is rich, the
+market-maker redirects traffic toward equally relevant alternatives with
+minimal quality cost. When the base model has little signal to work with,
+boosted low-application jobs can displace coherent recommendations. This
+is expected behaviour --- the market-maker is designed to optimise
+distributional fairness at the market level, not to improve individual
+recommendation quality.
 
 \begin{table}[H]
     \centering
     \caption{Top-3 recommendations for User~668904 across all universes.
     New Prob is the modified ranking probability; Orig Prob is the raw
-    Two-Tower probability before any modification.}
+    Two-Tower probability before any modification; Apps is the number of
+    applications the job had received at ranking time.}
     \label{tab:sanity_668904}
-    \begin{tabular}{@{}clp{6.5cm}r@{}}
+    \begin{tabular}{@{}clp{5.5cm}rrr@{}}
         \toprule
-        \textbf{Rank} & \textbf{New Prob} & \textbf{Job Title (City, State)} & \textbf{Orig Prob} \\
+        \textbf{Rank} & \textbf{New Prob} & \textbf{Job Title (City, State)} & \textbf{Orig Prob} & \textbf{Apps} \\
         \midrule
-        \multicolumn{4}{l}{\textit{Free Market}} \\
-        1 & 0.729 & Senior Accounts Payable Specialist (Houston, TX)         & 0.989 \\
-        2 & 0.729 & Accounting Payable / Receivable Specialist (Houston, TX) & 0.989 \\
-        3 & 0.729 & Accounting Assistant (Houston, TX)                       & 0.988 \\
+        \multicolumn{5}{l}{\textit{Free Market}} \\
+        1 & 0.729 & Senior Accounts Payable Specialist (Houston, TX)         & 0.989 & 15 \\
+        2 & 0.729 & Accounting Payable / Receivable Specialist (Houston, TX) & 0.989 &  7 \\
+        3 & 0.729 & Accounting Assistant (Houston, TX)                       & 0.988 &  7 \\
         \midrule
-        \multicolumn{4}{l}{\textit{Market Maker Linear}} \\
-        1 & 0.751 & Senior Accountant (Houston, TX)           & 0.978 \\
-        2 & 0.751 & Tax Accountant (Houston, TX)              & 0.977 \\
-        3 & 0.750 & Financial Accountant (Houston, TX)        & 0.975 \\
+        \multicolumn{5}{l}{\textit{Market Maker Linear}} \\
+        1 & 0.751 & Senior Accountant (Houston, TX)           & 0.978 & 2 \\
+        2 & 0.751 & Tax Accountant (Houston, TX)              & 0.977 & 2 \\
+        3 & 0.750 & Financial Accountant (Houston, TX)        & 0.975 & 2 \\
         \midrule
-        \multicolumn{4}{l}{\textit{Market Maker Quadratic}} \\
-        1 & 0.750 & Document Controller 4 (Houston, TX)       & 0.848 \\
-        2 & 0.744 & Energy Quantitative Analyst (Houston, TX) & 0.817 \\
-        3 & 0.740 & Accounts Payable Supervisor (Houston, TX) & 0.979 \\
+        \multicolumn{5}{l}{\textit{Market Maker Quadratic}} \\
+        1 & 0.750 & Document Controller 4 (Houston, TX)       & 0.848 & 1 \\
+        2 & 0.744 & Energy Quantitative Analyst (Houston, TX) & 0.817 & 1 \\
+        3 & 0.740 & Accounts Payable Supervisor (Houston, TX) & 0.979 & 2 \\
         \midrule
-        \multicolumn{4}{l}{\textit{Market Maker Sigmoid}} \\
-        1 & 0.763 & Account Director (Houston, TX)            & 0.921 \\
-        2 & 0.763 & Senior Tax Analyst (Houston, TX)          & 0.953 \\
-        3 & 0.762 & CPA with Big 4 Experience (Houston, TX)   & 0.950 \\
+        \multicolumn{5}{l}{\textit{Market Maker Sigmoid}} \\
+        1 & 0.763 & Account Director (Houston, TX)            & 0.921 & 2 \\
+        2 & 0.763 & Senior Tax Analyst (Houston, TX)          & 0.953 & 2 \\
+        3 & 0.762 & CPA with Big 4 Experience (Houston, TX)   & 0.950 & 2 \\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -1190,34 +1149,37 @@ provided in Appendix~\ref{app:sanity_check_full}.
 \begin{table}[H]
     \centering
     \caption{Top-3 recommendations for User~831532 across all universes.
-    $\dagger$~Indicates a job the user actually applied to in Window~7.}
+    $\dagger$~Indicates a job the user actually applied to in Window~7.
+    Apps is the number of applications the job had received at ranking time.}
     \label{tab:sanity_831532}
-    \begin{tabular}{@{}clp{6.5cm}r@{}}
+    \begin{tabular}{@{}clp{5.5cm}rrr@{}}
         \toprule
-        \textbf{Rank} & \textbf{New Prob} & \textbf{Job Title (City, State)} & \textbf{Orig Prob} \\
+        \textbf{Rank} & \textbf{New Prob} & \textbf{Job Title (City, State)} & \textbf{Orig Prob} & \textbf{Apps} \\
         \midrule
-        \multicolumn{4}{l}{\textit{Free Market}} \\
-        1 & 0.728 & Customer Service Representative (Broomall, PA)                     & 0.985 \\
-        2 & 0.728 & Nanny / Childcare / Teacher (Madison, NJ)                          & 0.983 \\
-        3 & 0.727 & Concierge / Receptionist (Madison, NJ)                             & 0.981 \\
+        \multicolumn{5}{l}{\textit{Free Market}} \\
+        1 & 0.728 & Customer Service Representative (Broomall, PA) & 0.985 & 709 \\
+        2 & 0.728 & Nanny / Childcare / Teacher (Madison, NJ)      & 0.983 &  89 \\
+        3 & 0.727 & Concierge / Receptionist (Madison, NJ)         & 0.981 & 206 \\
         \midrule
-        \multicolumn{4}{l}{\textit{Market Maker Linear}} \\
-        1 & 0.729 & Loss Prevention Openings (Middletown, NJ)                          & 0.742 \\
-        2 & 0.727 & Central Sterile Supply Technician (Hamilton, NJ)                   & 0.856 \\
-        3 & 0.727 & Loss Prevention Openings (Lawrenceville, NJ)                       & 0.729 \\
+        \multicolumn{5}{l}{\textit{Market Maker Linear}} \\
+        1 & 0.729 & Loss Prevention Openings (Middletown, NJ)          & 0.742 & 1 \\
+        2 & 0.727 & Central Sterile Supply Technician (Hamilton, NJ)   & 0.856 & 2 \\
+        3 & 0.727 & Loss Prevention Openings (Lawrenceville, NJ)       & 0.729 & 1 \\
         \midrule
-        \multicolumn{4}{l}{\textit{Market Maker Quadratic}} \\
-        1 & 0.729 & Loss Prevention Openings (Middletown, NJ)                          & 0.742 \\
-        2 & 0.727 & Store Management (Christiana, DE)                                  & 0.979 \\
-        3 & 0.727 & Nanny / Childcare / Teacher (Madison, NJ)                          & 0.983 \\
+        \multicolumn{5}{l}{\textit{Market Maker Quadratic}} \\
+        1 & 0.729 & Loss Prevention Openings (Middletown, NJ)          & 0.742 &  1 \\
+        2 & 0.727 & Store Management (Christiana, DE)                  & 0.979 & 21 \\
+        3 & 0.727 & Nanny / Childcare / Teacher (Madison, NJ)          & 0.983 & 25 \\
         \midrule
-        \multicolumn{4}{l}{\textit{Market Maker Sigmoid}} \\
-        1 & 0.733 & Pharmacy Technician (West Deptford, NJ)                            & 0.795 \\
-        2 & 0.730 & Certified Home Health Aides (Linwood, NJ)                          & 0.779 \\
-        3 & 0.729 & Loss Prevention Openings (Middletown, NJ)                          & 0.742 \\
+        \multicolumn{5}{l}{\textit{Market Maker Sigmoid}} \\
+        1 & 0.733 & Pharmacy Technician (West Deptford, NJ)            & 0.795 & 2 \\
+        2 & 0.730 & Certified Home Health Aides (Linwood, NJ)          & 0.779 & 2 \\
+        3 & 0.729 & Loss Prevention Openings (Middletown, NJ)          & 0.742 & 1 \\
         \bottomrule
     \end{tabular}
 \end{table}
+
+
 \subsection{User-Side Congestion Analysis}
 \label{sec:exp_user_congestion}
 \subsubsection{Historical Analysis}
