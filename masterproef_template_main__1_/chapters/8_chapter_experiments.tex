@@ -1082,7 +1082,7 @@ introducing some semantic noise for this care-adjacent profile. The sigmoid
 handles this more gracefully, demoting it to rank~3 and placing the more
 coherent Pharmacy Technician and Certified Home Health Aides at ranks~1--2.
 Under quadratic, ranks~2 and~3 are occupied by jobs with 21 and 25
-applications --- still well within the safe zone, where the quadratic
+applications --- where the quadratic
 penalty is modest, allowing their high original probabilities (0.979
 and 0.983) to dominate the ranking.
 
@@ -1162,40 +1162,30 @@ recommendation quality.
 \end{table}
 
 
-\subsection{User-Side Congestion Analysis}
+\subsection{Candidate-side congestion analysis}
 \label{sec:exp_user_congestion}
 \subsubsection{Historical Analysis}
 Figure~\ref{fig:user_congestion_baseline} shows the distribution of recruiter
 shortlists per candidate in the Windows~1--6 historical pool, obtained by
 simulating the top-5 recruiter screen on the raw application data. The
-distribution is heavily right-skewed: a small fraction of candidates
-accumulates a disproportionate share of recruiter attention while roughly
-half receive fewer than two shortlists. Unlike the job-side distribution
-however, the tail is considerably less extreme — candidates who applied to
-at least one job have a non-trivial chance of being shortlisted, so the
-spike at zero is smaller. Table~\ref{tab:user_congestion_baseline}
-quantifies this across both periods.
+distribution is right-skewed: a small fraction of candidates accumulates a
+disproportionate share of recruiter attention while the majority receive
+fewer than two shortlists. Unlike the job-side distribution however, the
+tail is considerably less extreme --- a candidate can only accumulate as many
+shortlists as jobs they applied to, so the distribution is structurally
+bounded by individual application behaviour and cannot develop the runaway
+tail seen on the job side. This is also reflected in a substantially lower
+Gini coefficient (0.5356 vs 0.8655 historically), as shown in
+Table~\ref{tab:user_congestion_baseline}.
 
 The Gini coefficients of 0.5356 and 0.5370 for Windows~1--6 and Window~7
 respectively confirm two things. First, meaningful inequality exists:
 recruiter attention is far from uniformly distributed. Second, the pattern
-is highly stable across time — a delta of only 0.0014 between periods. In
+is highly stable across time --- a delta of only 0.0014 between periods. In
 both windows, roughly half of all candidates are starved, receiving fewer
 than two shortlists, while around 41--43\% sit in the safe zone. This
 stability justifies using the Windows~1--6 distribution to derive the zone
 thresholds applied to Window~7.
-
-It is worth noting that both the historical and the market-maker baselines
-in this section are derived from the real application pool — the recruiter
-model is applied to the actual job inboxes, with no Two-Tower recommendation
-step involved. This is a deliberate design choice for the standalone
-user-side analysis: the market-maker operates purely on the recruiter
-ranking stage, isolating its effect from any upstream recommendation
-behaviour. The full interaction between the Two-Tower and the recruiter
-— where TT-generated applications form the inboxes the recruiter then
-ranks — is evaluated separately in the hybrid experiment
-(Section~\ref{sec:exp_hybrid_results}).
-
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=\textwidth]{images/views_per_candidate_past_windows_1_6.png}
