@@ -1056,52 +1056,46 @@ are examined across all four algorithmic universes. Their profiles are
 summarised in Tables~\ref{tab:user668904_profile} and~\ref{tab:user831532_profile}.
 Full top-10 recommendation lists are provided in Appendix~\ref{app:sanity_check_full};
 Tables~\ref{tab:sanity_668904} and~\ref{tab:sanity_831532} show the top-3
-per universe for reference, with application counts included to make the
-penalty mechanism transparent. The applications per job are the total applications after simulation.
+per universe for reference.
 
 \textbf{User 668904 — clear career signal.} This user has 18 years of
 finance experience with a background in accounts payable and administrative
-roles. For the free-market strategy discussion see Section~\ref{sec:exp_user_inference}.
+roles. The free-market recommendations reflect this clearly: all ten slots
+are minor variants of the same accounts-payable cluster in Houston (AP
+Specialist, AP Clerk, AP Accountant), with original probabilities between
+0.986 and 0.989. The list is relevant but extremely narrow.
 
 The market-maker strategies broaden this list while preserving semantic
-coherence across all three functional forms. Under linear and sigmoid, the
-penalty suppresses the heavily-applied AP cluster and surfaces roles
-squarely within the user's finance domain --- Senior Accountant, Tax
-Accountant, Financial Accountant, Senior Tax Analyst, CPA, Auditor ---
-all with high original probabilities (0.921--0.978). The sigmoid surfaces
-more senior and specialised roles, consistent with its more aggressive
-penalty. Under quadratic, the top two slots are occupied by Document
-Controller~4 and Energy Quantitative Analyst, with lower original
-probabilities of 0.848 and 0.817 respectively. Both had 0~prior
-applications at ranking time, earning them the maximum possible boost
-under the quadratic penalty and displacing higher-scoring finance roles.
-Overall, for a user with a strong career signal all three strategies
-successfully diversify the recommendation list without sacrificing domain
-relevance.
+coherence. Under linear and sigmoid, the top recommendations shift toward
+Tax Accountant, Financial Accountant, Senior Accountant, and Accounting
+Analyst roles --- all squarely within the user's finance domain and with
+high original probabilities (0.95--0.98). The sigmoid strategy surfaces more
+senior and specialised roles (Senior Tax Analyst, CPA, Auditor) as it
+penalises the popular AP cluster more aggressively. Under quadratic, Document
+Controller 4 (original probability 0.848) rises to rank~1. Having such a low score but ranked as first means the job has  a low number of applications. Overall,
+for a user with a strong career signal the market-maker successfully
+diversifies the recommendation list without sacrificing domain relevance.
 
 \textbf{User 831532 — no job history.} This user has no job history and
-only two years of experience. The free-market recommendations for this user
-were already examined in Section~\ref{sec:exp_user_inference}.
+only two years of experience. The free-market recommendations are nonetheless
+geographically coherent across the PA/NJ/DE tri-state area and semantically
+consistent, clustering around community care and support roles (Customer
+Service, Childcare, Shelter Staff, Youth Care Workers) --- a reasonable
+inference from location and basic profile features. Importantly, one of the
+user's actual applications (Residential Youth Care Workers Needed) appears
+at rank~7.
 
-The market-maker strategies maintain geographic coherence across the
-PA/NJ/DE tri-state area but introduce semantic variation with mixed results.
-Under linear and quadratic, Loss Prevention Openings (Middletown, NJ) rises
-to rank~1 with 0~prior applications and an original probability of only
-0.742 --- a role semantically distant from the user's care-adjacent profile,
-promoted purely by its maximum boost. However, ranks~2 and~3 under quadratic
-recover well, returning Store Management and Nanny/Childcare with high
-original probabilities (0.979 and 0.983) and moderate application counts
-(21 and 25), reflecting the quadratic's leniency further from the starved 
-boundary. Under linear, ranks~2 and~3 are also displaced by low-application
-jobs (Central Sterile Supply Technician and a second Loss Prevention role,
-both with 1--2~applications), making the linear top-3 the least coherent
-for this user. The sigmoid demotes this role to
-rank~3 and places Pharmacy Technician and Certified Home Health Aides at
-ranks~1--2, which are lower in base probability but considerably more
-coherent with the user's profile. In all strategies, the core care cluster
-(Shelter Staff, Youth Care Workers, Childcare) remains present in the top
-ten, suggesting the market-maker introduces additional noise around the
-recommendations rather than displacing them entirely.
+The market-maker strategies maintain geographic coherence but introduce more
+semantic variation, with mixed results. Under linear and quadratic, Loss
+Prevention Openings (original probability 0.742) rises to rank~1 purely due
+to low application count --- a role that is semantically distant from the
+user's care-adjacent profile. The sigmoid strategy also surfaces this role
+but at rank~3, and places Pharmacy Technician and Certified Home Health Aides
+at ranks~1--2, which are lower in base probability but arguably more coherent
+with the user's profile. In all strategies, the core care cluster (Shelter
+Staff, Youth Care Workers, Childcare) remains present in the top ten,
+suggesting the market-maker does not completely displace relevant
+recommendations but rather introduces additional noise around them.
 
 The contrast between the two users illustrates the fundamental trade-off:
 when the base model is confident and the candidate pool is rich, the
@@ -1111,37 +1105,35 @@ boosted low-application jobs can displace coherent recommendations. This
 is expected behaviour --- the market-maker is designed to optimise
 distributional fairness at the market level, not to improve individual
 recommendation quality.
-
 \begin{table}[H]
     \centering
     \caption{Top-3 recommendations for User~668904 across all universes.
     New Prob is the modified ranking probability; Orig Prob is the raw
-    Two-Tower probability before any modification; Apps is the number of
-    applications the job had received at ranking time.}
+    Two-Tower probability before any modification.}
     \label{tab:sanity_668904}
-    \begin{tabular}{@{}clp{5.5cm}rrr@{}}
+    \begin{tabular}{@{}clp{6.5cm}r@{}}
         \toprule
-        \textbf{Rank} & \textbf{New Prob} & \textbf{Job Title (City, State)} & \textbf{Orig Prob} & \textbf{Apps} \\
+        \textbf{Rank} & \textbf{New Prob} & \textbf{Job Title (City, State)} & \textbf{Orig Prob} \\
         \midrule
-        \multicolumn{5}{l}{\textit{Free Market}} \\
-        1 & 0.729 & Senior Accounts Payable Specialist (Houston, TX)         & 0.989 & 15 \\
-        2 & 0.729 & Accounting Payable / Receivable Specialist (Houston, TX) & 0.989 &  7 \\
-        3 & 0.729 & Accounting Assistant (Houston, TX)                       & 0.988 &  7 \\
+        \multicolumn{4}{l}{\textit{Free Market}} \\
+        1 & 0.729 & Senior Accounts Payable Specialist (Houston, TX)         & 0.989 \\
+        2 & 0.729 & Accounting Payable / Receivable Specialist (Houston, TX) & 0.989 \\
+        3 & 0.729 & Accounting Assistant (Houston, TX)                       & 0.988 \\
         \midrule
-        \multicolumn{5}{l}{\textit{Market Maker Linear}} \\
-        1 & 0.751 & Senior Accountant (Houston, TX)           & 0.978 & 2 \\
-        2 & 0.751 & Tax Accountant (Houston, TX)              & 0.977 & 2 \\
-        3 & 0.750 & Financial Accountant (Houston, TX)        & 0.975 & 2 \\
+        \multicolumn{4}{l}{\textit{Market Maker Linear}} \\
+        1 & 0.751 & Senior Accountant (Houston, TX)           & 0.978 \\
+        2 & 0.751 & Tax Accountant (Houston, TX)              & 0.977 \\
+        3 & 0.750 & Financial Accountant (Houston, TX)        & 0.975 \\
         \midrule
-        \multicolumn{5}{l}{\textit{Market Maker Quadratic}} \\
-        1 & 0.750 & Document Controller 4 (Houston, TX)       & 0.848 & 1 \\
-        2 & 0.744 & Energy Quantitative Analyst (Houston, TX) & 0.817 & 1 \\
-        3 & 0.740 & Accounts Payable Supervisor (Houston, TX) & 0.979 & 2 \\
+        \multicolumn{4}{l}{\textit{Market Maker Quadratic}} \\
+        1 & 0.750 & Document Controller 4 (Houston, TX)       & 0.848 \\
+        2 & 0.744 & Energy Quantitative Analyst (Houston, TX) & 0.817 \\
+        3 & 0.740 & Accounts Payable Supervisor (Houston, TX) & 0.979 \\
         \midrule
-        \multicolumn{5}{l}{\textit{Market Maker Sigmoid}} \\
-        1 & 0.763 & Account Director (Houston, TX)            & 0.921 & 2 \\
-        2 & 0.763 & Senior Tax Analyst (Houston, TX)          & 0.953 & 2 \\
-        3 & 0.762 & CPA with Big 4 Experience (Houston, TX)   & 0.950 & 2 \\
+        \multicolumn{4}{l}{\textit{Market Maker Sigmoid}} \\
+        1 & 0.763 & Account Director (Houston, TX)            & 0.921 \\
+        2 & 0.763 & Senior Tax Analyst (Houston, TX)          & 0.953 \\
+        3 & 0.762 & CPA with Big 4 Experience (Houston, TX)   & 0.950 \\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -1149,32 +1141,31 @@ recommendation quality.
 \begin{table}[H]
     \centering
     \caption{Top-3 recommendations for User~831532 across all universes.
-    $\dagger$~Indicates a job the user actually applied to in Window~7.
-    Apps is the number of applications the job had received at ranking time.}
+    $\dagger$~Indicates a job the user actually applied to in Window~7.}
     \label{tab:sanity_831532}
-    \begin{tabular}{@{}clp{5.5cm}rrr@{}}
+    \begin{tabular}{@{}clp{6.5cm}r@{}}
         \toprule
-        \textbf{Rank} & \textbf{New Prob} & \textbf{Job Title (City, State)} & \textbf{Orig Prob} & \textbf{Apps} \\
+        \textbf{Rank} & \textbf{New Prob} & \textbf{Job Title (City, State)} & \textbf{Orig Prob} \\
         \midrule
-        \multicolumn{5}{l}{\textit{Free Market}} \\
-        1 & 0.728 & Customer Service Representative (Broomall, PA) & 0.985 & 709 \\
-        2 & 0.728 & Nanny / Childcare / Teacher (Madison, NJ)      & 0.983 &  89 \\
-        3 & 0.727 & Concierge / Receptionist (Madison, NJ)         & 0.981 & 206 \\
+        \multicolumn{4}{l}{\textit{Free Market}} \\
+        1 & 0.728 & Customer Service Representative (Broomall, PA)                     & 0.985 \\
+        2 & 0.728 & Nanny / Childcare / Teacher (Madison, NJ)                          & 0.983 \\
+        3 & 0.727 & Concierge / Receptionist (Madison, NJ)                             & 0.981 \\
         \midrule
-        \multicolumn{5}{l}{\textit{Market Maker Linear}} \\
-        1 & 0.729 & Loss Prevention Openings (Middletown, NJ)          & 0.742 & 1 \\
-        2 & 0.727 & Central Sterile Supply Technician (Hamilton, NJ)   & 0.856 & 2 \\
-        3 & 0.727 & Loss Prevention Openings (Lawrenceville, NJ)       & 0.729 & 1 \\
+        \multicolumn{4}{l}{\textit{Market Maker Linear}} \\
+        1 & 0.729 & Loss Prevention Openings (Middletown, NJ)                          & 0.742 \\
+        2 & 0.727 & Central Sterile Supply Technician (Hamilton, NJ)                   & 0.856 \\
+        3 & 0.727 & Loss Prevention Openings (Lawrenceville, NJ)                       & 0.729 \\
         \midrule
-        \multicolumn{5}{l}{\textit{Market Maker Quadratic}} \\
-        1 & 0.729 & Loss Prevention Openings (Middletown, NJ)          & 0.742 &  1 \\
-        2 & 0.727 & Store Management (Christiana, DE)                  & 0.979 & 21 \\
-        3 & 0.727 & Nanny / Childcare / Teacher (Madison, NJ)          & 0.983 & 25 \\
+        \multicolumn{4}{l}{\textit{Market Maker Quadratic}} \\
+        1 & 0.729 & Loss Prevention Openings (Middletown, NJ)                          & 0.742 \\
+        2 & 0.727 & Store Management (Christiana, DE)                                  & 0.979 \\
+        3 & 0.727 & Nanny / Childcare / Teacher (Madison, NJ)                          & 0.983 \\
         \midrule
-        \multicolumn{5}{l}{\textit{Market Maker Sigmoid}} \\
-        1 & 0.733 & Pharmacy Technician (West Deptford, NJ)            & 0.795 & 2 \\
-        2 & 0.730 & Certified Home Health Aides (Linwood, NJ)          & 0.779 & 2 \\
-        3 & 0.729 & Loss Prevention Openings (Middletown, NJ)          & 0.742 & 1 \\
+        \multicolumn{4}{l}{\textit{Market Maker Sigmoid}} \\
+        1 & 0.733 & Pharmacy Technician (West Deptford, NJ)                            & 0.795 \\
+        2 & 0.730 & Certified Home Health Aides (Linwood, NJ)                          & 0.779 \\
+        3 & 0.729 & Loss Prevention Openings (Middletown, NJ)                          & 0.742 \\
         \bottomrule
     \end{tabular}
 \end{table}
