@@ -69,36 +69,33 @@ reduced without sacrificing recommendation quality.
 \section{Recruiter-Side Recommender}
 
 The most fundamental limitation of the recruiter-side component is that the model learns to
-replicate the judgments of a large language model, not the decisions of actual human
+replicate the judgments of a \gls{LLM}, not the decisions of actual human
 recruiters. LLM-generated labels are a proxy for ground truth: the labeler may carry biases
-inherited from its pretraining data, and despite the structured Chain-of-Thought prompt,
+inherited from its pretraining data, and despite the structured \gls{CoT} prompt, the model
 may apply inconsistent implicit thresholds across independent calls. This is a documented
-concern in LLM-as-judge settings more broadly~\cite{iso2025llmbias}, with research
+concern in LLM-as-judge settings more broadly, with research
 specifically in recruitment contexts showing that implicit biases around educational
-background remain significant even in recent models~\cite{iso2025llmbias}. Any downstream
-behaviour of the recruiter-side model inherits these biases. Access to real recruiter
-feedback --- shortlisting decisions, interview invitations, or hiring outcomes --- would
-remove this layer of indirection entirely and allow the model to learn from ground truth
-rather than a simulation of it.
+background remain significant even in recent models~\cite{iso2025evaluatingbiasllmsjobresume}. Access to real recruiter
+feedback would remove this layer of indirection entirely and allow the model to learn from ground truth rather than a simulation of it.
 
 A second limitation concerns the small size of the labelled dataset. With fewer than 6,000
-candidate--job pairs, the XGBoost classifier is trained on a narrow slice of the full
-diversity of candidate--job combinations present in the CareerBuilder dataset. Performance on
-unusual or underrepresented job categories is difficult to assess, and the model may not
-generalise to patterns outside what it has seen. The bottleneck here is the computational
+candidate--job pairs, the XGBoost classifier is trained on a small subset of the full
+diversity of candidate--job combinations present in the CareerBuilder dataset. Performance on unusual or underrepresented job categories is therefore difficult to
+assess, and the model may not generalise well to posting styles or candidate profiles
+not covered by the labelled sample. The bottleneck here is the computational
 cost of LLM-based labelling at scale. Future work could address this through faster
 inference, batched prompt optimisation, or by distilling the LLM's judgments into a smaller,
 faster labelling model that can be run over a substantially larger sample.
 
-A third limitation is that several heuristic features rely on brittle regex extraction. Both
-the experience delta $\delta_{\text{exp}}$ and the degree match feature are derived by
+A third limitation is that several heuristic features rely on regex extraction. Both
+the experience delta and the degree match feature are derived by
 parsing free-text job postings with hand-crafted patterns. When a posting does not follow a
 standard format, the regex fails silently: the experience delta defaults to zero and degree
 requirements go undetected. This means the features are informative only when the posting is
-well-structured, and they carry no signal otherwise. A future direction would be to replace
-regex extraction with a structured information extraction model fine-tuned on job postings,
-which would be more robust to formatting variation and could recover requirements from a
-broader range of posting styles.
+well-structured, and they carry no signal otherwise. A future direction would be to replace regex extraction with a structured
+information extraction model --- either a fine-tuned transformer or a zero-shot
+LLM prompting approach --- which would be more robust to formatting variation and
+would recover requirements from a broader range of posting styles.
 
 Fourth, the four-level LLM fit judgments --- \textit{Very Good Fit}, \textit{Good Fit},
 \textit{Poor Fit}, \textit{Very Poor Fit} --- are collapsed to binary labels before
@@ -106,14 +103,18 @@ training. This discards a meaningful distinction: a borderline \textit{Good Fit}
 \textit{Very Good Fit} are treated identically as positives, and the model has no signal to
 distinguish between them. Training directly on the ordinal fit levels using a ranking or
 ordinal regression objective would preserve this gradient and give the model a richer
-supervisory signal, potentially producing better-calibrated suitability scores at inference
+supervisory signal \cite{wang2025surveyordinalregressionapplications}, potentially producing better-calibrated suitability scores at inference
 time.
 
-Finally, the semantic similarity features used by the recruiter-side model are derived from
-Qwen3 embeddings that were optimised for application prediction in the user-side two-tower
-system --- not for recruiter-side suitability assessment. These are different tasks: the
-former captures what a job seeker is likely to apply to, while the latter captures whether a
-recruiter would consider a candidate qualified. Retraining or fine-tuning the text encoder
-specifically on recruiter-labelled pairs, rather than borrowing embeddings from the
-application-prediction task, could better align the semantic representation with the
-suitability notion the recruiter-side model is trying to learn.
+Finally, the semantic similarity features rely on cosine similarity between general-purpose
+Qwen3 text embeddings of job titles. These embeddings capture broad semantic proximity ---
+they know that \textit{software engineer} and \textit{backend developer} are conceptually
+close --- but they have no notion of recruitment-specific compatibility. A recruiter
+assessing suitability reasons about seniority gaps, domain transitions, and
+overqualification: two titles can be semantically similar while representing incompatible
+experience levels, or semantically distant while actually constituting a strong recruiter
+match. The cosine similarity feature therefore measures the wrong thing at a fine-grained
+level, and the model can only compensate for this through the other features in the vector.
+A future direction would be to fine-tune the text encoder on recruiter-labelled
+candidate--job pairs, so that proximity in the embedding space reflects qualification
+judgments rather than general language similarity.
