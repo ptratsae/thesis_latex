@@ -1,4 +1,7 @@
-\chapter{Limitations and Future Work}
+%This chapter explains what the next steps are to continue the research and innovation of your master's thesis. Are there any additional features of research directions that are interesting? Are there ways in which your solution can be improved?
+\chapter*{Future Work}
+\chaptermark{Future Work}
+\addcontentsline{toc}{chapter}{Future Work}  
 \label{ch:future-work}
 
 While the proposed framework produces strong quantitative results and qualitatively sensible behaviour,
@@ -7,74 +10,110 @@ together with the most natural directions for future work.
 
 \section{User-Side Recommender}
 
-The Two-Tower model is a strong baseline, but every aspect of its design --- the feature set, the
-network architecture, the training objective, and the hyperparameters --- represents a starting point
-rather than an optimised endpoint. More expressive architectures such as those with cross-attention or
-hierarchical interaction layers could capture richer user--job relationships. The feature engineering
-pipeline could be extended with additional signals, such as industry sector, contract type, or salary
-range, and the negative sampling strategy could be made adaptive rather than fixed. In short, the
-model provides a solid foundation, but substantial headroom for improvement remains across all of its
-components.
+The Two-Tower model operates on implicit feedback: application events are treated as binary
+positive signals, equating \emph{applied to} with \emph{good fit}. This assumption is a known
+limitation of interaction-log-based training~\cite{yin2026correctweightsimpleeffective}. A
+user may apply speculatively to positions for which they are underqualified, or conversely
+fail to apply to a highly relevant job due to limited visibility. This label noise is
+structural rather than incidental, and any model trained on application logs inherits it. A
+natural direction for future work would be to incorporate downstream hiring signals ---
+interview invitations, shortlisting decisions, or hiring outcomes --- to replace the current
+binary scheme with graded relevance labels, aligning the training objective more closely with
+the platform's actual goal of facilitating successful matches.
+
+A second direction concerns the training objective itself. The model is optimised with
+Binary Cross-Entropy loss, which treats each example independently and does not directly
+optimise for ranking quality. The deployment task, however, is a ranking problem: what
+matters is whether the most relevant jobs appear at the top of the list, not whether each
+pair is classified correctly in isolation. Replacing BCE with a ranking-aware objective such
+as Bayesian Personalised Ranking~\cite{rendle2012bprbayesianpersonalizedranking} would
+align training more directly with the evaluation metrics and could improve top-$K$
+performance without any architectural change.
+
+The negative sampling strategy offers a third avenue for improvement. Negatives are
+constructed once at dataset creation time using a fixed mixture of geographically proximal
+and distant jobs, and this set remains unchanged throughout training. Early in training, when
+the model is still a poor discriminator, these negatives are genuinely challenging. As the
+model improves, however, the same examples become trivially easy to reject, providing
+diminishing learning signal. A dynamic strategy --- where negatives are refreshed during
+training by selecting jobs the model currently scores as nearly relevant but that are
+in fact incorrect --- would maintain a consistent level of difficulty throughout and force the
+model to refine its representations beyond what a fixed negative set allows \cite{10.1145/2484028.2484126}.
+
+At the architectural level, the two towers process their respective inputs in complete
+isolation: the user tower reads the user profile and produces a single vector; the job tower
+does the same for the job. The only moment the two representations interact is the final dot
+product, which reduces compatibility to a single geometric similarity score. This means the
+model cannot capture conditional relationships between features --- for instance, that
+geographic proximity matters more for junior roles than for senior ones, or that a specific
+skill in the user profile is only relevant given a particular job category. A recruiter
+reading a CV alongside a job description naturally reasons across both simultaneously; the
+two-tower design structurally prevents this. Introducing cross-interactions between the two
+sides during encoding, as proposed by~\cite{su2023twotowermatchinglearningsparse}, could capture these
+dependencies and improve matching precision, though at the cost of the caching efficiency
+that makes the current design practical at scale.
+
+Finally, the popularity bias present in the historical application log is reflected in the
+training data: jobs that attracted many applications are well-represented in positive pairs
+and tend to produce large, well-separated embeddings, while rarely-applied-to jobs are
+underrepresented. The congestion correction described in
+Chapter~\ref{chap:congestion_balancing} addresses this post-hoc via score adjustments at
+inference time, but the underlying embedding space remains skewed toward popular jobs. A
+more principled direction for future work would be to incorporate the congestion objective
+directly into the training procedure, so that the model learns to produce fairer
+representations from the start rather than correcting for bias downstream. The work of
+\cite{mashayekhi2023reconreducingcongestionjob} demonstrates this in-processing paradigm by combining an optimal transport component with a
+job recommendation model in a joint optimisation problem, showing that congestion can be
+reduced without sacrificing recommendation quality.
 
 \section{Recruiter-Side Recommender}
 
-The recruiter-side component carries three limitations that are more fundamental in nature.
+The most fundamental limitation of the recruiter-side component is that the model learns to
+replicate the judgments of a large language model, not the decisions of actual human
+recruiters. LLM-generated labels are a proxy for ground truth: the labeler may carry biases
+inherited from its pretraining data, and despite the structured Chain-of-Thought prompt,
+may apply inconsistent implicit thresholds across independent calls. This is a documented
+concern in LLM-as-judge settings more broadly~\cite{iso2025llmbias}, with research
+specifically in recruitment contexts showing that implicit biases around educational
+background remain significant even in recent models~\cite{iso2025llmbias}. Any downstream
+behaviour of the recruiter-side model inherits these biases. Access to real recruiter
+feedback --- shortlisting decisions, interview invitations, or hiring outcomes --- would
+remove this layer of indirection entirely and allow the model to learn from ground truth
+rather than a simulation of it.
 
-\paragraph{LLM labels as a proxy for ground truth.}
-The model is trained to replicate the judgments of a large language model acting as a synthetic
-recruiter, not the decisions of actual human recruiters. LLM-generated labels are a proxy: they may
-reflect biases present in the model's training data, apply inconsistent implicit standards despite
-the structured Chain-of-Thought prompt, and fail to capture the contextual and interpersonal factors
-that influence real hiring decisions. Any downstream behaviour of the recruiter-side model therefore
-inherits these limitations. Access to real recruiter feedback --- shortlisting decisions, interview
-invitations, or hiring outcomes --- would be a transformative improvement and would allow the model
-to learn from ground truth rather than a simulation of it.
+A second limitation concerns the small size of the labelled dataset. With fewer than 6,000
+candidate--job pairs, the XGBoost classifier is trained on a narrow slice of the full
+diversity of candidate--job combinations present in the CareerBuilder dataset. Performance on
+unusual or underrepresented job categories is difficult to assess, and the model may not
+generalise to patterns outside what it has seen. The bottleneck here is the computational
+cost of LLM-based labelling at scale. Future work could address this through faster
+inference, batched prompt optimisation, or by distilling the LLM's judgments into a smaller,
+faster labelling model that can be run over a substantially larger sample.
 
-\paragraph{Small training set.}
-The labelled dataset contains only 5{,}896 candidate--job pairs, a direct consequence of the
-computational cost of LLM-based labelling at scale. This limits the model's capacity and
-generalisability: the XGBoost classifier may not capture the full diversity of candidate--job
-combinations present in the broader CareerBuilder dataset, and performance on unusual or
-underrepresented job categories is difficult to assess. Scaling up the labelling pipeline ---
-through faster inference, batch optimisation, or distillation into a smaller labelling model ---
-would allow a substantially larger and more representative training set to be constructed.
+A third limitation is that several heuristic features rely on brittle regex extraction. Both
+the experience delta $\delta_{\text{exp}}$ and the degree match feature are derived by
+parsing free-text job postings with hand-crafted patterns. When a posting does not follow a
+standard format, the regex fails silently: the experience delta defaults to zero and degree
+requirements go undetected. This means the features are informative only when the posting is
+well-structured, and they carry no signal otherwise. A future direction would be to replace
+regex extraction with a structured information extraction model fine-tuned on job postings,
+which would be more robust to formatting variation and could recover requirements from a
+broader range of posting styles.
 
-\paragraph{Prompt and feature engineering.}
-The Chain-of-Thought prompt used to generate labels was developed iteratively but remains a
-hand-crafted artefact. A more systematic prompt optimisation process, or the use of few-shot
-examples drawn from validated recruiter judgments, could improve label quality and consistency.
-Similarly, the feature engineering pipeline for the recruiter-side model, while carefully motivated,
-does not exhaust the space of useful signals. Richer semantic representations, structured extraction
-of job requirements, or features derived from the candidate's full application history rather than
-only their most recent titles could all improve the model's discriminative power.
+Fourth, the four-level LLM fit judgments --- \textit{Very Good Fit}, \textit{Good Fit},
+\textit{Poor Fit}, \textit{Very Poor Fit} --- are collapsed to binary labels before
+training. This discards a meaningful distinction: a borderline \textit{Good Fit} and a
+\textit{Very Good Fit} are treated identically as positives, and the model has no signal to
+distinguish between them. Training directly on the ordinal fit levels using a ranking or
+ordinal regression objective would preserve this gradient and give the model a richer
+supervisory signal, potentially producing better-calibrated suitability scores at inference
+time.
 
-\section{Congestion Balancing Framework}
-
-\paragraph{Sequential rather than joint optimisation.}
-The hybrid framework operates as a two-phase sequential pipeline: Phase~1 determines which jobs
-users apply to, and Phase~2 re-ranks candidates within the resulting inboxes. The two phases are
-independent --- they do not communicate during execution and are not jointly optimised. As a
-consequence, any distributional biases introduced by Phase~1 are silently inherited by Phase~2
-with no corrective mechanism. A joint optimisation formulation --- for example, one that explicitly
-models the downstream shortlisting distribution when generating recommendations in Phase~1 --- could
-reduce this coupling and potentially achieve better market equilibrium with smaller individual
-quality costs.
-
-\paragraph{Dilution of the job-side penalty.}
-The job congestion penalty in Phase~1 acts only on the Two-Tower component of the combined score,
-which carries weight $\alpha = 0.5$. The recruiter probability term is congestion-unaware and pulls
-the combined score in the opposite direction, effectively halving the penalty's redistribution power
-relative to the standalone job-side experiment. The weighting parameter $\alpha$ therefore controls
-a fundamental trade-off between match quality and congestion reduction, and its optimal value is
-likely task- and dataset-dependent. Future work could explore adaptive or learned values of $\alpha$,
-or redesign the scoring function so that the congestion correction acts on the combined score directly
-rather than on one of its components in isolation.
-
-\section{Evaluation}
-
-The entire framework is evaluated through counterfactual simulation on historical application logs
-rather than in a live deployment. This means that behavioural feedback loops --- users adjusting
-their application behaviour in response to changed recommendations, or recruiters updating their
-screening criteria as candidate distributions shift --- are not captured. Real-world deployment would
-almost certainly produce effects not visible in the simulation, and a live A/B test or field
-experiment would be necessary to validate the framework's impact on actual labour market outcomes.
+Finally, the semantic similarity features used by the recruiter-side model are derived from
+Qwen3 embeddings that were optimised for application prediction in the user-side two-tower
+system --- not for recruiter-side suitability assessment. These are different tasks: the
+former captures what a job seeker is likely to apply to, while the latter captures whether a
+recruiter would consider a candidate qualified. Retraining or fine-tuning the text encoder
+specifically on recruiter-labelled pairs, rather than borrowing embeddings from the
+application-prediction task, could better align the semantic representation with the
+suitability notion the recruiter-side model is trying to learn.
