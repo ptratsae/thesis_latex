@@ -118,3 +118,60 @@ level, and the model can only compensate for this through the other features in 
 A future direction would be to fine-tune the text encoder on recruiter-labelled
 candidate--job pairs, so that proximity in the embedding space reflects qualification
 judgments rather than general language similarity.
+
+\section{Congestion Balancing}
+
+The most immediate limitation of the market-maker framework is that all
+threshold and shape parameters --- $\tau_{\min}$, $\tau_{\max}$, $H$, $B$,
+$P$, and the market makers --- are set manually rather than
+optimised. The chapter is explicit that these are design choices, not tuned
+hyperparameters. In a real deployment, the optimal values depend on the scale
+of the job market, the application volume, and the platform's balance between
+relevance and distributional equity. A natural direction for future work would
+be to frame parameter selection as an optimisation problem with explicit
+objectives on both quality and fairness metrics, either via grid search,
+Bayesian optimisation, or a learned controller that adapts thresholds
+dynamically as market conditions change.
+
+A second limitation is the order dependence of the sequential simulation.
+Users and job inboxes are processed one by one, and the running counters
+$c_j^{(t)}$ and $v_u^{(t)}$ accumulate as the simulation progresses. This
+means early-processed users shape the penalty landscape seen by later-processed
+ones: a job that fills its safe zone early is penalised for all subsequent
+users, regardless of their fit. No principled ordering is used, so the results
+are implicitly a function of processing order. In a live system, this temporal
+dependence is unavoidable, but its effect on the final distribution --- and
+whether it systematically disadvantages certain user segments --- is not
+analysed. Future work could examine order-robust variants, for instance by
+processing users in randomised batches or by running the simulation multiple
+times with different orderings and reporting average behaviour.
+
+Third, Phase~1 of the hybrid strategy simulates the application pool by taking
+each user's top-$k$ jobs by combined score, where $k$ matches their historical
+application count. This conflates \emph{recommended} with \emph{applied to}: in
+practice, users apply selectively based on information beyond what the model
+captures, and not every high-scoring recommendation translates into an
+application. The simulated inboxes entering Phase~2 are therefore cleaner and
+more model-aligned than real inboxes would be, which likely leads to an
+optimistic estimate of the candidate-side congestion reduction achievable in
+production.
+
+Fourth, the weighting parameter $\alpha = 0.5$ in the bilateral scoring
+formula (Equation~\ref{eq:combined_score}) is fixed for simplicity, giving
+equal weight to the user-side and recruiter-side signals. This is an arbitrary
+choice. The optimal choice for $\alpha$ depends on which model would be considered most important. If the user preference is considered more important the weight for the Two-Tower model would be greater than 0.5 and vice versa for the suitability. Also in settings where one model is substantially more reliable than
+the other, equal weighting would be suboptimal. A learned or cross-validated
+$\alpha$ would be a straightforward improvement, and examining the sensitivity
+of congestion and quality metrics to its value would clarify how robust the
+current results are to this design choice.
+
+Finally, the hard cap $H$ removes any entity from consideration entirely once
+it exceeds a fixed count. For jobs, this means a posting that has received
+$H^{\text{job}}$ applications will not appear in any subsequent user's
+recommendations, even for users for whom it is the best available match and
+for whom no comparable alternative exists. The issue is that it 
+prioritises an equal distribution unconditionally over individual relevance.
+A softer alternative --- such as capping the penalty at a large but finite
+value, or conditioning the hard cap on whether a suitable substitute exists
+in the user's ranking --- would allow the framework to respect equity without
+entirely eliminating relevant options for users in sparse job markets.
