@@ -1,5 +1,5 @@
 \begin{appendices}
-\section{Full Ablation Study Results}
+\section*{Full Ablation Study Results}
 \label{app:ablation_full}
 \addcontentsline{toc}{section}{Full Ablation Study Results}
 
@@ -10,58 +10,41 @@ Table~\ref{app:tab:full_ablation} reports the complete set of metrics for all fo
     \small
     \caption{Full ablation results across all metrics at best validation checkpoint.}
     \label{app:tab:full_ablation}
-    \begin{tabular}{llccccc}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{llrrrrrrrrrrrrrrrr}
         \toprule
-        \textbf{Location} & \textbf{L2} & \textbf{Val Loss} & \textbf{Acc.} & \textbf{AUC} & \textbf{Epochs} \\
+        & & \multicolumn{4}{c}{\textbf{Classification}} & \multicolumn{4}{c}{\textbf{Hit@K}} & \multicolumn{4}{c}{\textbf{Recall@K}} & \multicolumn{4}{c}{\textbf{NDCG@K}} \\
+        \cmidrule(lr){3-6} \cmidrule(lr){7-10} \cmidrule(lr){11-14} \cmidrule(lr){15-18}
+        \textbf{Location} & \textbf{L2} & \textbf{Val Loss} & \textbf{Acc.} & \textbf{AUC} & \textbf{Epochs}
+            & \textbf{Hit@1} & \textbf{Hit@3} & \textbf{Hit@5} & \textbf{Hit@10}
+            & \textbf{Recall@1} & \textbf{Recall@3} & \textbf{Recall@5} & \textbf{Recall@10}
+            & \textbf{NDCG@1} & \textbf{NDCG@3} & \textbf{NDCG@5} & \textbf{NDCG@10} \\
         \midrule
-        Included & No  & 0.2706 & 88.90\% & \textbf{0.9242} & 19 \\
-        Excluded & No  & 0.3463 & 84.92\% & 0.8641 &  9 \\
-        Included & Yes & 0.4852 & 82.15\% & 0.7331 &  8 \\
-        Excluded & Yes & 0.4892 & 81.73\% & 0.7426 &  4 \\
+        Included & No  & 0.2706 & 88.90\% & \textbf{0.9242} & 19
+            & \textbf{0.8202} & \textbf{0.9740} & \textbf{0.9922} & \textbf{0.9979}
+            & \textbf{0.4193} & \textbf{0.7213} & \textbf{0.8291} & \textbf{0.9239}
+            & \textbf{0.8202} & \textbf{0.8525} & \textbf{0.8684} & \textbf{0.8871} \\
+
+        Excluded & No  & 0.3463 & 84.92\% & 0.8641 & 9
+            & 0.7144 & 0.9444 & 0.9879 & 0.9987
+            & 0.3678 & 0.6594 & 0.7806 & 0.8933
+            & 0.7144 & 0.7561 & 0.7838 & 0.8145 \\
+
+        Included & Yes & 0.4852 & 82.15\% & 0.7331 & 8
+            & 0.4848 & 0.8007 & 0.9404 & 0.9916
+            & 0.2359 & 0.5105 & 0.6823 & 0.8339
+            & 0.4848 & 0.5617 & 0.6186 & 0.6693 \\
+
+        Excluded & Yes & 0.4892 & 81.73\% & 0.7426 & 4
+            & 0.4995 & 0.8270 & 0.9489 & 0.9935
+            & 0.2479 & 0.5339 & 0.6943 & 0.8427
+            & 0.4995 & 0.5784 & 0.6315 & 0.6824 \\
         \bottomrule
-    \end{tabular}
-
-    \vspace{1em}
-
-    \begin{tabular}{llcccccc}
-        \toprule
-        \textbf{Location} & \textbf{L2} & \textbf{Hit@1} & \textbf{Hit@3} & \textbf{Hit@5} & \textbf{Hit@10} \\
-        \midrule
-        Included & No  & \textbf{0.8202} & \textbf{0.9740} & \textbf{0.9922} & \textbf{0.9979} \\
-        Excluded & No  & 0.7144 & 0.9444 & 0.9879 & 0.9987 \\
-        Included & Yes & 0.4848 & 0.8007 & 0.9404 & 0.9916 \\
-        Excluded & Yes & 0.4995 & 0.8270 & 0.9489 & 0.9935 \\
-        \bottomrule
-    \end{tabular}
-
-    \vspace{1em}
-
-    \begin{tabular}{llcccccc}
-        \toprule
-        \textbf{Location} & \textbf{L2} & \textbf{Recall@1} & \textbf{Recall@3} & \textbf{Recall@5} & \textbf{Recall@10} \\
-        \midrule
-        Included & No  & \textbf{0.4193} & \textbf{0.7213} & \textbf{0.8291} & \textbf{0.9239} \\
-        Excluded & No  & 0.3678 & 0.6594 & 0.7806 & 0.8933 \\
-        Included & Yes & 0.2359 & 0.5105 & 0.6823 & 0.8339 \\
-        Excluded & Yes & 0.2479 & 0.5339 & 0.6943 & 0.8427 \\
-        \bottomrule
-    \end{tabular}
-
-    \vspace{1em}
-
-    \begin{tabular}{llcccccc}
-        \toprule
-        \textbf{Location} & \textbf{L2} & \textbf{NDCG@1} & \textbf{NDCG@3} & \textbf{NDCG@5} & \textbf{NDCG@10} \\
-        \midrule
-        Included & No  & \textbf{0.8202} & \textbf{0.8525} & \textbf{0.8684} & \textbf{0.8871} \\
-        Excluded & No  & 0.7144 & 0.7561 & 0.7838 & 0.8145 \\
-        Included & Yes & 0.4848 & 0.5617 & 0.6186 & 0.6693 \\
-        Excluded & Yes & 0.4995 & 0.5784 & 0.6315 & 0.6824 \\
-        \bottomrule
-    \end{tabular}
+    \end{tabular}}
 \end{table}
 
-\section{Feature Importance}
+\newpage
+\section*{Feature Importance}
 \label{app:exp_recruiter_feature_importance}
 \addcontentsline{toc}{section}{Feature Importance}
 
@@ -101,7 +84,8 @@ Among the scalar features, the pattern differs by model family. In Logistic Regr
         \bottomrule
     \end{tabular}
 \end{table}
-\section{Market-Maker Qualitative Sanity Check — Full Recommendation Tables}
+\newpage
+\section*{Market-Maker Qualitative Sanity Check — Full Recommendation Tables}
 \label{app:sanity_check_full}
 \addcontentsline{toc}{section}{Market-Maker Qualitative Sanity Check — Full
 Recommendation Tables}
@@ -306,6 +290,133 @@ modification.
         \bottomrule
     \end{tabular}
 \end{table}
+\newpage
+\section*{Hybrid Congestion Ablation}
+\addcontentsline{toc}{section}{Hybrid Congestion Ablation}
+\label{app:hybrid_ablation}
+
+This appendix reports the full four-universe ablation for the hybrid balancing
+experiment introduced in Section~\ref{sec:exp_hybrid_results}. The two
+intermediate universes --- job-side sigmoid only (Universe~2) and candidate-side
+sigmoid only (Universe~3) --- isolate the contribution of each penalty
+independently and provide the mechanistic explanation for why the full dual-sided
+system (Universe~4) behaves as it does.
+
+Tables~\ref{tab:app_hybrid_job} and~\ref{tab:app_hybrid_candidate} extend
+Tables~\ref{tab:hybrid_job} and~\ref{tab:hybrid_candidate} with all four
+universes. A structural property is immediately visible in
+Table~\ref{tab:app_hybrid_job}: Universes~1 and~3 are identical on the job side,
+as are Universes~2 and~4. This is by design --- the candidate-side penalty
+operates exclusively in Phase~2 and has no influence on which jobs users apply
+to in Phase~1. Consequently, any configuration that shares the same job-side
+strategy (penalty active or not) will produce the same job distribution,
+regardless of what happens in Phase~2. All four universes differ on the candidate
+side (Table~\ref{tab:app_hybrid_candidate}), since both the job-side penalty
+(through its indirect effect on inbox composition) and the candidate-side penalty
+(through direct re-ranking suppression) independently shape the shortlist
+distribution.
+
+
+% ------------------------------------------------------------------
+% TABLE: Full job-side congestion
+% ------------------------------------------------------------------
+\begin{table}[htbp]
+    \centering
+    \caption{Full hybrid ablation --- job-side congestion on Window~7 across
+    all four universes. Historical Reality is shown for distributional reference
+    only and uses organic self-selected applications.
+    $\bar{p}_\text{TT}$ and $\bar{p}_\text{rec}$ are the average Two-Tower and
+    recruiter probabilities over all applied (user, job) pairs.}
+    \label{tab:app_hybrid_job}
+    \small
+    \begin{tabular}{lccccc cc}
+        \toprule
+        \textbf{Universe} & \textbf{Gini} & \textbf{Starved} & \textbf{Safe}
+            & \textbf{Congested} & $\bar{p}_\text{TT}$ & $\bar{p}_\text{rec}$ \\
+        \midrule
+        Historical Reality$^\dagger$ & 0.8575 & 80.9\% & 15.8\% & 3.3\%
+            & --- & --- \\
+        \addlinespace
+        1: Bilateral (no penalties)  & 0.9182 & 85.6\% & 11.1\% & 3.4\%
+            & 0.8966 & 0.8405 \\
+        2: Job-side sigmoid          & 0.7130 & 63.3\% & 34.0\% & 2.7\%
+            & 0.8645 & 0.8106 \\
+        3: Candidate-side sigmoid    & 0.9182 & 85.6\% & 11.1\% & 3.4\%
+            & 0.8966 & 0.8405 \\
+        4: Both sigmoid              & 0.7130 & 63.3\% & 34.0\% & 2.7\%
+            & 0.8645 & 0.8106 \\
+        \bottomrule
+    \end{tabular}
+    \par\smallskip
+    \raggedright\small
+    $^\dagger$ Organic self-selected applications; shown as a distributional
+    reference, not as a direct comparison baseline for the hybrid universes.
+\end{table}
+
+
+% ------------------------------------------------------------------
+% TABLE: Full candidate-side congestion
+% ------------------------------------------------------------------
+\begin{table}[htbp]
+    \centering
+    \caption{Full hybrid ablation --- candidate-side congestion on Window~7
+    across all four universes. All four universes differ here, reflecting
+    the independent contribution of each penalty.}
+    \label{tab:app_hybrid_candidate}
+    \small
+    \begin{tabular}{lcccc}
+        \toprule
+        \textbf{Universe} & \textbf{Gini} & \textbf{Starved} & \textbf{Safe}
+            & \textbf{Congested} \\
+        \midrule
+        1: Bilateral (no penalties) & 0.6326 & 32.1\% & 61.1\% &  6.7\% \\
+        2: Job-side sigmoid         & 0.5253 &  6.4\% & 79.7\% & 13.9\% \\
+        3: Candidate-side sigmoid   & 0.5765 & 25.8\% & 68.4\% &  5.8\% \\
+        4: Both sigmoid             & 0.4967 &  3.4\% & 83.1\% & 13.5\% \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+
+\subsection*{Job-side penalty only (Universe~2)}
+
+Adding the job-side sigmoid penalty reduces the job Gini substantially from 0.9182
+to 0.7130 and grows the safe zone from 11.1\% to 34.0\%. However, this improvement
+is considerably smaller than in the standalone job-side experiment, where the same
+sigmoid penalty achieved a Gini of 0.5741. The gap is explained by the structure
+of the combined scoring function (Equation~\ref{eq:combined_score}): the job
+penalty $\delta_\text{job}$ acts only on the Two-Tower component, which carries
+weight $\alpha = 0.5$. The recruiter probability term is congestion-unaware and
+pulls the combined score in the opposite direction --- a user may still apply to
+a congested job if their recruiter score is high enough to outweigh the penalty.
+This dilution is a fundamental consequence of the bilateral design: the recruiter
+signal improves match quality but attenuates the market-maker's redistribution
+power. A higher $\alpha$ would strengthen the penalty at the cost of recruiter
+influence, representing a tunable trade-off left for future work.
+
+The candidate-side effect of the job penalty is pronounced: starved candidates
+drop from 32.1\% to 6.4\% and the candidate Gini falls from 0.6326 to 0.5253.
+This improvement is entirely indirect --- by redistributing applications more
+evenly across jobs, each job inbox contains a more diverse set of candidates,
+so recruiter attention naturally spreads. The trade-off is a rise in congested
+candidates from 6.7\% to 13.9\%: when the job penalty redirects applications
+toward previously empty jobs, those jobs now have small inboxes where all
+applicants are automatically shortlisted, including candidates already frequently
+shortlisted elsewhere.
+
+
+\subsection*{Candidate-side penalty only (Universe~3)}
+
+The candidate-side penalty applied without any job penalty produces a more modest
+improvement: the candidate Gini drops from 0.6326 to 0.5765 and starved candidates
+from 32.1\% to 25.8\%. The job-side distribution is unchanged from the bilateral
+baseline by design, and the match quality scores are equal for the same reason.
+The candidate-side improvement here is smaller than the job-side penalty's indirect
+effect on candidate congestion (Gini 0.5765 vs.\ 0.5253 in Universe~2), confirming
+that redistributing the application pool in Phase~1 is a more powerful lever for
+candidate equity than re-ranking within fixed inboxes in Phase~2.
+
+
 \end{appendices}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
