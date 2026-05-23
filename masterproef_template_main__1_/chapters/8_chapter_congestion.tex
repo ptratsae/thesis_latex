@@ -1,4 +1,4 @@
-\chapter{Market congestion and two-phase balancing}
+\chapter{Market Congestion and Two-Phase Balancing}
 \label{chap:congestion_balancing}
 
 Now that both the user-side recommender system
@@ -102,7 +102,7 @@ parameter values used in the experiments are reported in
 Section~\ref{sec:exp_congestion_setting} and the empirical results are presented in Section~\ref{sec:exp_job_congestion}.
 
 % ============================================================
-\section{Candidate-side market-maker intervention}
+\section{Candidate-Side Market-Maker Intervention}
 \label{sec:user_congestion}
 % ============================================================
 
@@ -131,7 +131,7 @@ parameter values used in the experiments are reported in
 Section~\ref{sec:exp_congestion_setting}. The empirical results are presented in Section~\ref{sec:exp_user_congestion}.
 
 % ============================================================
-\section{Dual-sided hybrid strategy}
+\section{Dual-sided Hybrid Strategy}
 \label{sec:hybrid_strategy}
 % ============================================================
 
@@ -189,10 +189,9 @@ should be independent of how many other users happen to be applying to the same 
 Each user applies to their top-$k$ jobs by $s_{uj}$, where $k$ matches their
 historical application count, preserving realistic application volumes.
 
-A notable property of Equation~\ref{eq:combined_score} is that it reduces job congestion even without an explicit penalty ($δjob=0\delta_{\text{job}} = 0
-δjob​=0$): for users with low recruiter suitability, the combined score is lower than the Two-Tower score alone, naturally promoting other jobs in their ranking. The empirical effect of this is examined in Section~\ref{sec:hybrid_bilateral_baseline}.
+A notable property of Equation~\ref{eq:combined_score} is that it reduces job congestion even without an explicit penalty ($\delta_{\text{job}} = 0$): for users with low recruiter suitability, the combined score is lower than the Two-Tower score alone, naturally promoting other jobs in their ranking. The empirical effect of this is examined in Section~\ref{sec:hybrid_bilateral_baseline}.
 
-\subsection{Phase 2: recruiter shortlisting with candidate-side correction}
+\subsection{Phase 2: Recruiter Shortlisting with Candidate-Side Correction}
 \label{sec:hybrid_user_congestion}
 
 Phase~2 takes the job inboxes produced by Phase~1 and answers a different
