@@ -1,18 +1,16 @@
 \chapter{Preliminaries}
 \label{chap:preliminaries}
 
-This chapter introduces the background knowledge, notation and evaluation metrics used throughout the thesis. The goal is to make the subsequent method chapters self-contained: a reader familiar with machine learning but not with recommender systems or two-sided markets should be able to follow the technical content without consulting external references.
+This chapter introduces the notations, background knowledge and evaluation metrics used throughout the thesis. The goal is to make the subsequent method chapters self-contained: a reader familiar with machine learning but not with recommender systems or two-sided markets should be able to follow the technical content without consulting external references.
 
 The chapter is organised as follows. Section~\ref{sec:prelim_notation} establishes notation. Section~\ref{sec:prelim_rs_background} covers concepts specific to recommender systems, including a taxonomy of filtering approaches and the two-sided market setting that motivates this work. Section~\ref{sec:prelim_ml_background} reviews the general machine learning techniques employed across the thesis. Section~\ref{sec:prelim_metrics} defines the evaluation metrics used in the experiments. Finally, Section~\ref{sec:prelim_related_work} situates this thesis within the broader literature on recommender systems, two-sided markets and congestion control.
 
 \section{Notation}
 \label{sec:prelim_notation}
-
-The following notation is used consistently across all chapters. Let $\mathcal{U}$ denote the set of all users (job seekers) and $\mathcal{J}$ denote the set of all jobs. An individual user is denoted $u \in \mathcal{U}$ and an individual job $j \in \mathcal{J}$. The set of jobs that user $u$ has applied to is written $\mathcal{J}^{+}_u \subseteq \mathcal{J}$. The set of jobs that the user $u$ didn't apply to are written as $\mathcal{J}^{-}_u \subseteq \mathcal{J}$ and defined as $\mathcal{J}^{-}_u = \mathcal{J} \setminus \mathcal{J}^{+}_u$.
-
-Each user $u$ is associated with a feature vector $\mathbf{x}_u \in \mathbb{R}^{d_u}$ and each job $j$ with a feature vector $\mathbf{x}_j \in \mathbb{R}^{d_j}$, where $d_u$ and $d_j$ are the respective input dimensionalities. A recommendation model maps these features to dense embedding vectors $\mathbf{e}_u \in \mathbb{R}^{d}$ and $\mathbf{e}_j \in \mathbb{R}^{d}$ in a shared $d$-dimensional space. The compatibility score between a user and a job is then a function $s : \mathbb{R}^d \times \mathbb{R}^d \rightarrow \mathbb{R}$, typically the dot product $s(\mathbf{e}_u, \mathbf{e}_j) = \mathbf{e}_u \cdot \mathbf{e}_j$.
-
-Table~\ref{tab:notation} summarises the key symbols used throughout.
+Table~\ref{tab:notation} summarises the key symbols used throughout. 
+Symbols specific to later chapters are listed here for completeness 
+and will be reintroduced with full context when first used; this 
+table serves as a reference index rather than a prerequisite for reading.
 
 \begin{table}[htbp]
     \centering
@@ -60,6 +58,12 @@ Table~\ref{tab:notation} summarises the key symbols used throughout.
         $\gamma_b,\, \gamma_p$ & Linear boost and penalty rates \\
         $\kappa_b,\, \kappa_p$ & Quadratic boost and penalty scaling parameters \\
         $k$ & Sigmoid steepness parameter \\
+        $\tau_{\min}^{\text{job}},\, \tau_{\max}^{\text{job}}$ & Job-side starved / congested thresholds (applications) \\
+        $\tau_{\min}^{\text{cand}},\, \tau_{\max}^{\text{cand}}$ & Candidate-side starved / congested thresholds (shortlists) \\
+        $H^{\text{job}}$ & Job-side hard cap (applications) \\
+        $H^{\text{cand}}$ & Candidate-side hard cap (shortlists) \\
+        $B^{\text{job}},\, P^{\text{job}}$ & Boost / penalty magnitudes for job-side market-maker \\
+        $B^{\text{cand}},\, P^{\text{cand}}$ & Boost / penalty magnitudes for candidate-side market-maker \\
         $\delta(\cdot)$ & Congestion modification function \\
         $s_{uj},\, \hat{s}_{uj}$ & Base and modified job-ranking score for $(u,j)$ \\
         $r_{uj},\, \hat{r}_{uj}$ & Base and modified recruiter score for $(u,j)$ \\
@@ -69,6 +73,8 @@ Table~\ref{tab:notation} summarises the key symbols used throughout.
         \bottomrule
     \end{tabular}
 \end{table}
+
+
 
 \section{Recommender Systems Background}
 \label{sec:prelim_rs_background}
@@ -80,11 +86,38 @@ This section introduces the concepts specific to recommender systems that underp
 
 A recommender system is a function that, given a user $u$, returns a ranked list of items from a catalogue, in this case jobs. The core challenge is predicting which items a user will find relevant before they have interacted with them. Three broad approaches exist in the literature.
 
-\textbf{Collaborative filtering} \cite{glauber2019collaborativefilteringvscontentbased} exploits the collective behaviour of all users: if two users have historically applied to similar jobs, they are likely to find similar future jobs relevant. Pure collaborative filtering does not require any item or user features --- only the interaction matrix --- but it suffers from the cold-start problem: new users or new items with no interaction history cannot be represented \cite{nadimi2014coldstartproblem}. 
+\textbf{Collaborative filtering} \cite{glauber2019collaborativefilteringvscontentbased} exploits the collective behaviour of all users: if two users like the same items, they are likely to have similar preferences. Pure collaborative filtering does not require any item or user features --- only the interaction matrix --- but it suffers from the cold-start problem: new users or new items with no interaction history cannot be represented \cite{nadimi2014coldstartproblem}. 
 
-\textbf{Content-based filtering} \cite{glauber2019collaborativefilteringvscontentbased} instead represents each user and item by their features and learns to match them directly. A new user can immediately receive recommendations based on their profile, bypassing the cold-start problem, but the system is limited to surface-level feature similarity and cannot discover preferences the user has not yet expressed.
+\textbf{Content-based filtering} \cite{glauber2019collaborativefilteringvscontentbased} instead represents each user and item by their features and learns to match them directly. A new user can immediately receive recommendations based on their profile, bypassing the cold-start problem, but the system is limited to recommending similar items to those the user has already interacted with, which can lead to a lack of diversity.
 
-\textbf{Hybrid systems} combine both signals, typically by learning a joint representation that incorporates both interaction history and feature information \cite{li2018hybridrecommendationmethodbased}. The two-tower neural architecture used in this thesis (Chapter~\ref{chap:user_recommendation}) is a state-of-the-art hybrid approach: it operates on user and job features, but the training objective is defined over observed application interactions.
+\textbf{Hybrid systems} combine both signals, typically by learning a joint representation that incorporates both interaction history and feature information \cite{li2018hybridrecommendationmethodbased}. The \gls{TT} neural architecture used in this thesis (Chapter~\ref{chap:user_recommendation}) is a state-of-the-art hybrid approach: it operates on user and job features, but the training objective is defined over observed application interactions.
+
+\subsection{Data Representations}
+\label{sec:prelim_representations}
+
+Representations are the feature encodings used as inputs to recommendation models. In this thesis we distinguish representation methods (how information is encoded) from model classes (the learning algorithms that consume those features). The main representation methods used are neural embeddings and classical TF‑IDF vectors; both are used throughout the experiments either alone or in combination.
+
+\subsubsection{Neural Embeddings}
+\label{sec:prelim_embeddings}
+
+A neural embedding is a learned mapping from a discrete or high-dimensional input to a dense, low-dimensional vector. Embeddings are the core representational tool used throughout this thesis. Two types appear:
+
+\textbf{Learnable embedding layers} are used for categorical features such as city or education level. Each unique category value is assigned a vector of dimension $d_{\text{cat}}$, and these vectors are updated during training by gradient descent. Unlike one-hot encodings, learned embeddings can capture semantic similarity: categories that behave similarly in the training data will converge to nearby vectors.
+
+\textbf{Pre-trained text embeddings} are used to encode natural language fields such as job titles, descriptions and work history. In this thesis, the Qwen3 Embedding model (0.6B parameters) is used to produce continuous vector representations of text. Further discussed in Chapter~\ref{chap:user_recommendation}.
+
+\subsubsection{TF-IDF Representations}
+\label{sec:prelim_tfidf}
+
+While neural embeddings capture semantic relationships through learned representations, a simpler and complementary approach is \textbf{Term Frequency–Inverse Document Frequency} (TF-IDF), a classical bag-of-words weighting scheme. Given a corpus of documents, the TF-IDF weight of a term $t$ in document $d$ is:
+
+\begin{equation}
+    \text{TF-IDF}(t, d) = \text{TF}(t, d) \cdot \log \frac{|\mathcal{D}|}{|\{d' \in \mathcal{D} : t \in d'\}|}
+\end{equation}
+
+where $\text{TF}(t, d)$ is the frequency of term $t$ in document $d$ and $|\mathcal{D}|$ is the total number of documents. Terms that appear often in a specific document but rarely across the corpus receive high weights, making them good discriminators.
+
+Each document is represented as a sparse vector of TF-IDF weights over the full vocabulary. The similarity between two such vectors is then measured using cosine similarity, which captures keyword-level overlap between two texts in a computationally efficient manner. TF-IDF requires no training and is fully interpretable, making it a useful complementary signal when explicit keyword matching is more informative than semantic proximity.
 
 \subsection{Two-Sided Markets and Congestion}
 \label{sec:prelim_twosided}
@@ -96,10 +129,10 @@ This constraint leads to \textbf{market congestion}. Formally, congestion occurs
 Two concrete manifestations of congestion are studied in this thesis:
 
 \begin{itemize}
-    \item \textbf{Job-side congestion}: a small number of jobs accumulate a disproportionate share of recommended applications. This is closely related to the popularity bias described in Section~\ref{sec:intro_motivation}.
-    \item \textbf{Candidate-side congestion}: a small fraction of candidates 
+    \item \textbf{Job congestion}: a small number of jobs accumulate a disproportionate share of recommended applications. This is closely related to the popularity bias described in Section~\ref{sec:intro_motivation}.
+    \item \textbf{Candidate congestion}: a small fraction of candidates 
     receive a disproportionate share of recruiter shortlisting events, while 
-    the majority are overlooked entirely. This mirrors job-side congestion but 
+    the majority are overlooked entirely. This mirrors job congestion but 
     operates on the recruiter's inbox rather than the job posting's application 
     pool.
 \end{itemize}
@@ -109,22 +142,13 @@ A key goal of this research is to propose strategies that reduce both forms of c
 \section{Machine Learning Background}
 \label{sec:prelim_ml_background}
 
-This section reviews the general machine learning techniques employed in this work: the representational tools used to encode user and item features, the lightweight models used for recruiter-side prediction, and the language model prompting strategy used to generate synthetic training labels.
-
-\subsection{Neural Embeddings}
-\label{sec:prelim_embeddings}
-
-A neural embedding is a learned mapping from a discrete or high-dimensional input to a dense, low-dimensional vector. Embeddings are the core representational tool used throughout this thesis. Two types appear:
-
-\textbf{Learnable embedding layers} are used for categorical features such as city or education level. Each unique category value is assigned a vector of dimension $d_{\text{cat}}$, and these vectors are updated during training by gradient descent. Unlike one-hot encodings, learned embeddings can capture semantic similarity: categories that behave similarly in the training data will converge to nearby vectors.
-
-\textbf{Pre-trained text embeddings} are used to encode natural language fields such as job titles, descriptions and work history. In this thesis, the Qwen3 Embedding model (0.6B parameters) is used to produce continuous vector representations of text. Further discussed in Chapter~\ref{chap:user_recommendation}.
+This section reviews the general machine learning techniques employed in this work: the representational tools used to encode user and item features, the lightweight algorithms used for recruiter-side prediction, and the language model prompting strategy used to generate synthetic training labels.
 
 \subsection{Lightweight Machine Learning Models}
 \label{sec:prelim_lightweight}
 
 
-In addition to the neural architecture used for user-side recommendation, this thesis also employs several lightweight machine learning models for the recruiter-side recommendation component. See Chapter~\ref{chap:recruiter_recommendation} for details. These models include:
+In addition to the neural architecture used for user-side recommendation, this thesis employs several lightweight machine learning algorithms trained on feature vectors composed of engineered signals, TF‑IDF vectors and precomputed neural text embeddings. See Chapter~\ref{chap:recruiter_recommendation} for details. These models include:
 \paragraph{Logistic Regression.} A linear model that estimates the 
 probability of a binary outcome via a weighted sum of input features. 
 It is interpretable and efficient, making it well-suited to the small 
@@ -145,18 +169,7 @@ predictions of multiple models (here: Logistic Regression, Random Forest
 and XGBoost) by majority voting, improving robustness and generalisation 
 by leveraging the strengths of each.
 
-\subsection{TF-IDF Representations}
-\label{sec:prelim_tfidf}
 
-While neural embeddings capture semantic relationships through learned representations, a simpler and complementary approach is \textbf{Term Frequency–Inverse Document Frequency} (TF-IDF), a classical bag-of-words weighting scheme. Given a corpus of documents, the TF-IDF weight of a term $t$ in document $d$ is:
-
-\begin{equation}
-    \text{TF-IDF}(t, d) = \text{TF}(t, d) \cdot \log \frac{|\mathcal{D}|}{|\{d' \in \mathcal{D} : t \in d'\}|}
-\end{equation}
-
-where $\text{TF}(t, d)$ is the frequency of term $t$ in document $d$ and $|\mathcal{D}|$ is the total number of documents. Terms that appear often in a specific document but rarely across the corpus receive high weights, making them good discriminators.
-
-Each document is represented as a sparse vector of TF-IDF weights over the full vocabulary. The similarity between two such vectors is then measured using cosine similarity, which captures keyword-level overlap between two texts in a computationally efficient manner. Unlike neural embeddings, TF-IDF requires no training and is fully interpretable, making it a useful complementary signal when explicit keyword matching is more informative than semantic proximity.
 
 \subsection{Large Language Models and Prompting}
 \label{sec:prelim_llm}
@@ -231,7 +244,7 @@ where IDCG@$K$ is the DCG of the ideal (perfectly ranked) list, used for normali
 
 An important caveat applies to all ranking metrics: their values depend heavily on the size of the candidate pool against which ranking is performed. Hit@$K$, Recall@$K$ and NDCG@$K$ computed against a small balanced validation set are considerably more optimistic than the same metrics computed against the full job pool at inference. This distinction is discussed further in Chapter~\ref{chap:experiments}, where the implications for interpreting training-time metrics are made explicit. AUC-ROC is less sensitive to this effect and is therefore used as the primary early stopping criterion.
 
-\subsection{Fairness Metrics}
+\subsection{Fairness Metric}
 \label{sec:prelim_fairness}
 
 Beyond relevance-based metrics, this thesis evaluates recommendation systems
@@ -254,25 +267,4 @@ count); a Gini of 1 represents complete concentration (one entity receives
 everything). In a perfectly fair job market, both the distribution of
 applications across jobs and the distribution of shortlisting events across
 candidates would have a Gini of 0.
-
-\subsection{Congestion Zones}
-\label{sec:prelim_zones}
-
-To complement the Gini coefficient with an interpretable categorical measure,
-entities (jobs or candidates) are partitioned into three zones based on their
-count relative to two thresholds $\tau_{\min}$ and $\tau_{\max}$:
-
-\begin{itemize}
-    \item \textbf{Starved}: count $< \tau_{\min}$ --- the entity receives
-    insufficient attention and risks being overlooked entirely.
-    \item \textbf{Safe}: $\tau_{\min} \leq$ count $\leq \tau_{\max}$ --- the
-    entity receives a healthy, manageable level of attention.
-    \item \textbf{Congested}: count $> \tau_{\max}$ --- the entity receives
-    more attention than it can reasonably handle, creating noise and
-    inefficiency.
-\end{itemize}
-
-The thresholds are set empirically from the data distribution. In Chapter~\ref{chap:congestion_control} the choice of thresholds is further discussed. 
-
-
 
