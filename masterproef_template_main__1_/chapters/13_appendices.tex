@@ -4,7 +4,6 @@
 \addcontentsline{toc}{section}{Full Ablation Study Results}
 
 Table~\ref{app:tab:full_ablation} reports the complete set of metrics for all four ablation configurations at their respective best validation checkpoints. Section~\ref{sec:exp_user_ablation} only reports  AUC for brevity; this table additionally includes all ranking metrics at $K \in \{1, 3, 5, 10\}$. As noted in Section~\ref{sec:exp_user_ablation}, all ranking metrics are computed against the balanced validation candidate pool and are therefore optimistic relative to full-scale inference.
-
 \begin{table}[htbp]
     \centering
     \small
@@ -45,20 +44,19 @@ Table~\ref{app:tab:full_ablation} reports the complete set of metrics for all fo
 \newpage
 \section*{LLM Labelling Prompt and Example Output}
 \label{app:llm_prompt}
-
+\addcontentsline{toc}{section}{LLM Labelling Prompt and Example Output}
 This appendix provides the full prompt used to generate recruiter-side
 suitability labels via the Qwen3.5~(35B) model, together with a
-representative example of the model's JSON output. The design rationale
-and observed failure modes are discussed in
+representative example of the model's JSON output. The design is discussed in
 Section~\ref{sec:exp_recruiter_datagen}.
 
 \subsection*{Prompt}
 
-{\small
+{\footnotesize
 \begin{verbatim}
 Task: You are an HR recruiter. Evaluate how well each person fits the
 job based on their profile and the job description.
-(IMPORTANT: Treat each job-user pair independently.)
+(Important: Treat each job-user pair independently.)
 
 Assign a fit level:
 - "Very Good Fit": Meets 100% of Must-Haves AND 50%+ of Nice-to-Haves
@@ -87,7 +85,7 @@ Candidate Profiles: {profiles_text}
 
 \subsection*{Example Output}
 
-The following shows a representative model response for a single
+The following shows a model response for a single
 candidate--job pair. The model states the extracted must-haves,
 nice-to-haves, and deal-breakers before assigning a fit level,
 ensuring the reasoning is traceable and the label is not assigned
@@ -99,13 +97,10 @@ without justification.
   "results": [
     {
       "candidate_id": 349089,
-      "must_haves": "Associates degree, 6mo experience/leadership,
-                     valid license, work authorisation",
-      "nice_to_haves": "Bachelors degree, sales/CS background",
+      "must_haves": "Associates degree, 6 months experience/leadership, valid license, work authorisation",
+      "nice_to_haves": "Bachelors degree, sales/CS  background",
       "deal_breakers": "None identified",
-      "reasoning": "Candidate profile shows degree and experience as
-                    empty. Job requires Associates degree and 6 months
-                    experience. Missing these core requirements.",
+      "reasoning": "Candidate profile shows degree and experience as empty. Job requires Associates degree and 6 months experience. Missing these core requirements.",
       "fit_level": "Poor Fit"
     }
   ]
@@ -121,20 +116,9 @@ without justification.
 \label{app:exp_recruiter_feature_importance}
 \addcontentsline{toc}{section}{Feature Importance}
 
-\paragraph{Interaction matrix PCA}
-The embedding interaction matrix $\mathbf{m}_{uj} \in \mathbb{R}^{2d_{\text{text}}}$ has 200 dimensions. \gls{PCA} is applied to reduce the interaction matrix to $d_{\text{pca}} = 80$ components, retaining 92.9\% of the total variance. This compression is justified on two grounds. First, the Hadamard product and absolute difference of the same pair of embeddings share significant covariance structure, meaning a large fraction of the 200 dimensions are redundant — a finding confirmed by the high variance retention at only 40\% of the original dimensionality. Second, reducing the feature space lowers the risk of XGBoost fitting to noise in the interaction dimensions, even with 5,896 training pairs.
-
-\paragraph{Feature importance analysis}
-Table~\ref{tab:recruiter_feature_importance} shows the normalised feature 
+Table~\ref{tab:recruiter_feature_importance} reports the normalised feature 
 importance for each of the three base classifiers on the last cross-validation 
-fold. The \gls{PCA} interaction components dominate across all models — 
-accounting for 69.2\%, 83.2\%, and 85.6\% of total importance in Logistic 
-Regression, Random Forest, and XGBoost respectively. This confirms that the 
-element-wise interaction between user and job Qwen embeddings captures the 
-majority of the discriminative signal, validating the design choice of computing 
-the full interaction matrix rather than relying solely on scalar cosine similarity.
-
-Among the scalar features, the pattern differs by model family. In Logistic Regression, the Qwen cosine similarity (12.6\%) is the second most important feature, suggesting the linear model benefits from the direct scalar similarity signal. In Random Forest and XGBoost, \texttt{tfidf\_overlap} ranks higher than cosine similarity, suggesting that tree-based models extract more value from explicit keyword matching once the dominant PCA signal is accounted for. \texttt{TotalYearsExperience} ranks consistently across all three models. Both \texttt{degree\_match} and \texttt{full\_profile\_cosine\_sim} contribute negligibly across all classifiers --- under 2.6\% in the best case, and zero in XGBoost --- indicating they are subsumed by the PCA interaction and TF-IDF features. Despite their low importance, both features are retained in the final model. XGBoost's built-in regularisation already suppresses low-importance features during training, so removing them would not meaningfully change performance. Retaining them also preserves consistency with the feature engineering pipeline described in Section~\ref{sec:recruiter_features} and avoids the need for a separate retraining run to confirm that the delta is negligible.
+fold. PCA interaction components are aggregated into a single row.
 
 \begin{table}[htbp]
     \centering
@@ -157,6 +141,8 @@ Among the scalar features, the pattern differs by model family. In Logistic Regr
         \bottomrule
     \end{tabular}
 \end{table}
+
+
 \newpage
 \section*{Market-Maker Qualitative Sanity Check — Full Recommendation Tables}
 \label{app:sanity_check_full}

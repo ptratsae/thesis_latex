@@ -69,9 +69,9 @@ where $e_u$ is the candidate's total years of experience and $e_j^{\text{req}}$ 
 
 This feature captures explicit keyword matches --- programming languages, domain terms, tool names --- that are often decisive in recruiter decisions but may not be captured by embedding-based similarity alone. It is used to complement the semantic features.
 
-\paragraph{Total years of experience.} The raw value $e_u$ is included alongside $\delta_{\text{exp}}$, since the experience delta is uninformative when no requirement is stated and an absolute experience level remains a useful stand-alone signal in those cases. This feature is part of the dataset, meaning no regex extraction is needed which makes it more reliable than the experience delta feature.
+\paragraph{Total years of experience.} The raw value $e_u$ is included alongside $\delta_{\text{exp}}$, since the experience delta is uninformative when no requirement is stated and an absolute experience level remains a useful stand-alone signal in those cases. This feature is part of the dataset, meaning no regex extraction is needed which makes it more reliable than the experience delta feature. If the feature is missing, it is equal to 0.
 
-\paragraph{Degree match.} This feature indicates whether the candidate's degree type matches any degree requirements stated in the job posting. The degree requirements are extracted using regex patterns. More specifically, if the user has the degree needed or a higher degree, the feature is set to 1. If the user has no degree but the job requires one, the feature is set to -1. If the user has a degree but the job does not require one, the feature is set to 0.5. If neither the user has a degree nor the job requires one, the feature is set to 0. This feature was added due to the fact that the \gls{LLM} labeler often considers degree requirements as a key criterion.
+\paragraph{Degree match.} This feature indicates whether the candidate's degree type matches any degree requirements stated in the job posting. The degree requirements are extracted using regex patterns. More specifically, if the user has the degree needed or a higher degree, the feature is set to 1. If the user has no degree but the job requires one, the feature is set to -1. If the user has a degree but the job does not require one, the feature is set to 0.5. If neither the user has a degree nor the job requires one, the feature is set to 0. 
 
 \paragraph{Experience freshness.} This feature captures the ratio of the candidate's experience to the years since graduation, which serves as a proxy for how recent and relevant the experience is:
 \begin{equation}
@@ -100,38 +100,54 @@ Table~\ref{tab:recruiter_heuristic_features} summarises the heuristic features u
 
 Semantic features are derived from the neural embeddings introduced in Chapter~\ref{chap:user_recommendation} and from an additional profile-level encoder.
 
-\paragraph{Qwen embedding cosine similarity.} Using the already computed Qwen3 embeddings from Chapter~\ref{chap:user_recommendation}, the cosine similarity between the $d_{\text{text}}$-dimensional embeddings of the candidate and job is computed directly:
+\paragraph{Cosine Similarity of Job Title and Job History.} Using the already computed Qwen3 embeddings from Chapter~\ref{chap:user_recommendation}, the cosine similarity between the $d_{\text{text}}$-dimensional embeddings of the candidate's job history and the job's title is computed directly:
 
 \begin{equation}
     \text{cosine\_sim} = \frac{\mathbf{e}_u \cdot \mathbf{e}_j}{\|\mathbf{e}_u\| \cdot \|\mathbf{e}_j\|}
 \end{equation}
 
-\paragraph{Interaction matrix via PCA.} To capture non-linear interactions between the two embeddings that a single cosine similarity score cannot express, an interaction matrix is constructed by concatenating the Hadamard product and the absolute element-wise difference:
+\paragraph{Interaction matrix via PCA.} To capture non-linear interactions 
+between the two embeddings that a single cosine similarity score cannot 
+express, an interaction matrix is constructed by concatenating the Hadamard 
+product and the absolute element-wise difference:
 
 \begin{equation}
-    \mathbf{m}_{uj} = \left[\mathbf{e}_u \odot \mathbf{e}_j \;\Big|\; |\mathbf{e}_u - \mathbf{e}_j|\right] \in \mathbb{R}^{2d_{\text{text}}}
+    \mathbf{m}_{uj} = \left[\mathbf{e}_u \odot \mathbf{e}_j \;\Big|\; 
+    |\mathbf{e}_u - \mathbf{e}_j|\right] \in \mathbb{R}^{2d_{\text{text}}}
 \end{equation}
 
-where $\odot$ denotes element-wise multiplication. The dot product captures feature-level interactions, while the absolute difference captures distance in the embedding space. Since $2d_{\text{text}}$ dimensions are high-dimensional and correlated, \gls{PCA} reduces the interaction vector to $d_{\text{pca}}$ components while preserving the dominant variance:
+where $\odot$ denotes element-wise multiplication. The dot product captures 
+feature-level interactions, while the absolute difference captures distance 
+in the embedding space. Since $2d_{\text{text}}$ dimensions are 
+high-dimensional and correlated, \gls{PCA} reduces the interaction vector 
+to $d_{\text{pca}}$ components:
 
 \begin{equation}
-    \mathbf{p}_{uj} = \text{PCA}_{d_{\text{pca}}}(\mathbf{m}_{uj}) \in \mathbb{R}^{d_{\text{pca}}}
+    \mathbf{p}_{uj} = \text{PCA}_{d_{\text{pca}}}(\mathbf{m}_{uj}) 
+    \in \mathbb{R}^{d_{\text{pca}}}
 \end{equation}
 
-\paragraph{Full profile semantic Similarity.} To capture holistic profile-level fit beyond job-title embeddings, a structured natural language document is constructed for each candidate and each job:
+The interaction matrix is reduced to $d_{\text{pca}} = 80$ components, 
+retaining 92.9\% of the total variance. This compression is justified on 
+two grounds: the Hadamard product and absolute difference share significant 
+covariance structure, making a large fraction of the 200 dimensions 
+redundant; and reducing the feature space lowers the risk of XGBoost 
+overfitting on the 5896 training pairs.
+
+\paragraph{Profile Similarity.} To capture profile-level fit beyond job-title embeddings, the remaining user profile information (degree, major, experience) and the full job description are encoded using a separate MiniLM encoder. The candidate and job information are concatenated into two documents:
 
 \begin{align}
     \text{doc}_u &= \textit{``Degree: } d\textit{. Major: } m\textit{. Experience: } e\textit{ years.''} \\
     \text{doc}_j &= \textit{``Title: } t\textit{. Description: \ldots{} Requirements: \ldots''}
 \end{align}
 
-These documents are encoded using the all-MiniLM-L6-v2 sentence transformer, which is a more lightweight model compared to the Qwen3 model, and the cosine similarity between embeddings is computed:
+and the cosine similarity between embeddings is computed:
 
 \begin{equation}
     \text{full\_profile\_cosine\_sim} = \cos\!\left(\text{enc}(\text{doc}_u),\, \text{enc}(\text{doc}_j)\right)
 \end{equation}
 
-This provides a complementary semantic signal grounded in the complete candidate and job profiles rather than embeddings optimised for application prediction. 
+This provides a complementary semantic signal grounded in the complete candidate and job profiles compared to the cosine similarity of job title and job history embeddings.
 
 Table~\ref{tab:recruiter_semantic_features} summarises the semantic features. The total dimension contributed by the interaction matrix, $d_{pca}$, and its effect on performance are reported in Chapter~\ref{chap:experiments}
 
@@ -143,8 +159,8 @@ Table~\ref{tab:recruiter_semantic_features} summarises the semantic features. Th
         \toprule
         \textbf{Feature} & \textbf{Description} \\
         \midrule
-        cosine\_sim & Qwen3 embedding cosine similarity \\
-        full\_profile\_cosine\_sim & MiniLM full-profile cosine similarity \\
+        Job Similarity & Qwen3 embedding cosine similarity between job and candidate's job history embeddings \\
+        Profile Similarity & MiniLM full-profile cosine similarity \\
         $\mathbf{p}_{uj}$ & $d_{\text{pca}}$ PCA components of the embedding interaction matrix \\
         \bottomrule
     \end{tabular}

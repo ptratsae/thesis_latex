@@ -211,7 +211,7 @@ with a learning rate of $10^{-3}$ and a batch size of 1024.
 \subsection{Ablation Study}
 \label{sec:exp_user_ablation}
  
-To determine the optimal model configuration, a systematic ablation study is conducted comparing two design choices: whether to include location features (city and state) and whether to apply L2 normalisation to the output embeddings. All configurations are trained with the 2:1:1 negative sampling strategy described in Section~\ref{sec:negative_sampling} and use the same training settings described in Section~\ref{sec:exp_user_hyperparameters}. Table~\ref{tab:ablation_user} reports the results at the best validation checkpoint for each configuration.
+To determine the optimal model configuration, a systematic ablation study is conducted comparing two design choices: whether to include location features (city and state) and whether to apply L2 normalisation to the output embeddings. All configurations are trained with the 2:1:1 negative sampling strategy described in Section~\ref{sec:dataset_construction} and use the same training settings described in Section~\ref{sec:exp_user_hyperparameters}. Table~\ref{tab:ablation_user} reports the results at the best validation checkpoint for each configuration.
  
 A note on interpreting the ranking metrics: Hit@K, Recall@K and NDCG@K are computed against the validation set's balanced candidate pool (positive and sampled negative jobs per user) rather than the full job catalogue. For example if a user has applied to 2 jobs, the metrics are computed against a pool of 2 positive jobs and 8 sampled negative jobs using the negative sampling strategy. As discussed in Section~\ref{sec:prelim_metrics}, this makes their absolute values considerably more optimistic than what would be observed at full-scale inference. \gls{AUC-ROC} is therefore used as the primary comparison criterion, as it is less sensitive to this pool-size effect.
  
@@ -420,7 +420,7 @@ Chapter~\ref{chap:congestion_balancing}.
 
 \subsection{Dataset Creation}
 \label{sec:exp_recruiter_datagen}
-Unlike the two-tower model, which derives its training signal directly
+Unlike the \gls{TT} model, which derives its training signal directly
 from observed applications, the recruiter-side model requires an
 additional labeling step before any dataset can be constructed. The
 labeling procedure is described in Section~\ref{sec:recruiter_data_gen};
@@ -491,7 +491,7 @@ Section~\ref{sec:prelim_metrics}, with \gls{AUC-ROC} as the primary
 selection criterion. Table~\ref{tab:recruiter_hyperparams} lists the
 hyperparameters used for each candidate classifier.
 
-\begin{table}[htbp]
+\begin{table}[H]
     \centering
     \caption{Hyperparameters for each candidate classifier.}
     \label{tab:recruiter_hyperparams}
@@ -513,19 +513,83 @@ hyperparameters used for each candidate classifier.
 
 \subsection{Stage 1: Classifier Selection}
 \label{sec:exp_recruiter_model_comparison}
- 
-All four candidate classifiers are compared on the dataset with \gls{LLM} negatives only. This way only the model type is varied. The choice of this dataset is motivated by the fact that this is the hardest classification task among the three strategies, as all negatives are drawn from the real applicant pool rather than from randomly sampled non-applicants. Table~\ref{tab:recruiter_results_cv} reports 5-fold cross-validation results; Table~\ref{tab:recruiter_results_test} reports the held-out test set performance of the selected model.
 
-XGBoost achieves the highest F1 (0.597) and outperforms Logistic Regression across all metrics by a clear margin. Compared to Random Forest, XGBoost has substantially higher Recall (0.588 vs.\ 0.528) — an important difference in a recruitment context where missing genuinely qualified candidates is costly. The Ensemble achieves a marginally higher AUC (0.696 vs.\ 0.690), but the gap is well within the standard deviation of both models and does not represent a meaningful difference. XGBoost is therefore selected as the final classifier: it achieves the best F1, matches the Ensemble on AUC within noise. The final XGBoost model achieves an AUC of 0.724 on the held-out test set, confirming that cross-validation performance generalises to unseen jobs. A feature importance analysis across all three classifiers is provided in Appendix~\ref{app:exp_recruiter_feature_importance}.
+All four candidate classifiers are compared on the dataset with \gls{LLM}
+negatives only. This way only the model type is varied. The choice of this
+dataset is motivated by the fact that this is the hardest classification task
+among the three strategies, as all negatives are drawn from the real applicant
+pool rather than from randomly sampled non-applicants.
+Table~\ref{tab:recruiter_results_cv} reports 5-fold cross-validation results;
+Table~\ref{tab:recruiter_results_test} reports the held-out test set
+performance of the selected model.
 
 \begin{table}[htbp]
     \centering
     \small
-    \caption{Final XGBoost model performance on the held-out test set (LLM negatives). The test set is evaluated only for the selected model to avoid selection bias.}
-    \label{tab:recruiter_results_test}
-    \begin{tabular}{lrrrrrr}
+    \caption{5-fold cross-validation results for all candidate classifiers
+    on the \gls{LLM}-negative dataset, grouped by job. Values are mean
+    $\pm$ standard deviation across folds. \gls{AUC-ROC} is the primary
+    selection criterion.}
+    \label{tab:recruiter_results_cv}
+    \begin{tabular}{lrrrrr}
         \toprule
-        \textbf{Model} & \textbf{Accuracy} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} & \textbf{AUC} \\
+        \textbf{Model} & \textbf{Accuracy} & \textbf{Precision}
+            & \textbf{Recall} & \textbf{F1} & \textbf{AUC} \\
+        \midrule
+        Logistic Regression
+            & $0.598 \pm 0.009$
+            & $0.554 \pm 0.027$
+            & $0.589 \pm 0.054$
+            & $0.569 \pm 0.024$
+            & $0.638 \pm 0.017$ \\
+        Random Forest
+            & $0.637 \pm 0.013$
+            & $0.619 \pm 0.036$
+            & $0.528 \pm 0.052$
+            & $0.567 \pm 0.021$
+            & $0.691 \pm 0.012$ \\
+        \textbf{XGBoost}
+            & $\mathbf{0.642 \pm 0.012}$
+            & $0.610 \pm 0.024$
+            & $0.588 \pm 0.047$
+            & $\mathbf{0.597 \pm 0.021}$
+            & $0.690 \pm 0.019$ \\
+        Ensemble
+            & $0.646 \pm 0.013$
+            & $0.619 \pm 0.032$
+            & $0.579 \pm 0.048$
+            & $0.596 \pm 0.019$
+            & $\mathbf{0.696 \pm 0.017}$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+XGBoost achieves the highest F1 (0.597) and outperforms Logistic Regression
+across all metrics except Recall, where both models are nearly identical
+(0.588 vs.\ 0.589). Compared to Random Forest, XGBoost has substantially
+higher Recall (0.588 vs.\ 0.528) --- an important difference in a recruitment
+context where missing genuinely qualified candidates is costly. The Ensemble
+achieves a marginally higher AUC (0.696 vs.\ 0.690), but the gap is well
+within the standard deviation of both models and does not represent a
+meaningful difference. XGBoost is therefore selected as the final classifier:
+it achieves the best F1, matches the Ensemble on AUC within noise, and avoids
+the added complexity of combining three models. The final XGBoost model
+achieves an AUC of 0.724 on the held-out test set, confirming that
+cross-validation performance generalises to unseen jobs. A feature importance
+analysis across all three classifiers is provided in
+Appendix~\ref{app:exp_recruiter_feature_importance}.
+
+\begin{table}[htbp]
+    \centering
+    \small
+    \caption{Final XGBoost model performance on the held-out test set
+    (\gls{LLM} negatives). The test set is evaluated only for the selected
+    model to avoid selection bias.}
+    \label{tab:recruiter_results_test}
+    \begin{tabular}{lrrrrr}
+        \toprule
+        \textbf{Model} & \textbf{Accuracy} & \textbf{Precision}
+            & \textbf{Recall} & \textbf{F1} & \textbf{AUC} \\
         \midrule
         XGBoost & 0.669 & 0.675 & 0.600 & 0.636 & 0.724 \\
         \bottomrule
@@ -734,10 +798,7 @@ addresses congestion on both sides of the market.
 \subsection{Experiment Setting}
 \label{sec:exp_congestion_setting}
 \paragraph{Simulation arena.}
-The congestion balancing experiments operate exclusively on Window~7, 
-the deployment window introduced in Section~\ref{sec:custom_split}. 
-Both the \gls{TT} model and the recruiter-side model are 
-applied here without any further fine-tuning. Windows~1--6 are used to determine parameters as in a real deployment scenario (see Section~\ref{sec:temporal_split}). Window~7 is only used as comparison.
+The congestion balancing experiments operate on Window~7 (the deployment window introduced in Section~\ref{sec:custom_split}). Both the Two‑Tower and recruiter models are applied without additional fine‑tuning; market‑maker parameters are determined from Windows~1--6 and the resulting strategies are evaluated on Window~7 as a held‑out production simulation.
 
  
 \paragraph{Parameter values.}
@@ -866,9 +927,9 @@ from Window~7, isolating the recruiter re-ranking mechanism. Section~\ref{sec:ex
 
 
 \subsection{Job Congestion Analysis and Market-maker Results}
-
-This section analyses historical job congestion and evaluates the job-side market-maker strategies in isolation.
 \label{sec:exp_job_congestion}
+This section analyses historical job congestion and evaluates the job-side market-maker strategies in isolation.
+
 % ============================================================
 
 \subsubsection{Historical Analysis}
@@ -1146,7 +1207,7 @@ than two shortlists, while around 41--43\% sit in the safe zone.
 Table~\ref{tab:user_mm_results} compares the three market-maker strategies
 against the Window~7 historical baseline. The baseline here is the recruiter
 screen applied to the real Window~7 application pool as mentioned before. The market-maker operates purely at the recruiter ranking
-stage (see Section~\ref{exp_congestion_setting}).
+stage (see Section~\ref{sec:exp_congestion_setting}).
 
 All three strategies produce a consistent improvement over the baseline.
 The Gini drops from 0.5370 to approximately 0.479 and the safe zone grows
@@ -1188,7 +1249,7 @@ in their penalty curves at this scale, the panels differ only in the
 magnitude of the starved spike at zero and one, not in the shape of the
 tail. The hard cap at $H^{\text{cand}} = 10$ is never visibly triggered
 as a cliff, for the same reason as the job side: the gradient penalties
-suppress shortlisting before any candidate reaches it.
+suppress shortlisting before any candidate reaches it. No qualitative inference evaluation is performed here since the task for the candidate-side market-maker hasn't changed. It reranks the application pool.
 
 \begin{figure}[htbp]
     \centering
@@ -1269,7 +1330,7 @@ achieves the best results across all metrics.
         \textbf{Universe} & \textbf{Gini} & \textbf{Starved} & \textbf{Safe}
             & \textbf{Congested} & $\bar{p}_\text{TT}$ & $\bar{p}_\text{rec}$ \\
         \midrule
-        Historical Reality$^\dagger$ & 0.8575 & 80.9\% & 15.8\% & 3.3\% & --- & --- \\
+        Historical Reality & 0.8575 & 80.9\% & 15.8\% & 3.3\% & --- & --- \\
         \addlinespace
         0: Free Market (TT only)    & 0.9625 & 90.8\% &  6.4\% & 2.9\% & 0.9537 & 0.4976 \\
         1: Bilateral (no penalties) & 0.9182 & 85.6\% & 11.1\% & 3.4\% & 0.8966 & 0.8405 \\
