@@ -42,8 +42,81 @@ Table~\ref{app:tab:full_ablation} reports the complete set of metrics for all fo
         \bottomrule
     \end{tabular}}
 \end{table}
+\newpage
+\section*{LLM Labelling Prompt and Example Output}
+\label{app:llm_prompt}
+
+This appendix provides the full prompt used to generate recruiter-side
+suitability labels via the Qwen3.5~(35B) model, together with a
+representative example of the model's JSON output. The design rationale
+and observed failure modes are discussed in
+Section~\ref{sec:exp_recruiter_datagen}.
+
+\subsection*{Prompt}
+
+{\small
+\begin{verbatim}
+Task: You are an HR recruiter. Evaluate how well each person fits the
+job based on their profile and the job description.
+(IMPORTANT: Treat each job-user pair independently.)
+
+Assign a fit level:
+- "Very Good Fit": Meets 100% of Must-Haves AND 50%+ of Nice-to-Haves
+  AND 0 Deal-Breakers.
+- "Good Fit": Meets 100% of Must-Haves (OR misses 1 Must-Have but
+  compensates with extensive relevant experience) AND 0 Deal-Breakers.
+- "Poor Fit": Missing 2+ Must-Haves OR has exactly 1 Deal-Breaker.
+- "Very Poor Fit": Missing 3+ Must-Haves OR has 2+ Deal-Breakers.
+
+Return a JSON object:
+{"results": [{"candidate_id": <id>, "must_haves": "...",
+  "nice_to_haves": "...", "deal_breakers": "...",
+  "reasoning": "...", "fit_level": "Good Fit"}]}
+
+Notes:
+- Be strict. Only candidates that truly meet requirements get Good Fit.
+- Be objective. Focus on concrete matches/mismatches.
+- If Degree, Major, Experience or History is empty/NaN, assume the
+  candidate does not have that feature.
+- Assume all applicants are 18+, available, and physically able.
+
+Job Description: {job_desc}
+Candidate Profiles: {profiles_text}
+\end{verbatim}
+}
+
+\subsection*{Example Output}
+
+The following shows a representative model response for a single
+candidate--job pair. The model states the extracted must-haves,
+nice-to-haves, and deal-breakers before assigning a fit level,
+ensuring the reasoning is traceable and the label is not assigned
+without justification.
+
+\begin{listing}[H]
+\begin{minted}{json}
+{
+  "results": [
+    {
+      "candidate_id": 349089,
+      "must_haves": "Associates degree, 6mo experience/leadership,
+                     valid license, work authorisation",
+      "nice_to_haves": "Bachelors degree, sales/CS background",
+      "deal_breakers": "None identified",
+      "reasoning": "Candidate profile shows degree and experience as
+                    empty. Job requires Associates degree and 6 months
+                    experience. Missing these core requirements.",
+      "fit_level": "Poor Fit"
+    }
+  ]
+}
+\end{minted}
+\caption{Example LLM JSON output for a single candidate--job evaluation.}
+\label{lst:llm_json_output}
+\end{listing}
 
 \newpage
+
 \section*{Feature Importance}
 \label{app:exp_recruiter_feature_importance}
 \addcontentsline{toc}{section}{Feature Importance}

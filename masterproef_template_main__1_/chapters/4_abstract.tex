@@ -2,15 +2,15 @@
 \chaptermark{Abstract}
 \addcontentsline{toc}{chapter}{Abstract}  
 
-This chapter should contain three things.
+%This chapter should contain three things.
 
-\begin{itemize}
-    \item A copy of all the information on the title page of your master's thesis. This includes things like the name of your master's thesis and your advisors.
-    \item A one-paragraph description of your master's thesis. This should be 15 to 20 lines long. This should include the context of your master's thesis, the problem statement of your master's thesis. The results of your master's thesis, and the evaluation of the work.
-    \item Five keywords that describe the subject best.
-\end{itemize}
+%\begin{itemize}
+    %\item A copy of all the information on the title page of your master's thesis. This includes things like the name of your master's thesis and your advisors.
+    %\item A one-paragraph description of your master's thesis. This should be 15 to 20 lines long. This should include the context of your master's thesis, the problem statement of your master's thesis. The results of your master's thesis, and the evaluation of the work.
+    %\item Five keywords that describe the subject best.
+%\end{itemize}
 
-The chapter should be one page at most.
+%The chapter should be one page at most.
 
 \textbf{Title:} Can AI help you find your dream job?\\
 \textbf{Author:} Pharrell Tratsaert\\
@@ -22,12 +22,32 @@ The chapter should be one page at most.
 \bigskip
 \bigskip
 
-Job platforms suffer from severe market congestion, where popular postings attract disproportionate applications while qualified candidates go unseen. This dissertation addresses this imbalance by proposing a dual-phase AI-driven recommendation framework for two-sided job markets that reduces congestion while preserving fair and efficient matches. On the user side, a Two-Tower neural architecture generates personalised job recommendation lists for jobseekers; on the recruiter side, a lightweight XGBoost model scores candidate suitability for shortlisting. Because recruiter training labels were unavailable, a large language model is used to synthesise them, producing a compact model suited for fast inference. Both components are integrated into a hybrid congestion-balancing strategy that applies job-level score adjustments at recommendation time and candidate-level adjustments during recruiter shortlisting. The approach is evaluated via counterfactual simulations on real application logs from the CareerBuilder dataset, using applications-per-job and shortlists-per-candidate distributions, Gini coefficients, and model-based match probabilities as metrics. The full hybrid strategy reduces the job-side Gini coefficient from 0.918 to 0.728 and lowers the fraction of starved jobs from 85.6\% to 67.4\%, while simultaneously reducing the candidate-side Gini from 0.633 to 0.495 and the fraction of unseen candidates from 32.1\% to 3.9\%. The full hybrid strategy reduces the job-side Gini coefficient from 
-0.918 to 0.728 and lowers the fraction of starved jobs from 85.6\% 
-to 67.4\%, while simultaneously reducing the candidate-side Gini 
-from 0.633 to 0.495 and the fraction of unseen candidates from 
-32.1\% to 3.9\%, at a match quality cost of under 3.5\% in average 
-Two-Tower probability relative to the unpenalised bilateral baseline. These results demonstrate that coordinating user-side recommendations and recruiter-side ranking is an effective lever for congestion mitigation in large-scale labour platforms.
-
+The job market is a two-sided platform where jobseekers and recruiters
+have distinct and often competing preferences. A structural problem in
+such markets is congestion: when a recommender system surfaces the same
+popular jobs to many users, applications concentrate on a small subset
+of postings. This leaves the majority of jobs starved of candidates
+while a small number is overwhelmed. The concentration of applications on
+popular jobs has a compounding effect on the candidate side: when many
+jobseekers compete for the same positions, only a small number of
+candidates are ever seen by recruiters, while the rest are ignored. Recommender systems that optimise purely for relevance
+amplify this dynamic, since popularity bias causes them to
+systematically favour already-visible jobs, creating a feedback loop that worsens congestion and reduces overall market efficiency. This dissertation addresses this imbalance by proposing a dual-phase
+AI-driven recommendation framework for two-sided job markets that
+reduces congestion while preserving fair and efficient matches. On the
+user side, a Two-Tower neural architecture generates personalised job
+recommendation lists for jobseekers; on the recruiter side, a
+lightweight XGBoost model scores candidate suitability for
+shortlisting. Because recruiter training labels were unavailable, a
+large language model is used to synthesise them, producing a compact
+model suited for fast inference. Both components are integrated into a
+hybrid congestion-balancing strategy that applies job-level score
+adjustments using market-makers and the scores of both the user-side and recruiter-side models at recommendation time and candidate-level adjustments
+during recruiter shortlisting. The approach is evaluated via
+counterfactual simulations on real application logs from the
+CareerBuilder dataset, using applications-per-job and
+shortlists-per-candidate distributions, Gini coefficients, and
+model-based match probabilities as metrics. 
+% EVALUATIONS! mainly the comparison of tt only vs tt+recruiter
 
 \textbf{Keywords:} recommender systems; job matching; two-sided markets; market congestion; machine learning
