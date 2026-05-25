@@ -56,10 +56,10 @@ Heuristic features are based on explicit pattern matching and are fully interpre
 \paragraph{Experience delta.} This feature captures the gap between the candidate's recorded experience and the experience required by the job:
 
 \begin{equation}
-    \delta_{\text{exp}} = e_u - e_j^{\text{req}}
+    \delta_{\text{exp}} = \text{exp}_u - \text{exp}_j^{\text{req}}
 \end{equation}
 
-where $e_u$ is the candidate's total years of experience and $e_j^{\text{req}}$ is extracted from the job requirements text using a regex pattern that identifies phrases such as \textit{``5+ years of experience''} or \textit{``minimum 3 years required''}. When no requirement is stated or found, $\delta_{\text{exp}}$ is set to 0. A positive value indicates the candidate meets or exceeds the requirement; a negative value indicates a shortfall.
+where $\text{exp}_u$ is the candidate's total years of experience and $\text{exp}_j^{\text{req}}$ is extracted from the job requirements text using a regex pattern that identifies phrases such as \textit{``5+ years of experience''} or \textit{``minimum 3 years required''}. When no requirement is stated or found, $\delta_{\text{exp}}$ is set to 0. A positive value indicates the candidate meets or exceeds the requirement; a negative value indicates a shortfall.
 
 \paragraph{TF-IDF keyword overlap.} Using the \gls{TF-IDF} representation introduced in Section~\ref{sec:prelim_tfidf}, keyword-level overlap between the candidate profile and the job posting is computed. A vectorizer is fit on all job postings in the training set; each candidate is represented by a document constructed from their job history and degree type. The cosine similarity between the two TF-IDF vectors yields:
 
@@ -75,7 +75,7 @@ This feature captures explicit keyword matches --- programming languages, domain
 
 \paragraph{Experience freshness.} This feature captures the ratio of the candidate's experience to the years since graduation, which serves as a proxy for how recent and relevant the experience is:
 \begin{equation}
-    \text{experience\_freshness} = \frac{e_u}{\text{current\_year} - \text{graduation\_year} + 1}
+    \text{experience\_freshness} = \frac{\text{exp}_u}{\text{current\_year} - \text{graduation\_year} + 1}
 \end{equation}
 
 Table~\ref{tab:recruiter_heuristic_features} summarises the heuristic features used in the model.
@@ -87,7 +87,7 @@ Table~\ref{tab:recruiter_heuristic_features} summarises the heuristic features u
         \toprule
         \textbf{Feature} & \textbf{Description} \\
         \midrule
-        $e_u$ & Candidate's total years of recorded experience \\
+        $\text{exp}_u$ & Candidate's total years of recorded experience \\
         $\delta_{\text{exp}}$ & Gap between candidate experience and the job requirement \\
         tfidf\_overlap & TF-IDF cosine similarity between candidate and job text \\
         degree\_match & Encoded degree alignment $\in \{-1, 0, 0.5, 1\}$ \\

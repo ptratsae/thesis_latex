@@ -910,11 +910,10 @@ of initial descent.
  
 \paragraph{Metrics.}
 Congestion is measured using the Gini coefficient $G$ and the percentage of entities in each zone (starved, safe, congested). To assess whether congestion
-reduction comes at the cost of match quality, the average \gls{TT} probability
-$\bar{p}_{\text{TT}}$ and average recruiter probability $\bar{p}_{\text{rec}}$
-are also reported across all applied (user, job) pairs. A strategy that reduces
-congestion while keeping these averages close to the free-market baseline is
-considered successful.
+reduction comes at the cost of match quality, the average \gls{TT} probability $\bar{p}_{\text{TT}}$, average recruiter 
+probability over applied pairs $\bar{p}_{\text{rec}}^{\text{app}}$, and 
+average recruiter probability over shortlisted pairs 
+$\bar{p}_{\text{rec}}^{\text{short}}$ are reported where relevant.
 
 \paragraph{Difference between analyses.} One further distinction applies within the congestion experiments 
 themselves. The standalone job-side and candidate-side analyses 
@@ -999,12 +998,12 @@ strategy has the highest Gini (0.5994) and the largest starved fraction
     \caption{Job-side market-maker results on Window~7. Historical W7 shows
     the raw application distribution for reference. $\bar{p}_{\text{TT}}$ is
     the average Two-Tower probability of applied (user, job) pairs;
-    $\bar{p}_{\text{rec}}$ is the average recruiter suitability probability.
+    $\bar{p}_{\text{rec}}^{\text{app}}$ is the average recruiter suitability probability over all applications.
     Both serve as proxies for match quality.}
     \label{tab:job_mm_results}
     \begin{tabular}{@{}lccccrr@{}}
         \toprule
-        \textbf{Strategy} & \textbf{Gini} & \textbf{Starved} & \textbf{Safe} & \textbf{Congested} & $\bar{p}_{\textbf{TT}}$ & $\bar{p}_{\textbf{rec}}$ \\
+        \textbf{Strategy} & \textbf{Gini} & \textbf{Starved ($<$2)} & \textbf{Safe (2-9)} & \textbf{Congested ($>$9)} & $\bar{p}_{\textbf{TT}}$ & $\bar{p}_{\text{rec}}^{\text{app}}$ \\
         \midrule
         Historical W7         & 0.8575 & 80.9\% & 15.8\% & 3.3\% & ---    & ---    \\
         Free Market (TT only) & 0.9625 & 90.8\% &  6.4\% & 2.9\% & 0.9537 & 0.4976 \\
@@ -1019,8 +1018,8 @@ strategy has the highest Gini (0.5994) and the largest starved fraction
 These differences follow directly from the shape of each penalty function (Figure~\ref{fig:modification_functions}) and are clearly visible in the application distributions (Figure~\ref{fig:all_universes_job_congestion}). The free-market panel confirms the inequity: a massive spike at zero and a heavy tail extending well beyond 50 applications, with 623 jobs exceeding this threshold. All three market-maker strategies successfully suppress this extreme tail, though a large zero spike persists across all panels, reflecting jobs that received no recommendations regardless of strategy. The quadratic strategy produces the longest tail because its penalty is lenient near $\tau_{\max}$ and only accelerates later, allowing traffic to bleed through gradually into the congested zone. The linear strategy produces a shorter tail by descending at a constant rate, while the sigmoid produces the smallest tail due to its steep descent and early saturation of the penalty. A further consequence of this steepness is visible in the distributions as a local maximum just beyond $\tau_{\max}=9$: the faster the penalty ramps up beyond the threshold, the more sharply it discourages further applications, causing jobs to accumulate just past the boundary. This effect is most visible under the sigmoid, but nearly absent under the quadratic. The same logic applies to the starved zone. Finally, the congested fraction remains low and stable across all strategies (2.1--2.4\%), confirming that the market-maker genuinely redistributes traffic toward the safe zone rather than simply pushing it from congested into the void.
 
 The match quality cost is modest across all strategies. The average \gls{TT}
-probability drops from 0.9537 under free market to between 0.8837 and 0.8963
---- a reduction of 6--7\%. The average recruiter probability also decreases
+probability $\bar{p}_{\text{TT}}$ drops from 0.9537 under free market to between 0.8837 and 0.8963
+--- a reduction of 6--7\%. The average applied recruiter probability $\bar{p}_{\text{rec}}^{\text{app}}$ also decreases
 slightly (0.4976 free market vs 0.4737--0.4788 with penalties), a reduction of
 around 4\%. This reduction is expected as the market-maker intentionally promotes less popular jobs and doesn't optimise for relevance directly. 
 
@@ -1223,14 +1222,14 @@ rather than arbitrary ones.
     \centering
     \caption{User-side market-maker results on Window~7. The baseline is
     the top-5 recruiter screen applied to the raw application pool, with
-    no market-maker intervention. $\bar{p}_{\text{rec}}$ is the average
+    no market-maker intervention. $\bar{p}_{\text{rec}}^{\text{short}}$ is the average
     base recruiter suitability probability of shortlisted (candidate, job)
     pairs, serving as a proxy for match quality.}
     \label{tab:user_mm_results}
     \begin{tabular}{@{}lccccr@{}}
         \toprule
-        \textbf{Strategy} & \textbf{Gini} & \textbf{Starved} &
-        \textbf{Safe} & \textbf{Congested} & $\bar{p}_{\text{rec}}$ \\
+        \textbf{Strategy} & \textbf{Gini} & \textbf{Starved (<2)} &
+        \textbf{Safe (2-6)} & \textbf{Congested (>6)} & $\bar{p}_{\text{rec}}^{\text{short}}$ \\
         \midrule
         Baseline (raw apps)   & 0.5370 & 52.3\% & 40.8\% & 6.9\% & 0.8576 \\
         \midrule
@@ -1249,8 +1248,11 @@ in their penalty curves at this scale, the panels differ only in the
 magnitude of the starved spike at zero and one, not in the shape of the
 tail. The hard cap at $H^{\text{cand}} = 10$ is never visibly triggered
 as a cliff, for the same reason as the job side: the gradient penalties
-suppress shortlisting before any candidate reaches it. No qualitative inference evaluation is performed here since the task for the candidate-side market-maker hasn't changed. It reranks the application pool.
+suppress shortlisting before any candidate reaches it. 
 
+A qualitative sanity check is not performed here. The average recruiter 
+suitability probability of shortlisted pairs drops by only 1.1\% relative 
+to the baseline ($\bar{p}_{\text{rec}}^{\text{short}}$ from 0.8576 to $\approx$0.848), which is a small change compared to the job-side market-maker results (6--7\% drop in $\bar{p}_{\text{TT}}$ and 4\% drop in $\bar{p}_{\text{rec}}^{\text{app}}$). 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=\textwidth]{images/all_universes_user_congestion_grid.png}
@@ -1288,13 +1290,6 @@ genuinely suitable, diversifying which jobs receive traffic and
 partially breaking the feedback loop that concentrates applications on
 popular postings.
  
-The match quality picture reflects this trade-off directly. The
-average \gls{TT} probability drops from 0.9537 to 0.8966 --- a
-reduction of 5.9\% --- while the average recruiter probability rises
-substantially from 0.4976 to 0.8405. The combined score therefore
-sacrifices some user-side relevance in exchange for a large gain in
-candidate-job suitability from the recruiter's perspective. 
- 
 \paragraph{Candidate-side.}
 On the candidate side (Table~\ref{tab:hybrid_candidate}), the TT-only
 free market produces a Gini of 0.7896 with 79.7\% of candidates
@@ -1305,6 +1300,15 @@ with 32.1\% of candidates starved. The improvement arises for the same
 reason as on the job side --- steering users toward jobs where they are
 genuinely competitive produces smaller, more selective inboxes and
 naturally spreads recruiter attention more evenly across candidates.
+
+\paragraph{Match quality.}
+The average \gls{TT} probability $p_{\text{TT}}$ drops from 0.9537 to 0.8966 --- a reduction 
+of 5.9\% --- while $\bar{p}_{\text{rec}}^{\text{app}}$ rises substantially 
+from 0.4976 to 0.8405, confirming that the combined score steers users toward 
+jobs where they are genuinely competitive. The average shortlisted recruiter 
+probability $\bar{p}_{\text{rec}}^{\text{short}}$ is 0.8666, indicating that 
+the candidates surfaced to recruiters are genuinely suitable despite the more 
+selective inbox composition.
  
 % ============================================================
 \subsection{Complete Two-Phase Pipeline}
@@ -1321,14 +1325,14 @@ achieves the best results across all metrics.
     \caption{Hybrid simulation results --- job congestion on Window~7.
     Historical Reality shows the raw application distribution for reference
     only.
-    $\bar{p}_\text{TT}$ and $\bar{p}_\text{rec}$ are the average Two-Tower
+    $\bar{p}_\text{TT}$ and $\bar{p}_{\text{rec}}^{\text{app}}$ are the average Two-Tower
     and recruiter probabilities over all applied (user, job) pairs.}
     \label{tab:hybrid_job}
     \small
     \begin{tabular}{lcccccc}
         \toprule
-        \textbf{Universe} & \textbf{Gini} & \textbf{Starved} & \textbf{Safe}
-            & \textbf{Congested} & $\bar{p}_\text{TT}$ & $\bar{p}_\text{rec}$ \\
+        \textbf{Universe} & \textbf{Gini} & \textbf{Starved ($<$2)} & \textbf{Safe (2-9)}
+            & \textbf{Congested ($>$9)} & $\bar{p}_\text{TT}$ & $\bar{p}_{\text{rec}}^{\text{app}}$ \\
         \midrule
         Historical Reality & 0.8575 & 80.9\% & 15.8\% & 3.3\% & --- & --- \\
         \addlinespace
@@ -1371,31 +1375,29 @@ cannot fully counteract it, leading to a modest increase in
 congestion.
  
 \paragraph{Match quality.}
-The average \gls{TT} probability is 0.8645 and the average recruiter
-probability is 0.8106 --- both lower than the bilateral baseline, as
-expected. The reduction in \gls{TT} probability is due to the
-job-side penalty redirecting some users away from their
-highest-scoring jobs; the reduction in recruiter probability is due
-to the candidate-side penalty suppressing some frequently shortlisted
-candidates. However, the recruiter probability remains well above the
-TT-only free market (0.4976), confirming that the bilateral scoring
-gain in candidate-job fit is preserved even after both penalties are
-applied.
+The average \gls{TT} probability $\bar{p}_\text{TT}$ is 0.8645 and 
+$\bar{p}_{\text{rec}}^{\text{app}}$ is 0.8106 --- both lower than the 
+bilateral baseline, as expected. The average shortlisted recruiter probability 
+$\bar{p}_{\text{rec}}^{\text{short}}$ drops from 0.8666 to 0.8133, a reduction 
+of 6.3\% over the bilateral baseline which is expected because of the market-maker intervention. However, both recruiter probabilities 
+remain well above the TT-only free market ($\bar{p}_{\text{rec}}^{\text{app}}$ 
+= 0.4976), confirming that the bilateral scoring gain in candidate-job fit is 
+preserved even after both penalties are applied.
  
 \begin{table}[htbp]
     \centering
-    \caption{Hybrid simulation results --- candidate-side congestion on
+    \caption{Hybrid simulation results --- candidate congestion on
     Window~7.}
     \label{tab:hybrid_candidate}
     \small
-    \begin{tabular}{lcccc}
+    \begin{tabular}{lccccc}
         \toprule
         \textbf{Universe} & \textbf{Gini} & \textbf{Starved ($<$2)}
-            & \textbf{Safe (2--6)} & \textbf{Congested ($>$6)} \\
+            & \textbf{Safe (2--6)} & \textbf{Congested ($>$6)} & $\bar{p}_{\text{rec}}^{\text{short}}$ \\
         \midrule
-        0: Free Market (TT only)    & 0.7896 & 79.7\% & 16.5\% &  3.8\% \\
-        1: Bilateral (no penalties) & 0.6326 & 32.1\% & 61.1\% &  6.7\% \\
-        2: Both sigmoid             & 0.4967 &  3.4\% & 83.1\% & 13.5\% \\
+        0: Free Market (TT only)    & 0.7896 & 79.7\% & 16.5\% &  3.8\% & ---\\
+        1: Bilateral (no penalties) & 0.6326 & 32.1\% & 61.1\% &  6.7\% & 0.8666 \\
+        2: Both sigmoid             & 0.4967 &  3.4\% & 83.1\% & 13.5\% & 0.8133 \\
         \bottomrule
     \end{tabular}
 \end{table}

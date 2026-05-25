@@ -12,64 +12,115 @@ Symbols specific to later chapters are listed here for completeness
 and will be reintroduced with full context when first used; this 
 table serves as a reference index rather than a prerequisite for reading.
 
-\begin{table}[htbp]
+\begin{table}[H]
     \centering
     \small
-    \caption{Summary of notation used throughout the thesis.}
-    \label{tab:notation}
+    \caption{Notation: general symbols used throughout the thesis.}
+    \label{tab:notation_general}
     \begin{tabular}{@{}ll@{}}
         \toprule
         \textbf{Symbol} & \textbf{Meaning} \\
         \midrule
-        \multicolumn{2}{l}{\textit{Users, jobs and interactions}} \\
+        \multicolumn{2}{l}{\textit{Sets and individuals}} \\
         \midrule
-        $\mathcal{U}$ & Set of all users (job seekers) \\
-        $\mathcal{J}$ & Set of all jobs \\
-        $u,\, j$ & Individual user and job \\
-        $\mathcal{J}^{+}_u$ & Jobs applied to by user $u$ (positive interactions) \\
-        $\mathcal{J}^{-}_u$ & Jobs not applied to by user $u$; $\mathcal{J} \setminus \mathcal{J}^{+}_u$ \\
-        $\mathbf{x}_u,\, \mathbf{x}_j$ & Raw feature vectors for user and job \\
-        $\mathbf{e}_u,\, \mathbf{e}_j$ & Learned embedding vectors for user and job \\
-        $d$ & Shared embedding dimension \\
-        $d_u,\, d_j$ & Input feature dimensionalities for user and job \\
-        $d_{\text{text}}$ & Dimensionality of truncated text embeddings \\
-        $s(\mathbf{e}_u, \mathbf{e}_j)$ & Compatibility score (typically $\mathbf{e}_u \cdot \mathbf{e}_j$) \\
-        $\hat{y}$ & Predicted score or probability \\
-        $y \in \{0,1\}$ & Binary ground truth label \\
-        $N$ & Number of training examples \\
-        $K$ & Cutoff for ranking metrics (e.g.\ Hit@$K$) \\
+        $\mathcal{U}$               & Set of all users (job seekers) \\
+        $\mathcal{J}$               & Set of all jobs \\
+        $u,\, j$                    & Individual user and job \\
+        $\mathcal{J}^{+}_u$         & Jobs applied to by user $u$ (positive interactions) \\
+        $\mathbf{x}_u,\,\mathbf{x}_j$ & Raw feature vectors for user and job \\
+        $\hat{y}$                   & Predicted score or probability \\
+        $y \in \{0,1\}$             & Binary ground-truth label \\
+        $N$                         & Number of training examples \\
         \midrule
-        \multicolumn{2}{l}{\textit{Recruiter-side model}} \\
+        \multicolumn{2}{l}{\textit{Ranking and fairness metrics (Chapter~\ref{chap:preliminaries})}} \\
         \midrule
-        $d_{\text{pca}}$ & Output dimensionality of PCA reduction \\
-        $F$ & Total number of features in the recruiter feature vector \\
+        $K$                         & Cutoff for ranking metrics (e.g.\ Hit@$K$) \\
+        $R_u^K$                     & Top-$K$ recommendation list for user $u$ \\
+        $r_i \in \{0,1\}$           & Relevance of the item at rank position $i$ \\
+        $G(\mathbf{x})$             & Gini coefficient over a count distribution $\mathbf{x}$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+% ── Table 2 of 4 ────────────────────────────────────────────────────
+\begin{table}[H]
+    \centering
+    \small
+    \caption{Notation: user-side job recommender system (Chapter~\ref{chap:user_recommendation}).}
+    \label{tab:notation_user}
+    \begin{tabular}{@{}ll@{}}
+        \toprule
+        \textbf{Symbol} & \textbf{Meaning} \\
+        \midrule
+        $\mathbf{e}_u,\,\mathbf{e}_j$  & Learned embedding vectors for user and job \\
+        $d$                             & Shared embedding output dimension \\
+        $d_u,\,d_j$                     & Input feature dimensionalities for user and job towers \\
+        $d_{\text{cat}}$                & Dimension of learnable categorical embedding layers \\
+        $d_{\text{text}}$               & Dimension of truncated pre-trained text embeddings \\
+        $s(\mathbf{e}_u,\mathbf{e}_j)$  & Compatibility score; typically $\mathbf{e}_u \cdot \mathbf{e}_j$ \\
+        $\sigma$                        & Sigmoid function $\sigma(x) = 1/(1+e^{-x})$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+% ── Table 3 of 4 ────────────────────────────────────────────────────
+\begin{table}[H]
+    \centering
+    \small
+    \caption{Notation: recruiter-side suitability model (Chapter~\ref{chap:recruiter_recommendation}).}
+    \label{tab:notation_recruiter}
+    \begin{tabular}{@{}ll@{}}
+        \toprule
+        \textbf{Symbol} & \textbf{Meaning} \\
+        \midrule
+        $\text{exp}_u$              & Candidate's total years of recorded experience \\
+        $e_j^{\text{req}}$          & Years of experience required by job $j$ (regex-extracted) \\
+        $\delta_{\text{exp}}$       & Experience delta $\text{exp}_u - e_j^{\text{req}}$ \\
+        $d_{\text{pca}}$            & Output dimensionality of PCA reduction \\
+        $F$                         & Total number of features in the recruiter feature vector \\
         $\mathbf{f} \in \mathbb{R}^F$ & Recruiter feature vector for a candidate–job pair \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+
+\begin{table}[H]
+    \centering
+    \small
+    \caption{Notation: hybrid congestion control (Chapters~\ref{chap:congestion}--\ref{chap:experiments}).}
+    \label{tab:notation_congestion}
+    \begin{tabular}{@{}ll@{}}
+        \toprule
+        \textbf{Symbol} & \textbf{Meaning} \\
         \midrule
-        \multicolumn{2}{l}{\textit{Congestion and hybrid balancing}} \\
+        \multicolumn{2}{l}{\textit{Running counters}} \\
         \midrule
-        $c_j^{(t)}$ & Applications received by job $j$ at simulation step $t$ \\
-        $\mathbf{c} = (c_1,\ldots,c_{|\mathcal{J}|})$ & Vector of application counts over all jobs \\
-        $v_u^{(t)}$ & Shortlisting events for candidate $u$ at simulation step $t$ \\
-        $\mathbf{v} = (v_1,\ldots,v_{|\mathcal{U}|})$ & Vector of shortlisting counts over all candidates \\
-        $G(\mathbf{x})$ & Gini coefficient over a count distribution $\mathbf{x}$ \\
-        $\tau_{\min},\, \tau_{\max}$ & Lower and upper zone thresholds (starved / congested) \\
-        $H$ & Hard cap; entities exceeding this are excluded from ranking \\
-        $B,\, P$ & Maximum boost and penalty magnitudes \\
-        $\gamma_b,\, \gamma_p$ & Linear boost and penalty rates \\
-        $\kappa_b,\, \kappa_p$ & Quadratic boost and penalty scaling parameters \\
-        $k$ & Sigmoid steepness parameter \\
-        $\tau_{\min}^{\text{job}},\, \tau_{\max}^{\text{job}}$ & Job-side starved / congested thresholds (applications) \\
-        $\tau_{\min}^{\text{cand}},\, \tau_{\max}^{\text{cand}}$ & Candidate-side starved / congested thresholds (shortlists) \\
-        $H^{\text{job}}$ & Job-side hard cap (applications) \\
-        $H^{\text{cand}}$ & Candidate-side hard cap (shortlists) \\
-        $B^{\text{job}},\, P^{\text{job}}$ & Boost / penalty magnitudes for job-side market-maker \\
-        $B^{\text{cand}},\, P^{\text{cand}}$ & Boost / penalty magnitudes for candidate-side market-maker \\
-        $\delta(\cdot)$ & Congestion modification function \\
-        $s_{uj},\, \hat{s}_{uj}$ & Base and modified job-ranking score for $(u,j)$ \\
-        $r_{uj},\, \hat{r}_{uj}$ & Base and modified recruiter score for $(u,j)$ \\
-        $p_{\text{TT}}$ & Two-Tower probability $\sigma(\hat{y}_{\text{TT}}) \in [0,1]$ \\
-        $p_{\text{rec}}$ & XGBoost recruiter suitability probability $\in [0,1]$ \\
-        $\alpha$ & Weighting parameter for the bilateral combined score \\
+        $c_j^{(t)}$   & Applications received by job $j$ at simulation step $t$ \\
+        $v_u^{(t)}$   & Times candidate $u$ has been shortlisted at simulation step $t$ \\
+        \midrule
+        \multicolumn{2}{l}{\textit{Market-maker parameters}} \\
+        \midrule
+        $\tau_{\min},\,\tau_{\max}$                             & Generic lower / upper zone thresholds (starved / congested) \\
+        $\tau_{\min}^{\text{job}},\,\tau_{\max}^{\text{job}}$   & Job-side starved / congested thresholds (applications) \\
+        $\tau_{\min}^{\text{cand}},\,\tau_{\max}^{\text{cand}}$ & Candidate-side starved / congested thresholds (shortlists) \\
+        $H$                       & Generic hard cap; entities exceeding this are excluded \\
+        $H^{\text{job}}$          & Job-side hard cap (applications) \\
+        $H^{\text{cand}}$         & Candidate-side hard cap (shortlists) \\
+        $B,\,P$                   & Maximum boost and penalty magnitudes \\
+        $\gamma_b,\,\gamma_p$     & Linear boost and penalty rates \\
+        $\kappa_b,\,\kappa_p$     & Quadratic boost and penalty scaling parameters \\
+        $k$                       & Sigmoid steepness parameter \\
+        $\delta(\cdot)$           & Congestion modification function \\
+        \midrule
+        \multicolumn{2}{l}{\textit{Scoring and pipeline}} \\
+        \midrule
+        $s_{uj},\,\hat{s}_{uj}$   & Base and modified job-ranking score for $(u,j)$ \\
+        $r_{uj},\,\hat{r}_{uj}$   & Base and modified recruiter ranking score for $(u,j)$ \\
+        $p_{\text{TT}}$           & Two-Tower probability $\sigma(\hat{y}_{\text{TT}}) \in [0,1]$ \\
+        $p_{\text{rec}}$          & XGBoost recruiter suitability probability $\in [0,1]$ \\
+        $\alpha$                  & Bilateral score weight balancing $p_{\text{TT}}$ and $p_{\text{rec}}$ \\
+        $\bar{p}_{\text{rec}}^{\text{app}}$   & Average recruiter suitability over all applied pairs \\
+        $\bar{p}_{\text{rec}}^{\text{short}}$ & Average recruiter suitability over shortlisted pairs \\
         \bottomrule
     \end{tabular}
 \end{table}
