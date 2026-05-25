@@ -1,14 +1,14 @@
 \chapter{User-Side Job Recommender System}
 \label{chap:user_recommendation}
 
-This chapter describes the job recommender system built for users, consisting of the dataset construction, the feature engineering, the \gls{TT} neural network architecture and the training procedure. The system learns dense representations of both users and jobs and uses their similarity to rank job opportunities for each individual user. This model is later used in Chapter~\ref{chap:congestion_balancing} as one of the two fundamental components for the two-stage hybrid framework for congestion-aware job matching 
+This chapter describes the job recommender system built for users, consisting of the dataset construction, the feature engineering, the \gls{TT} neural network architecture and the training procedure. The system learns dense representations of users $u \in \mathcal{U}$ and jobs $j \in \mathcal{J}$ and uses their similarity to rank job opportunities for each user $u$. This model is later used in Chapter~\ref{chap:congestion_balancing} as one of the two fundamental components for the two-stage hybrid framework for congestion-aware job matching 
 
 First, the dataset construction with negative sampling strategy is described in Section~\ref{sec:dataset_construction}. Then, the feature engineering is described in Section~\ref{sec:user_data_pipeline} followed by the architecture of the \gls{TT} model in Section~\ref{sec:user_arch}. Finally, the training procedure is described in Section~\ref{sec:user_training} and in Section~\ref{sec:user_inference} the usage of the trained model is discussed. The methods are applied in practice and the specific design choices and hyperparameters are reported in Chapter~\ref{chap:experiments}.
 
 \section{Dataset Construction with Negative Sampling}
 \label{sec:dataset_construction}
 
-Because the interaction log contains only positive examples, negative examples are constructed during dataset creation. For each positive (user, job) pair we sample a mixture of hard and easy negatives: a fraction of negatives are drawn from geographically close jobs while the remainder are sampled from distant jobs. This stratified negative sampling prevents the model from learning trivial separations based only on coarse attributes and ensures it distinguishes true preference from mere co-location. The specific sampling ratio is reported in Section~\ref{sec:exp_user_datagen}.
+Because the interaction log contains only positive examples, negative examples are constructed during dataset creation. For each positive $(u, j)$ pair we sample a mixture of hard and easy negatives: a fraction of negatives are drawn from geographically close jobs while the remainder are sampled from distant jobs. This stratified negative sampling prevents the model from learning trivial separations based only on coarse attributes and ensures it distinguishes true preference from mere co-location. The specific sampling ratio is reported in Section~\ref{sec:exp_user_datagen}.
 
 
 \section{Feature Engineering}
@@ -104,7 +104,7 @@ Job features undergo the same encoding and scaling process as user features: num
 \section{Two-Tower Model Architecture}
 \label{sec:user_arch}
 
-The \gls{TT} recommender consists of two separate neural networks. The user tower processes user features and the job tower processes job features. Both towers learn a dense vector representation of their respective input. The compatibility of a user-job pair is then measured as the dot product of these two vectors. 
+The \gls{TT} recommender consists of two separate neural networks. The user tower processes user features and the job tower processes job features. Both towers learn a dense vector representation of their respective input. The compatibility of a user–job pair $(u,j)$ is then measured as the dot product of these two vectors. 
 This architecture is chosen because it handles the cold-start problem \cite{rama2019deeplearningaddresscandidate} effectively. A user with no prior interaction history can still receive recommendations based on their profile features alone by using the learned user embedding. This property is essential given the temporal evaluation setup described in Section~\ref{sec:custom_split}. Additionally, it allows for efficient inference at scale, as both towers can be computed independently and the final similarity can be calculated with a simple dot product (see Section~\ref{sec:user_inference}).  
 
 \subsection{User Tower}
@@ -176,7 +176,7 @@ Here $y_i \in \{0,1\}$ is the ground-truth label. At training time the sigmoid m
 
 \section{Usage at Inference Time}
 \label{sec:user_inference}
-At inference time, recommendations are generated efficiently by precomputing the output of the job tower for each job and caching them in memory. For each user, only the user tower forward pass is executed, followed by a single matrix multiplication against the precomputed job matrix. This reduces per-user recommendation time to one matrix multiply regardless of the size of the job pool.
+At inference time, recommendations are generated efficiently by precomputing the output of the job tower for each $j \in \mathcal{J}$ and caching them in memory. For each user $u$, only the user tower forward pass is executed, followed by a single matrix multiplication against the precomputed job matrix for all $j \in \mathcal{J}$. This reduces per-user recommendation time to one matrix multiply regardless of $|\mathcal{J}|$.
  
 Either raw scores or sigmoid probabilities could be used for ranking. The raw dot product scores are used directly for ranking in Section~\ref{sec:exp_user_inference}. However, the hybrid model described in Chapter~\ref{chap:congestion_balancing} uses the sigmoid probabilities for ranking because the recruiter model produces probability estimates, so using the same scale for both components simplifies the aggregation step.
  

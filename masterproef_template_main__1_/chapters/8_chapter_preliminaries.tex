@@ -135,7 +135,7 @@ This section introduces the concepts specific to recommender systems that underp
 \subsection{Recommender Systems}
 \label{sec:prelim_rs}
 
-A recommender system is a function that, given a user $u$, returns a ranked list of items from a catalogue, in this case jobs. The core challenge is predicting which items a user will find relevant before they have interacted with them. Three broad approaches exist in the literature.
+A recommender system is a function that, given a user $u$, returns a ranked list of items from the catalogue $\mathcal{J}$. The core challenge is predicting which items a user will find relevant before they have interacted with them. Three broad approaches exist in the literature.
 
 \textbf{Collaborative filtering} \cite{glauber2019collaborativefilteringvscontentbased} exploits the collective behaviour of all users: if two users like the same items, they are likely to have similar preferences. Pure collaborative filtering does not require any item or user features --- only the interaction matrix --- but it suffers from the cold-start problem: new users or new items with no interaction history cannot be represented \cite{nadimi2014coldstartproblem}. 
 
@@ -175,7 +175,7 @@ Each document is represented as a sparse vector of TF-IDF weights over the full 
 
 A two-sided market is a platform that serves two distinct groups of participants whose value derives from interacting with each other \cite{mashayekhi2023challengebasedsurveyerecruitmentrecommendation}. The job market is a canonical example: job seekers derive value from being matched to a suitable job, and recruiters or employers derive value from finding suitable candidates. Unlike a one-sided market such as video streaming, where the same item can be consumed by arbitrarily many users simultaneously, the job market operates under \emph{capacity constraints}: each position can be filled by at most one candidate.
 
-This constraint leads to \textbf{market congestion}. Formally, congestion occurs when the recommendation distribution is highly concentrated: a large fraction of users are directed towards a small subset of jobs, resulting in those jobs receiving far more applications than they can process, while other jobs receive too few. Congestion is harmful on both sides: over-exposed jobs create noise and decision fatigue for recruiters, and under-exposed jobs represent missed opportunities for seekers and vacant positions.
+This constraint leads to \textbf{market congestion}. Formally, congestion occurs when the recommendation distribution is highly concentrated: a large fraction of $\mathcal{U}$ are directed towards a small subset of $\mathcal{J}$, resulting in those jobs receiving far more applications than they can process, while other jobs receive too few. Congestion is harmful on both sides: over-exposed jobs create noise and decision fatigue for recruiters, and under-exposed jobs represent missed opportunities for seekers and vacant positions.
 
 Two concrete manifestations of congestion are studied in this thesis:
 

@@ -17,9 +17,9 @@ To address this, an \gls{LLM} is used as a synthetic labeler. The \gls{LLM} is p
 \subsection{LLM-based Label Generation}
 \label{sec:recruiter_llm}
 
-For each candidate--job pair, the \gls{LLM} is prompted to derive a role's must-haves, nice-to-haves, and deal-breakers directly from the job description, and then to evaluate the candidate profile against those criteria. Letting the criteria emerge from the posting itself, rather than from a fixed taxonomy, more closely mirrors how a recruiter reads a job description.
+For each $(u,j)$ pair, the \gls{LLM} is prompted to derive a role's must-haves, nice-to-haves, and deal-breakers directly from the job description, and then to evaluate the candidate profile against those criteria. Letting the criteria emerge from the posting itself, rather than from a fixed taxonomy, more closely mirrors how a recruiter reads a job description.
 
-Based on this evaluation, the \gls{LLM} assigns each pair one of four 
+Based on this evaluation, the \gls{LLM} assigns each $(u,j)$ pair one of four 
 fit levels: \textit{Very Good Fit}, \textit{Good Fit}, \textit{Poor Fit}, 
 or \textit{Very Poor Fit}. The four-level scale encourages the model to 
 reason more carefully before committing to a label, avoiding the 
@@ -28,14 +28,15 @@ are available. These are then mapped to binary labels: $y = 1$ for
 the two positive classes and $y = 0$ for the two negative classes.
 
 \paragraph{Prompt design.}
-The prompt is developed iteratively, with each revision guided by inspection of outputs on sampled pairs. The key insight driving the design is that without structured criteria, the \gls{LLM} applies inconsistent implicit thresholds across independent calls. Explicit \gls{CoT} instructions resolve this by forcing the model to reason through the same criteria for every pair before assigning a fit level, and explicit rules for evaluation ensure the model is consistent. The output is returned in JSON format, which enables to sanity check the reasoning behind the \gls{LLM} easily. The specific prompt and example output are given in the Appendix~\ref{app:llm_prompt} with a more detailed discussion in Section~\ref{sec:exp_recruiter_datagen}.
+The prompt is developed iteratively, with each revision guided by inspection of outputs on sampled $(u,j)$ pairs. The key insight driving the design is that without structured criteria, the \gls{LLM} applies inconsistent implicit thresholds across independent calls. Explicit \gls{CoT} instructions resolve this by forcing the model to reason through the same criteria for every $(u,j)$ pair before assigning a fit level, and explicit rules for evaluation ensure the model is consistent. The output is returned in JSON format, which enables sanity checking the reasoning behind the \gls{LLM} easily. The specific prompt and example output are given in the Appendix~\ref{app:llm_prompt} with a more detailed discussion in Section~\ref{sec:exp_recruiter_datagen}.
 
 \subsection{Balanced Dataset Construction}
 \label{sec:recruiter_balanced}
 
-Three different datasets are constructed for training and evaluation. The first one consists of the generated labels. The positives are sampled from pairs that the \gls{LLM} labels as \textit{Good Fit} or \textit{Very Good Fit}, while the negatives are sampled from pairs labeled as \textit{Poor Fit} or \textit{Very Poor Fit}. This dataset trains a recruiter-side which learns to predict the \gls{LLM}'s judgments based on the engineered features. This distinction is the most challenging task, as the model needs to learn to distinguish good candidates from bad candidates among the pool of applicants, which is a more realistic scenario for recruitment. 
 
-Another dataset is constructed by using the same positives, but the negatives are randomly sampled from a set of candidate-job pairs where the job history's words of a user are not overlapping with the job's title. This dataset is used to evaluate the model's ability to distinguish good candidates from the entire pool. This task is easier as the negatives are more likely to be truly unqualified.  
+Three different datasets are constructed for training and evaluation. The first one consists of the generated labels. The positives are sampled from $(u,j)$ pairs that the \gls{LLM} labels as \textit{Good Fit} or \textit{Very Good Fit}, while the negatives are sampled from $(u,j)$ pairs labeled as \textit{Poor Fit} or \textit{Very Poor Fit}. This dataset trains a recruiter-side model which learns to predict the \gls{LLM}'s judgments based on the engineered features. This distinction is the most challenging task, as the model needs to learn to distinguish good candidates from bad candidates among the pool of applicants, which is a more realistic scenario for recruitment. 
+
+Another dataset is constructed by using the same positives, but the negatives are randomly sampled from a set of $(u,j)$ pairs where the job history's words of a user do not overlap with the job's title. This dataset is used to evaluate the model's ability to distinguish good candidates from the entire pool. This task is easier as the negatives are more likely to be truly unqualified.  
 
 Finally, a combined dataset is constructed by sampling an equal number of negatives from the \gls{LLM}-generated negatives and the random negatives. This dataset is used to train a model that can generalise to both the within-applicant-pool ranking scenario and the broader candidate-scoring context that arises during congestion balancing in Chapter~\ref{chap:congestion_balancing}.
 
@@ -46,7 +47,7 @@ where the combined strategy is adopted as the final training configuration.
 \section{Feature Engineering}
 \label{sec:recruiter_features}
 
-The feature vector $\mathbf{f}$ combines heuristic features derived from explicit domain rules with semantic features derived from neural embeddings. This hybrid design is motivated by the structure of the \gls{LLM} evaluation: the labeler considers both concrete, rule-based criteria (years of experience, degree requirements) and deeper semantic alignment (skill overlap, career trajectory). The features are designed to mirror these dimensions so that the trained classifier can learn to replicate the labeler's reasoning on unseen pairs.
+The feature vector $\mathbf{f}$ combines heuristic features derived from explicit domain rules with semantic features derived from neural embeddings. This hybrid design is motivated by the structure of the \gls{LLM} evaluation: the labeler considers both concrete, rule-based criteria (years of experience, degree requirements) and deeper semantic alignment (skill overlap, career trajectory). The features are designed to mirror these dimensions so that the trained classifier can learn to replicate the labeler's reasoning on unseen $(u,j)$ pairs.
 
 \subsection{Heuristic Features}
 \label{sec:recruiter_heuristic}
@@ -127,12 +128,12 @@ to $d_{\text{pca}}$ components:
     \in \mathbb{R}^{d_{\text{pca}}}
 \end{equation}
 
-The interaction matrix is reduced to $d_{\text{pca}} = 80$ components, 
+The interaction matrix is reduced to $d_{	ext{pca}} = 80$ components, 
 retaining 92.9\% of the total variance. This compression is justified on 
 two grounds: the Hadamard product and absolute difference share significant 
 covariance structure, making a large fraction of the 200 dimensions 
 redundant; and reducing the feature space lowers the risk of XGBoost 
-overfitting on the 5896 training pairs.
+overfitting on the 5896 training $(u,j)$ pairs.
 
 \paragraph{Profile Similarity.} To capture profile-level fit beyond job-title embeddings, the remaining user profile information (degree, major, experience) and the full job description are encoded using a separate MiniLM encoder. The candidate and job information are concatenated into two documents:
 
@@ -176,7 +177,7 @@ The recruiter-side suitability model is a binary classifier that takes a feature
 
 Several classifiers are considered as candidates: Logistic Regression, Random Forest, XGBoost, and a soft-voting ensemble of all three. Each is evaluated under the same group-based cross-validation protocol to ensure a fair comparison. Section~\ref{sec:exp_recruiter_model_comparison} reports the full comparison; based on those results, XGBoost is selected as the final classifier and held fixed for all subsequent experiments.
 
-XGBoost is a gradient-boosted decision tree ensemble that builds an additive sequence of shallow trees \cite{Chen_2016}, each correcting the residual errors of the previous one. The predicted probability for a pair is:
+XGBoost is a gradient-boosted decision tree ensemble that builds an additive sequence of shallow trees \cite{Chen_2016}, each correcting the residual errors of the previous one. The predicted probability for a pair $(u,j)$ is:
 
 \begin{equation}
     \hat{y} = \sigma\!\left(\sum_{k=1}^{T} f_k(\mathbf{f})\right)
@@ -188,7 +189,7 @@ where $f_k$ is the $k$-th regression tree in the ensemble, $T$ is the total numb
 \label{sec:recruiter_training_proc}
 
 \paragraph{Data partitioning.}
-The dataset is partitioned at the job level: all pairs belonging to a given job are assigned exclusively to one split, so the model never observes the same job during both training and evaluation. Jobs are randomly assigned to a training set (70\%), a validation set (10\%), and a held-out test set (20\%), which is withheld until final evaluation.
+The dataset is partitioned at the job level: all $(u,j)$ pairs belonging to a given job are assigned exclusively to one split, so the model never observes the same job during both training and evaluation. Jobs are randomly assigned to a training set (70\%), a validation set (10\%), and a held-out test set (20\%), which is withheld until final evaluation.
 
 \paragraph{Cross-validation.}
 Model selection is carried out by 5-fold group cross-validation on the combined training and validation data, again grouped by job so that no job appears in both the fold training and fold evaluation portions. Within each fold, the \gls{TF-IDF} vectorizer, \gls{PCA} transformer, and feature scaler are each fitted exclusively on the fold's training portion and applied to the fold's evaluation portion, keeping cross-validation estimates free of leakage. Cross-validation results and model comparison are reported in Chapter~\ref{chap:experiments}.
@@ -200,8 +201,8 @@ As mentioned before, based on cross-validation results, XGBoost is selected and 
 \label{sec:recruiter_inference}
 % ==============================================================
  
-At inference time the model is applied in two modes depending on the context. In the single-pair mode, a feature vector $\mathbf{f}$ is assembled for a specific (user, job) pair, scaled with the fitted \texttt{StandardScaler}, and passed through the serialised XGBoost model to produce a suitability probability $\hat{y}$. This mode is used for qualitative inspection and sanity-checking.
+At inference time the model is applied in two modes depending on the context. In the single-pair mode, a feature vector $\mathbf{f}$ is assembled for a specific $(u,j)$ pair, scaled with the fitted \texttt{StandardScaler}, and passed through the serialised XGBoost model to produce a suitability probability $\hat{y}$. This mode is used for qualitative inspection and sanity-checking.
  
-In the batch mode, the model scores all candidate--job pairs for a single job simultaneously. Because the job-side features (TF-IDF document, Qwen embedding, MiniLM embedding) are fixed across all candidates for a given job, they are computed once and reused. The candidate-side features are then extracted in a vectorised pass over all candidates, yielding a feature matrix $\mathbf{F} \in \mathbb{R}^{N \times F}$ that is scaled and scored in a single call to the classifier. This produces a probability estimate $\hat{y}_i$ for each of the $N$ candidates, ranking them by predicted suitability without per-pair iteration overhead. This batch mode is the one used by the congestion balancing system in Chapter~\ref{chap:congestion_balancing}, where the recruiter score serves as the second component of the bilateral match score.
+In the batch mode, the model scores all pairs $(u,j)$ for a fixed job $j$ simultaneously. Because the job-side features (TF-IDF document, Qwen embedding, MiniLM embedding) are fixed across all candidates for a given job, they are computed once and reused. The candidate-side features are then extracted in a vectorised pass over all candidates, yielding a feature matrix $\mathbf{F} \in \mathbb{R}^{N \times F}$ that is scaled and scored in a single call to the classifier. This produces a probability estimate $\hat{y}_i$ for each of the $N$ candidates, ranking them by predicted suitability without per-pair iteration overhead. This batch mode is the one used by the congestion balancing system in Chapter~\ref{chap:congestion_balancing}, where the recruiter score serves as the second component of the bilateral match score.
  
 In Section~\ref{sec:exp_recruiter_sanity} examples of the model's output are provided for a sample of jobs from the deployment window, together with a qualitative discussion of whether the ranking of actual applicants aligns with expectations given their profiles.
