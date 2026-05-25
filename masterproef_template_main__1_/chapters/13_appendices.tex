@@ -351,34 +351,20 @@ modification.
 \end{table}
 \newpage
 \section*{Hybrid Congestion Ablation}
-\addcontentsline{toc}{section}{Hybrid Congestion Ablation}
 \label{app:hybrid_ablation}
+\addcontentsline{toc}{section}{Hybrid Congestion Ablation}
 
-This appendix reports the full four-universe ablation for the hybrid balancing
-experiment introduced in Section~\ref{sec:exp_hybrid_results}. The two
-intermediate universes --- job-side sigmoid only (Universe~2) and candidate-side
-sigmoid only (Universe~3) --- isolate the contribution of each penalty
-independently and provide the mechanistic explanation for why the full dual-sided
-system (Universe~4) behaves as it does.
+Tables~\ref{tab:app_hybrid_job} and~\ref{tab:app_hybrid_candidate} extend 
+the results of Section~\ref{sec:exp_hybrid_results} with the two intermediate 
+universes. On the job side, Universes~1 and~3 are identical, as are 
+Universes~2 and~4 --- the candidate-side penalty operates only in Phase~2 
+and has no effect on which jobs users apply to. On the candidate side, all 
+four universes differ. Notably, the job-side penalty alone (Universe~2) 
+reduces candidate congestion further than the candidate-side penalty alone 
+(Universe~3): Gini 0.5253 vs.\ 0.5765. This confirms that redistributing 
+the application pool in Phase~1 is a more powerful lever for candidate equity 
+than re-ranking within fixed inboxes in Phase~2.
 
-Tables~\ref{tab:app_hybrid_job} and~\ref{tab:app_hybrid_candidate} extend
-Tables~\ref{tab:hybrid_job} and~\ref{tab:hybrid_candidate} with all four
-universes. A structural property is immediately visible in
-Table~\ref{tab:app_hybrid_job}: Universes~1 and~3 are identical on the job side,
-as are Universes~2 and~4. This is by design --- the candidate-side penalty
-operates exclusively in Phase~2 and has no influence on which jobs users apply
-to in Phase~1. Consequently, any configuration that shares the same job-side
-strategy (penalty active or not) will produce the same job distribution,
-regardless of what happens in Phase~2. All four universes differ on the candidate
-side (Table~\ref{tab:app_hybrid_candidate}), since both the job-side penalty
-(through its indirect effect on inbox composition) and the candidate-side penalty
-(through direct re-ranking suppression) independently shape the shortlist
-distribution.
-
-
-% ------------------------------------------------------------------
-% TABLE: Full job-side congestion
-% ------------------------------------------------------------------
 \begin{table}[htbp]
     \centering
     \caption{Full hybrid ablation --- job-side congestion on Window~7 across
@@ -388,7 +374,7 @@ distribution.
     recruiter probabilities over all applied (user, job) pairs.}
     \label{tab:app_hybrid_job}
     \small
-    \begin{tabular}{lccccc cc}
+    \begin{tabular}{lccccccc}
         \toprule
         \textbf{Universe} & \textbf{Gini} & \textbf{Starved} & \textbf{Safe}
             & \textbf{Congested} & $\bar{p}_\text{TT}$ & $\bar{p}_\text{rec}$ \\
@@ -413,9 +399,6 @@ distribution.
 \end{table}
 
 
-% ------------------------------------------------------------------
-% TABLE: Full candidate-side congestion
-% ------------------------------------------------------------------
 \begin{table}[htbp]
     \centering
     \caption{Full hybrid ablation --- candidate-side congestion on Window~7
@@ -436,44 +419,6 @@ distribution.
     \end{tabular}
 \end{table}
 
-
-\subsection*{Job-side penalty only (Universe~2)}
-
-Adding the job-side sigmoid penalty reduces the job Gini substantially from 0.9182
-to 0.7130 and grows the safe zone from 11.1\% to 34.0\%. However, this improvement
-is considerably smaller than in the standalone job-side experiment, where the same
-sigmoid penalty achieved a Gini of 0.5741. The gap is explained by the structure
-of the combined scoring function (Equation~\ref{eq:combined_score}): the job
-penalty $\delta_\text{job}$ acts only on the Two-Tower component, which carries
-weight $\alpha = 0.5$. The recruiter probability term is congestion-unaware and
-pulls the combined score in the opposite direction --- a user may still apply to
-a congested job if their recruiter score is high enough to outweigh the penalty.
-This dilution is a fundamental consequence of the bilateral design: the recruiter
-signal improves match quality but attenuates the market-maker's redistribution
-power. A higher $\alpha$ would strengthen the penalty at the cost of recruiter
-influence, representing a tunable trade-off left for future work.
-
-The candidate-side effect of the job penalty is pronounced: starved candidates
-drop from 32.1\% to 6.4\% and the candidate Gini falls from 0.6326 to 0.5253.
-This improvement is entirely indirect --- by redistributing applications more
-evenly across jobs, each job inbox contains a more diverse set of candidates,
-so recruiter attention naturally spreads. The trade-off is a rise in congested
-candidates from 6.7\% to 13.9\%: when the job penalty redirects applications
-toward previously empty jobs, those jobs now have small inboxes where all
-applicants are automatically shortlisted, including candidates already frequently
-shortlisted elsewhere.
-
-
-\subsection*{Candidate-side penalty only (Universe~3)}
-
-The candidate-side penalty applied without any job penalty produces a more modest
-improvement: the candidate Gini drops from 0.6326 to 0.5765 and starved candidates
-from 32.1\% to 25.8\%. The job-side distribution is unchanged from the bilateral
-baseline by design, and the match quality scores are equal for the same reason.
-The candidate-side improvement here is smaller than the job-side penalty's indirect
-effect on candidate congestion (Gini 0.5765 vs.\ 0.5253 in Universe~2), confirming
-that redistributing the application pool in Phase~1 is a more powerful lever for
-candidate equity than re-ranking within fixed inboxes in Phase~2.
 
 
 \end{appendices}
