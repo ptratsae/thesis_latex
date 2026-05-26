@@ -3,16 +3,16 @@
 
 \section{Context}
 
-Recommender systems are widely used in various domains, such as entertainment \cite{ytrecommender}, e-commerce \cite{recommenderecommerce} and employment \cite{qin2020enhanced}, to help users discover relevant personalized content. The job market differs from other recommendation domains. A good match benefits not only the individual job seeker and recruiter, but has measurable implications for productivity, wages and economic growth. Yet, despite decades of progress in recommendation research, applying these systems to the job market remains fundamentally harder than applying them to domains like music or film. The job market is a \emph{two-sided} ecosystem --- both job seekers and recruiters have preferences, constraints and goals --- and satisfying one side without considering the other leads to systemic inefficiencies. This master's dissertation investigates how \gls{AI}, more specifically recommender systems, can be redesigned to address these inefficiencies.
+Recommender systems are widely used in various domains, such as entertainment \cite{ytrecommender}, e-commerce \cite{recommenderecommerce} and employment \cite{celik2025jobrecommendersystemssystematic}, to help users discover relevant personalized content. The job market differs from other recommendation domains. A good match benefits not only the individual job seeker and recruiter, but has measurable implications for productivity, wages and economic growth. Yet, despite decades of progress in recommendation research, applying these systems to the job market remains fundamentally harder than applying them to domains like music or film. The job market is a \emph{two-sided} ecosystem --- both job seekers and recruiters have preferences, constraints and goals --- and satisfying one side without considering the other leads to systemic inefficiencies. This master's dissertation investigates how \gls{AI}, more specifically through recommender systems, can be redesigned to address these inefficiencies.
 
 \section{Motivation}
 \label{sec:intro:motivation}
 
 The need to improve job matching goes beyond individual convenience. At a macroeconomic level, inefficient matching degrades productivity across entire labour markets. Both overqualification and underqualification generate real costs: reduced job satisfaction, accelerated burnout and higher turnover \cite{cedefop_skills}. These are not marginal effects --- skills mismatch has been identified as one of the central structural challenges in modern labour markets.
 
-Digitisation was expected to solve this problem by making information more accessible to all parties. In practice, it has introduced new complications: the large number of jobs (items) available online leads to decision fatigue and systematically suboptimal choices for jobseekers (users) \cite{nurfadillah2026analysis, aljukhadar2010informationoverload}. This is where recommender systems come in: by filtering and ranking the vast pool of options, they can help users navigate the overload and find relevant opportunities.
+Digitisation was expected to solve this problem by making information more accessible to all parties. In practice, it has introduced new complications: the large number of jobs (items) available online leads to decision fatigue and systematically suboptimal choices for jobseekers (users) \cite{nurfadillah2026analysis}. This is where recommender systems come in: by filtering and ranking the vast pool of options, they can help users navigate the overload and find relevant opportunities.
 
-The way current recommendation algorithms provide that assistance, however, introduces a third problem. Standard systems tend to surface the most popular options to the most users, creating a rich-get-richer dynamic known as popularity bias \cite{Klimashevskaia_2024}. In the job market this has concrete consequences: popular jobs attract the majority of all applications, leaving less prominent but equally valid positions under-applied, while highly qualified candidates miss opportunities at companies that never appear in their recommendations \cite{li2023feirquantifyingreducingenvy}. The result is a inequitable distribution of attention and opportunity that harms both sides of the market. This inequity is even worsened due to recommender systems.
+The way current recommendation algorithms provide that assistance, however, introduces a third problem. Standard systems tend to surface the most popular options to the most users, creating a rich-get-richer dynamic known as popularity bias \cite{Klimashevskaia_2024}. In the job market this has concrete consequences: popular jobs attract the majority of all applications, leaving less prominent but equally valid positions under-applied, while highly qualified candidates miss opportunities at companies that never appear in their recommendations \cite{li2023feirquantifyingreducingenvy}. The result is an inequitable distribution of attention and opportunity that harms both sides of the market.
 
 Taken together, these three forces --- macroeconomic mismatch, information overload, and algorithmic inequality of visibility --- motivate a shift towards fairness-aware and congestion-aware recommendation frameworks capable of balancing the needs of both sides of the market.
 
@@ -21,30 +21,37 @@ Taken together, these three forces --- macroeconomic mismatch, information overl
 
 The job market has a structural property that sets it apart from most recommendation domains: only one candidate can fill any given role, and each candidate can only hold one job. Unlike a streaming service where the same film can be recommended to millions of simultaneous viewers, the job market operates under hard capacity constraints \cite{mashayekhi2023reconreducingcongestionjob}. When digitisation brought recommendation systems to this market, the mismatch between the system's design assumptions and the market's actual structure became a source of new inefficiencies.
 
-The scale of the problem is illustrated by a simple example from \cite{mashayekhi2023reconreducingcongestionjob}: given four job seekers and four job openings, if all four seekers receive the same top-two recommendations, all four will apply to the same two jobs. Only two can be hired. Two jobs remain vacant, two candidates remain unemployed --- not because good matches did not exist, but because the recommender system created congestion that prevented them from being found. Standard systems fail here in three ways which are connected to each other.
+The scale of the problem is illustrated by a simple example from \cite{mashayekhi2023reconreducingcongestionjob}: given four job seekers and four job openings, if all four seekers receive the same top-two recommendations, all four will apply to the same two jobs. Only two can be hired. Two jobs remain vacant, two candidates remain unemployed --- not because good matches did not exist, but because the recommender system created congestion that prevented them from being found. Standard systems fail here in three ways that are connected to each other.
 
 First, they optimise for point-wise relevance without accounting for market capacity. Recommending the same high-relevance job to hundreds of users is locally correct --- the match is genuinely good --- but globally harmful, because it overloads that job with applications while leaving capacity elsewhere unused. 
 
-Second, existing systems are unidirectional. They are built around one side of the market --- typically the job seeker --- and treat the other side as a static target rather than an active participant with its own preferences and constraints. A recruiter looking for a candidate with a specific set of qualifications is not well-served by a system that has only ever learned what job seekers click on.
-
-Third, the data landscape is deeply asymmetric. Job seeker behaviour --- clicks, views, applications --- is captured at scale by job platforms and is relatively well documented. Recruiter behaviour, by contrast, is largely invisible: decisions about which candidates are reviewed, shortlisted or ultimately hired are typically made internally off-platform, and are further withheld due to privacy concerns. The result is that any system trained on publicly available data --- including the dataset used in this work --- sees only one side of the hiring conversation. This structural absence of recruiter signal biases learned models towards seeker preferences by default, further compounding the unidirectionality problem described above.
-
+%TODO: Fix reference for assymetric / unidirectional data problem.
+Second, existing systems are unidirectional. They are built around one side of the market --- typically the job seeker --- and treat the other side as a static target rather than an active participant with its own preferences and constraints. A recruiter looking for a candidate with a specific set of qualifications is not well-served by a system that has only ever learned what job seekers click on. This problem is
+compounded by a deeply asymmetric data landscape. Job seeker behaviour
+--- clicks, views, applications --- is captured at scale. Recruiter
+behaviour, by contrast, is largely invisible due to privacy concerns \cite{mashayekhi2023challengebasedsurveyerecruitmentrecommendation}. The result is that
+any system trained on publicly available data sees only one side of the
+hiring conversation, biasing learned models towards seeker preferences
+by default and making it structurally difficult to build a genuinely
+two-sided system.
 \section{Research Contributions}
 \label{sec:intro:contributions}
 
-This thesis proposes a two-sided recommendation framework that addresses all three of the above failures. The framework consists of three components, each of which constitutes a standalone contribution while also serving the larger system.
+This thesis proposes a congestion-aware two-phase job matching framework that addresses all three of the above failures. The framework consists of three components, each of which constitutes a standalone contribution while also serving the larger system. The two-phase design allows for a clear separation of concerns: the first phase focuses on generating personalised recommendations for job seekers, while the second phase focuses on re-ranking candidates from the recruiter's perspective. 
 
-The first contribution is a \textbf{job recommender system} based on a \gls{TT} neural network architecture. The model learns dense representations of both users and jobs and computes compatibility via a dot-product similarity, enabling efficient retrieval across large job pools. Importantly, the architecture is designed to handle cold-start users --- an unavoidable reality in any realistic deployment --- by relying on profile features rather than interaction history.
+The first contribution is a \textbf{job recommender system} built on a 
+Two-Tower neural architecture, adapted for the specific challenges of 
+two-sided job markets. Key design contributions include a stratified 
+geographic negative sampling strategy that teaches the model to 
+discriminate on career content rather than proximity, and a cold-start 
+evaluation setup that reflects realistic production conditions where 
+all inference users are new to the system.
 
-The second contribution is a \textbf{recruiter model} that addresses the absence of ground-truth recruiter feedback in existing datasets. The model is trained on synthetic labels generated using a \gls{LLM} prompted with \gls{CoT} reasoning to evaluate candidate-job fit across multiple 
+The second contribution is a \textbf{recruiter suitability model} that is trained on synthetic labels generated using a \gls{LLM} prompted with \gls{CoT} reasoning to evaluate candidate-job fit across multiple 
 dimensions. The model uses a combination of heuristic and semantic features, 
-yielding an interpretable and computationally efficient model that serves as a recruiter-side signal for the larger system.
+yielding an interpretable and computationally efficient model that serves as a recruiter-side signal for the larger framework. This contribution directly addresses the data asymmetry problem and unidirectionality problem.
 
-The third contribution is a \textbf{hybrid congestion balancing strategy} that uses the outputs of both preceding systems as inputs. By analysing the recommendation distribution across both sides of the market, the strategy identifies and mitigates over-exposure of popular jobs and under-representation of qualified but overlooked candidates. The result is a more equitable market equilibrium in which recommendation quality is preserved while congestion is reduced.
-
-\subsection{Outline of the Following Chapters}
-The remainder of this thesis is structured as follows. Chapter~\ref{chap:preliminaries} introduces the notation, background concepts and evaluation metrics used throughout. Chapters~\ref{chap:user_recommendation} and \ref{chap:recruiter_recommendation} describe the job recommender and recruiter-side suitability model in detail. In Chapter~\ref{chap:congestion_balancing} both systems are integrated into a combined framework to mitigate congestion while preserving recommendation quality. Chapter~\ref{chap:experiments} presents the experimental evaluation across all three. Chapter~\ref{ch:conclusion} summarises the findings and Chapter~\ref{ch:future-work} discusses limitations and possibilities for future research. 
-
+The third contribution is a \textbf{hybrid congestion balancing strategy} that uses the outputs of both preceding systems as inputs. By analysing the recommendation distribution across both sides of the market, the strategy identifies and mitigates congestion through market-maker penalties and bilateral score adjustments. 
 
 \section{Related Work}
 \label{sec:prelim_related_work}
@@ -57,17 +64,22 @@ The scientific literature classifies \gls{RRS} based on how they integrate the p
 \subsubsection{Aggregation and Match Prediction}
 The traditional approach, known as \gls{PtA}, trains separate models for each direction (user-to-job and job-to-user) and combines their scores using fusion functions like the harmonic mean or product \cite{goda2024bestofbothapproachimprovematch}. To address the error propagation inherent in \gls{PtA}, the recent Best-of-Both (BoB) framework leverages pseudo-match scores --- a weighted average of sparse ground-truth labels and dense predictions --- to train meta-models that directly output match likelihoods.
 
-
 \subsection{Neural Architectures for Retrieval}
-As platforms scale to millions of users, the \gls{TT} neural architecture has become the industrial standard for candidate retrieval \cite{Xiong_2025, yuan2024contextgnntwotowerrecommendationsystems}. 
-
-\subsubsection{Two-Tower Enhancements}
-Standard \gls{TT} models suffer from "Late Interaction," where user and item features do not interact until the final dot product. Recent state-of-the-art enhancements include:
-\begin{itemize}
-    \item \textbf{Hierarchical Interaction-Enhanced Two-Tower (HIT):} Augments the paradigm with multi-head representers to project embeddings into multi-faceted interest dimensions \cite{yang2025hitmodelhierarchicalinteractionenhanced}.
-    \item \textbf{biLorentzFM:} Utilizes hyperbolic embeddings to capture the hierarchical nature of job markets (e.g., senior roles requiring specific junior experiences) \cite{biLorentzFM2025}.
-    \item \textbf{ContextGNN:} Fuses pair-wise representations for local interaction graphs with global \gls{TT} representations for exploratory items \cite{yuan2024contextgnntwotowerrecommendationsystems}.
-\end{itemize}
+As platforms scale to millions of users, the \gls{TT} neural
+architecture has become the industrial standard for candidate retrieval
+\cite{Xiong_2025, yuan2024contextgnntwotowerrecommendationsystems}.
+Standard \gls{TT} models suffer from ``Late Interaction,'' where user
+and item features do not interact until the final dot product. Recent
+enhancements address this: HIT augments the paradigm with multi-head
+representers to project embeddings into multi-faceted interest
+dimensions \cite{yang2025hitmodelhierarchicalinteractionenhanced};
+biLorentzFM uses hyperbolic embeddings to capture hierarchical job
+market structure \cite{biLorentzFM2025}; and ContextGNN fuses
+pair-wise local interaction graphs with global \gls{TT} representations
+\cite{yuan2024contextgnntwotowerrecommendationsystems}. This thesis
+adopts the standard \gls{TT} architecture as a transparent and
+efficient baseline, prioritising cold-start generalisation and
+interpretability over interaction-layer complexity.
 
 \subsection{Market Congestion and Distributional Equity}
 Market congestion occurs when recommendation policies concentrate attention on a tiny subset of popular job postings, leading to "orphan jobs" that receive zero applications \cite{01KAK08E4756SJAF6RCBJVGWXB, mashayekhi2023challengebasedsurveyerecruitmentrecommendation}. This concentration degrades the welfare of all job seekers and creates information overload and vacancy gaps for employers.
@@ -91,4 +103,8 @@ recommendations of limited resources such as job positions
 A persistent challenge is data asymmetry: seeker behavioural signals are captured at scale, but recruiter decision signals (shortlisting, hiring) are often invisible or off-platform \cite{mashayekhi2023challengebasedsurveyerecruitmentrecommendation}.
 
 \subsubsection{LLM-Based Synthetic Feedback}
-To overcome data scarcity, state-of-the-art research leverages Large Language Models (LLMs) to generate synthetic labels for candidate suitability \cite{gan2024applicationllmagentsrecruitment}. These models possess high \textit{Algorithmic Fidelity}, enabling them to simulate expert professional judgments. Dominant methodologies involve \gls{CoT} prompting to extract explicit criteria (Must-Haves, Deal-Breakers) from job descriptions and reason through candidate fit \cite{wei2023chainofthoughtpromptingelicitsreasoning}.
+To overcome data scarcity, state-of-the-art research leverages Large Language Models (LLMs) to generate synthetic labels for candidate suitability \cite{gan2024applicationllmagentsrecruitment}. Dominant methodologies involve \gls{CoT} prompting to extract explicit criteria (Must-Haves, Deal-Breakers) from job descriptions and reason through candidate fit \cite{wei2023chainofthoughtpromptingelicitsreasoning}.
+
+
+\subsection{Outline of the Following Chapters}
+The remainder of this thesis is structured as follows. Chapter~\ref{chap:preliminaries} introduces the notation, background concepts and evaluation metrics used throughout. Chapters~\ref{chap:user_recommendation} and \ref{chap:recruiter_recommendation} describe the job recommender and recruiter-side suitability model in detail. In Chapter~\ref{chap:congestion_balancing} both systems are integrated into a combined framework to mitigate congestion while preserving recommendation quality. Chapter~\ref{chap:experiments} presents the experimental evaluation across all three components. Chapter~\ref{chap:conclusion} summarises the findings and Chapter~\ref{ch:future-work} discusses limitations and possibilities for future research. 

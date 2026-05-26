@@ -3,132 +3,103 @@
 
 This chapter introduces the notations, background knowledge and evaluation metrics used throughout the thesis. The goal is to make the subsequent method chapters self-contained: a reader familiar with machine learning but not with recommender systems or two-sided markets should be able to follow the technical content without consulting external references.
 
-The chapter is organised as follows. Section~\ref{sec:prelim_notation} establishes notation. Section~\ref{sec:prelim_rs_background} covers concepts specific to recommender systems, including a taxonomy of filtering approaches and the two-sided market setting that motivates this work. Section~\ref{sec:prelim_ml_background} reviews the general machine learning techniques employed across the thesis. Section~\ref{sec:prelim_metrics} defines the evaluation metrics used in the experiments. Finally, Section~\ref{sec:prelim_related_work} situates this thesis within the broader literature on recommender systems, two-sided markets and congestion control.
+The chapter is organised as follows. Section~\ref{sec:prelim_notation} establishes notation. Section~\ref{sec:prelim_rs_background} covers concepts specific to recommender systems and the two-sided market setting that motivates this work. Section~\ref{sec:prelim_llm} briefly introduces \glspl{LLM} 
+and \gls{CoT} prompting as background for the synthetic label 
+generation approach used in Chapter~\ref{chap:recruiter_recommendation}. Section~\ref{sec:prelim_metrics} defines the evaluation metrics used in the experiments.
 
 \section{Notation}
 \label{sec:prelim_notation}
-Tables \ref{tab:notation_general}, \ref{tab:notation_user}, \ref{tab:notation_recruiter} and \ref{tab:notation_congestion} summarise the key symbols used throughout the chapters. 
-This table serves as a reference index rather than a prerequisite for reading.
+Table~\ref{tab:notation_all} summarises the key symbols used across all chapters.
+This table serves as a reference index rather than a prerequisite for reading. It is split into thematic blocks and can break across pages automatically if needed.
+\begin{longtable}{@{}ll@{}}
+    \caption{Notation used throughout the thesis.}
+    \label{tab:notation_all}\\
+    \toprule
+    \textbf{Symbol} & \textbf{Meaning} \\
+    \midrule
+    \endfirsthead
 
-\begin{table}[H]
-    \centering
-    \small
-    \caption{Notation: general symbols used throughout the thesis.}
-    \label{tab:notation_general}
-    \begin{tabular}{@{}ll@{}}
-        \toprule
-        \textbf{Symbol} & \textbf{Meaning} \\
-        \midrule
-        \multicolumn{2}{l}{\textit{Sets and individuals}} \\
-        \midrule
-        $\mathcal{U}$               & Set of all users (job seekers) \\
-        $\mathcal{J}$               & Set of all jobs \\
-        $u,\, j$                    & Individual user and job \\
-        $\mathcal{J}^{+}_u$         & Jobs applied to by user $u$ (positive interactions) \\
-        $\mathbf{x}_u,\,\mathbf{x}_j$ & Raw feature vectors for user and job \\
-        $\hat{y}$                   & Predicted score or probability \\
-        $y \in \{0,1\}$             & Binary ground-truth label \\
-        $N$                         & Number of training examples \\
-        \midrule
-        \multicolumn{2}{l}{\textit{Ranking and fairness metrics (Chapter~\ref{chap:preliminaries})}} \\
-        \midrule
-        $K$                         & Cutoff for ranking metrics (e.g.\ Hit@$K$) \\
-        $R_u^K$                     & Top-$K$ recommendation list for user $u$ \\
-        $r_i \in \{0,1\}$           & Relevance of the item at rank position $i$ \\
-        $G(\mathbf{x})$             & Gini coefficient over a count distribution $\mathbf{x}$ \\
-        \bottomrule
-    \end{tabular}
-\end{table}
+    \caption[]{Notation used throughout the thesis. (continued)}\\
+    \toprule
+    \textbf{Symbol} & \textbf{Meaning} \\
+    \midrule
+    \endhead
 
-% ── Table 2 of 4 ────────────────────────────────────────────────────
-\begin{table}[H]
-    \centering
-    \small
-    \caption{Notation: user-side job recommender system (Chapter~\ref{chap:user_recommendation}).}
-    \label{tab:notation_user}
-    \begin{tabular}{@{}ll@{}}
-        \toprule
-        \textbf{Symbol} & \textbf{Meaning} \\
-        \midrule
-        $\mathbf{e}_u,\,\mathbf{e}_j$  & Learned embedding vectors for user and job \\
-        $d$                             & Shared embedding output dimension \\
-        $d_u,\,d_j$                     & Input feature dimensionalities for user and job towers \\
-        $d_{\text{cat}}$                & Dimension of learnable categorical embedding layers \\
-        $d_{\text{text}}$               & Dimension of truncated pre-trained text embeddings \\
-        $s(\mathbf{e}_u,\mathbf{e}_j)$  & Compatibility score; typically $\mathbf{e}_u \cdot \mathbf{e}_j$ \\
-        $\sigma$                        & Sigmoid function $\sigma(x) = 1/(1+e^{-x})$ \\
-        \bottomrule
-    \end{tabular}
-\end{table}
+    \midrule
+    \multicolumn{2}{r}{\textit{Continued on next page}} \\
+    \endfoot
 
-% ── Table 3 of 4 ────────────────────────────────────────────────────
-\begin{table}[H]
-    \centering
-    \small
-    \caption{Notation: recruiter-side suitability model (Chapter~\ref{chap:recruiter_recommendation}).}
-    \label{tab:notation_recruiter}
-    \begin{tabular}{@{}ll@{}}
-        \toprule
-        \textbf{Symbol} & \textbf{Meaning} \\
-        \midrule
-        $\text{exp}_u$              & Candidate's total years of recorded experience \\
-        $\text{exp}_j^{\text{req}}$          & Years of experience required by job $j$ (regex-extracted) \\
-        $\delta_{\text{exp}}$       & Experience delta $\text{exp}_u - \text{exp}_j^{\text{req}}$ \\
-        $d_{\text{pca}}$            & Output dimensionality of PCA reduction \\
-        $F$                         & Total number of features in the recruiter feature vector \\
-        $\mathbf{f} \in \mathbb{R}^F$ & Recruiter feature vector for a $(u,j)$ pair \\
-        \bottomrule
-    \end{tabular}
-\end{table}
+    \bottomrule
+    \endlastfoot
 
-
-\begin{table}[H]
-    \centering
-    \small
-    \caption{Notation: hybrid congestion control (Chapters~\ref{chap:congestion}--\ref{chap:experiments}).}
-    \label{tab:notation_congestion}
-    \begin{tabular}{@{}ll@{}}
-        \toprule
-        \textbf{Symbol} & \textbf{Meaning} \\
-        \midrule
-        \multicolumn{2}{l}{\textit{Running counters}} \\
-        \midrule
-        $c_j^{(t)}$   & Applications received by job $j$ at simulation step $t$ \\
-        $v_u^{(t)}$   & Times candidate $u$ has been shortlisted at simulation step $t$ \\
-        \midrule
-        \multicolumn{2}{l}{\textit{Market-maker parameters}} \\
-        \midrule
-        $\tau_{\min},\,\tau_{\max}$                             & Generic lower / upper zone thresholds (starved / congested) \\
-        $\tau_{\min}^{\text{job}},\,\tau_{\max}^{\text{job}}$   & Job-side starved / congested thresholds (applications) \\
-        $\tau_{\min}^{\text{cand}},\,\tau_{\max}^{\text{cand}}$ & Candidate-side starved / congested thresholds (shortlists) \\
-        $H$                       & Generic hard cap; entities exceeding this are excluded \\
-        $H^{\text{job}}$          & Job-side hard cap (applications) \\
-        $H^{\text{cand}}$         & Candidate-side hard cap (shortlists) \\
-        $B,\,P$                   & Maximum boost and penalty magnitudes \\
-        $\gamma_b,\,\gamma_p$     & Linear boost and penalty rates \\
-        $\kappa_b,\,\kappa_p$     & Quadratic boost and penalty scaling parameters \\
-        $k$                       & Sigmoid steepness parameter \\
-        $\delta(\cdot)$           & Congestion modification function \\
-        \midrule
-        \multicolumn{2}{l}{\textit{Scoring and pipeline}} \\
-        \midrule
-        $s_{uj},\,\hat{s}_{uj}$   & Base and modified job-ranking score for $(u,j)$ \\
-        $r_{uj},\,\hat{r}_{uj}$   & Base and modified recruiter ranking score for $(u,j)$ \\
-        $p_{\text{TT}}$           & Two-Tower probability $\sigma(\hat{y}_{\text{TT}}) \in [0,1]$ \\
-        $p_{\text{rec}}$          & XGBoost recruiter suitability probability $\in [0,1]$ \\
-        $\alpha$                  & Bilateral score weight balancing $p_{\text{TT}}$ and $p_{\text{rec}}$ \\
-        $\bar{p}_{\text{rec}}^{\text{app}}$   & Average recruiter suitability over all applied $(u,j)$ pairs \\
-        $\bar{p}_{\text{rec}}^{\text{short}}$ & Average recruiter suitability over shortlisted $(u,j)$ pairs \\
-        \bottomrule
-    \end{tabular}
-\end{table}
-
+    \multicolumn{2}{l}{\textit{Sets and individuals}} \\
+    \midrule
+    $\mathcal{U}$                  & Set of all users (job seekers) \\
+    $\mathcal{J}$                  & Set of all jobs \\
+    $u,\, j$                       & Individual user and job \\
+    $\mathcal{J}^{+}_u$            & Jobs applied to by user $u$ (positive interactions) \\
+    $\mathbf{x}_u,\,\mathbf{x}_j$  & Input vectors for user and job tower respectively \\
+    $\hat{y}$                      & Predicted score or probability \\
+    $y \in \{0,1\}$                & Binary ground-truth label \\
+    $N$                            & Number of training examples \\
+    \midrule
+    \multicolumn{2}{l}{\textit{Ranking and fairness metrics
+        (Section~\ref{sec:prelim_metrics})}} \\
+    \midrule
+    $K$                            & Cutoff for ranking metrics (e.g.\ Hit@$K$) \\
+    $R_u^K$                        & Top-$K$ recommendation list for user $u$ \\
+    $r_i \in \{0,1\}$              & Relevance of the item at rank position $i$ \\
+    $G(\mathbf{x})$                & Gini coefficient over a count distribution $\mathbf{x}$ \\
+    \midrule
+    \multicolumn{2}{l}{\textit{User-side recommender system
+        (Chapter~\ref{chap:user_recommendation})}} \\
+    \midrule
+    $\mathbf{e}_u,\,\mathbf{e}_j$  & Learned embedding vectors for user and job \\
+    $d$                            & Shared embedding output dimension \\
+    $d_u,\,d_j$                    & Input feature dimensionalities for user and job towers \\
+    $d_{\text{cat}}$               & Dimension of learnable categorical embedding layers \\
+    $d_{\text{text}}$              & Dimension of truncated pre-trained text embeddings \\
+    $s(\mathbf{e}_u,\mathbf{e}_j)$ & Compatibility score; typically $\mathbf{e}_u \cdot \mathbf{e}_j$ \\
+    $\sigma$                       & Sigmoid function $\sigma(x) = 1/(1+e^{-x})$ \\
+    \midrule
+    \multicolumn{2}{l}{\textit{Recruiter-side suitability model
+        (Chapter~\ref{chap:recruiter_recommendation})}} \\
+    \midrule
+    $\text{exp}_u$                 & Candidate's total years of recorded experience \\
+    $\text{exp}_j^{\text{req}}$    & Years of experience required by job $j$ (regex-extracted) \\
+    $\delta_{\text{exp}}$          & Experience delta $\text{exp}_u - \text{exp}_j^{\text{req}}$ \\
+    $d_{\text{pca}}$               & Output dimensionality of PCA reduction \\
+    $F$                            & Total number of features in the recruiter feature vector \\
+    $\mathbf{f} \in \mathbb{R}^F$  & Recruiter feature vector for a $(u,j)$ pair \\
+    \midrule
+    \multicolumn{2}{l}{\textit{Hybrid congestion control
+        (Chapter~\ref{chap:congestion_balancing})}} \\
+    \midrule
+    $c_j^{(t)}$                    & Applications received by job $j$ at simulation step $t$ \\
+    $v_u^{(t)}$                    & Times candidate $u$ has been shortlisted at step $t$ \\[4pt]
+    $\tau_{\min},\,\tau_{\max}$    & Lower / upper zone thresholds (starved / congested) \\
+    $H$                            & Hard cap; entities exceeding this are excluded \\
+    $B,\,P$                        & Maximum boost and penalty magnitudes \\
+    $\gamma_b,\,\gamma_p$          & Linear boost and penalty rates \\
+    $\kappa_b,\,\kappa_p$          & Quadratic boost and penalty scaling parameters \\
+    $\kappa_s$                     & Sigmoid steepness parameter \\
+    $\delta(\cdot)$                & Congestion modification function \\[4pt]
+    $s_{uj},\,\hat{s}_{uj}$        & Base and modified job-ranking score for $(u,j)$ \\
+    $r_{uj},\,\hat{r}_{uj}$        & Base and modified recruiter ranking score for $(u,j)$ \\
+    $p_{\text{TT}}$                & Two-Tower probability $\sigma(\hat{y}_{\text{TT}}) \in [0,1]$ \\
+    $p_{\text{rec}}$               & XGBoost recruiter suitability probability $\in [0,1]$ \\
+    $\alpha$                       & Bilateral score weight balancing $p_{\text{TT}}$ and $p_{\text{rec}}$ \\
+    $\bar{p}_{\text{rec}}^{\text{app}}$
+                                   & Average recruiter suitability over all applied $(u,j)$ pairs \\
+    $\bar{p}_{\text{rec}}^{\text{short}}$
+                                   & Average recruiter suitability over shortlisted $(u,j)$ pairs \\
+\end{longtable}
 
 
 \section{Recommender Systems Background}
 \label{sec:prelim_rs_background}
 
-This section introduces the concepts specific to recommender systems that underpin this work: a taxonomy of filtering approaches, and the two-sided market dynamics that shape the job recommendation problem.
+This section introduces the concepts specific to recommender systems that form the basis of this research: a taxonomy of filtering approaches, neural embeddings as input, and the two-sided market dynamics that shape the job recommendation problem.
 
 \subsection{Recommender Systems}
 \label{sec:prelim_rs}
@@ -141,41 +112,19 @@ A recommender system is a function that, given a user $u$, returns a ranked list
 
 \textbf{Hybrid systems} combine both signals, typically by learning a joint representation that incorporates both interaction history and feature information \cite{li2018hybridrecommendationmethodbased}. The \gls{TT} neural architecture used in this thesis (Chapter~\ref{chap:user_recommendation}) is a state-of-the-art hybrid approach: it operates on user and job features, but the training objective is defined over observed application interactions.
 
-\subsection{Data Representations}
-\label{sec:prelim_representations}
-
-Representations are the feature encodings used as inputs to recommendation models. In this thesis we distinguish representation methods (how information is encoded) from model classes (the learning algorithms that consume those features). The main representation methods used are neural embeddings and classical TF‑IDF vectors; both are used throughout the experiments either alone or in combination.
-
-\subsubsection{Neural Embeddings}
+\subsection{Neural Embeddings}
 \label{sec:prelim_embeddings}
 
 A neural embedding is a learned mapping from a discrete or high-dimensional input to a dense, low-dimensional vector. Embeddings are the core representational tool used throughout this thesis. Two types appear:
 
 \textbf{Learnable embedding layers} are used for categorical features such as city or education level. Each unique category value is assigned a vector of dimension $d_{\text{cat}}$, and these vectors are updated during training by gradient descent. Unlike one-hot encodings, learned embeddings can capture semantic similarity: categories that behave similarly in the training data will converge to nearby vectors.
 
-\textbf{Pre-trained text embeddings} are used to encode natural language fields such as job titles, descriptions and work history. In this thesis, the Qwen3 Embedding model (0.6B parameters) is used to produce continuous vector representations of text. Further discussed in Chapter~\ref{chap:user_recommendation}.
-
-\subsubsection{TF-IDF Representations}
-\label{sec:prelim_tfidf}
-
-While neural embeddings capture semantic relationships through learned representations, a simpler and complementary approach is \textbf{Term Frequency–Inverse Document Frequency} (TF-IDF), a classical bag-of-words weighting scheme. Given a corpus of documents, the TF-IDF weight of a term $t$ in document $d$ is:
-
-\begin{equation}
-    \text{TF-IDF}(t, d) = \text{TF}(t, d) \cdot \log \frac{|\mathcal{D}|}{|\{d' \in \mathcal{D} : t \in d'\}|}
-\end{equation}
-
-where $\text{TF}(t, d)$ is the frequency of term $t$ in document $d$ and $|\mathcal{D}|$ is the total number of documents. Terms that appear often in a specific document but rarely across the corpus receive high weights, making them good discriminators.
-
-Each document is represented as a sparse vector of TF-IDF weights over the full vocabulary. The similarity between two such vectors is then measured using cosine similarity, which captures keyword-level overlap between two texts in a computationally efficient manner. TF-IDF requires no training and is fully interpretable, making it a useful complementary signal when explicit keyword matching is more informative than semantic proximity.
+\textbf{Pre-trained text embeddings} are used to encode natural language fields such as job titles, descriptions and work history. In this thesis, the Qwen3 Embedding model (0.6B parameters) \cite{yang2025qwen3technicalreport} and MiniLM \cite{wang2020minilmdeepselfattentiondistillation} are used to produce continuous vector representations of text. Further discussed in Chapter~\ref{chap:user_recommendation} and Chapter~\ref{chap:recruiter_recommendation}.
 
 \subsection{Two-Sided Markets and Congestion}
 \label{sec:prelim_twosided}
 
-A two-sided market is a platform that serves two distinct groups of participants whose value derives from interacting with each other \cite{mashayekhi2023challengebasedsurveyerecruitmentrecommendation}. The job market is a canonical example: job seekers derive value from being matched to a suitable job, and recruiters or employers derive value from finding suitable candidates. Unlike a one-sided market such as video streaming, where the same item can be consumed by arbitrarily many users simultaneously, the job market operates under \emph{capacity constraints}: each position can be filled by at most one candidate.
-
-This constraint leads to \textbf{market congestion}. Formally, congestion occurs when the recommendation distribution is highly concentrated: a large fraction of $\mathcal{U}$ are directed towards a small subset of $\mathcal{J}$, resulting in those jobs receiving far more applications than they can process, while other jobs receive too few. Congestion is harmful on both sides: over-exposed jobs create noise and decision fatigue for recruiters, and under-exposed jobs represent missed opportunities for seekers and vacant positions.
-
-Two concrete manifestations of congestion are studied in this thesis:
+As mentioned in the introduction, the job market is a two-sided market that operates under \emph{capacity constraints}: each position can be filled by at most one candidate. This constraint leads to \textbf{market congestion}. Formally, congestion occurs when the recommendation distribution is highly concentrated: a large fraction of $\mathcal{U}$ are directed towards a small subset of $\mathcal{J}$, resulting in those jobs receiving far more applications than they can process, while other jobs receive too few. Two concrete manifestations of congestion are studied in this thesis:
 
 \begin{itemize}
     \item \textbf{Job congestion}: a small number of jobs accumulate a disproportionate share of recommended applications. This is closely related to the popularity bias described in Section~\ref{sec:intro:motivation}.
@@ -186,54 +135,17 @@ Two concrete manifestations of congestion are studied in this thesis:
     pool.
 \end{itemize}
 
-A key goal of this research is to propose strategies that reduce both forms of congestion while preserving recommendation relevance for individual users.
-
-\section{Machine Learning Background}
-\label{sec:prelim_ml_background}
-
-This section reviews the general machine learning techniques employed in this work: the representational tools used to encode user and item features, the lightweight algorithms used for recruiter-side prediction, and the language model prompting strategy used to generate synthetic training labels.
-
-\subsection{Lightweight Machine Learning Models}
-\label{sec:prelim_lightweight}
 
 
-In addition to the neural architecture used for user-side recommendation, this thesis employs several lightweight machine learning algorithms trained on feature vectors composed of engineered signals, TF‑IDF vectors and precomputed neural text embeddings. See Chapter~\ref{chap:recruiter_recommendation} for details. These models include:
-\paragraph{Logistic Regression.} A linear model that estimates the 
-probability of a binary outcome via a weighted sum of input features. 
-It is interpretable and efficient, making it well-suited to the small 
-synthetic dataset used for recruiter-side training.
-
-\paragraph{Random Forest.} An ensemble of decision trees that improves 
-predictive performance by averaging the outputs of multiple trees trained 
-on random subsets of the data and features. It can capture non-linear 
-relationships and interactions between features.
-
-\paragraph{XGBoost.} A gradient boosting framework that builds an ensemble 
-of weak learners (typically decision trees) in a stage-wise manner, 
-optimising a differentiable loss function. It is known for its high 
-performance on structured data.
-
-\paragraph{Voting Classifier.} An ensemble method that combines the 
-predictions of multiple models (here: Logistic Regression, Random Forest 
-and XGBoost) by majority voting, improving robustness and generalisation 
-by leveraging the strengths of each.
-
-
-
-\subsection{Large Language Models and Prompting}
+\section{Large Language Models and Prompting}
 \label{sec:prelim_llm}
  
-A \gls{LLM} is a neural network trained on large amounts of text to predict the probability of the next token in a sequence. Through this objective, \gls{LLM} acquire generalised knowledge about language, facts and reasoning patterns. At inference time, an \gls{LLM} takes a natural language \emph{prompt} as input and generates a continuation --- making it usable as a reasoner without any task-specific retraining.
+A \gls{LLM} is a neural network trained on large amounts of text to predict the probability of the next token in a sequence. Through this objective, \glspl{LLM} acquire generalised knowledge about language, facts and reasoning patterns. At inference time, an \gls{LLM} takes a natural language \emph{prompt} as input and generates a continuation --- making it usable as a reasoner without any task-specific retraining.
  
-In this thesis, an \gls{LLM} is used not as a recommender system in itself, but as a \textbf{label generator}. Because no ground-truth recruiter feedback exists in the available dataset, an \gls{LLM} is prompted to act as a recruiter and evaluate candidate-job fit using different features and assign a binary label to each $(u,j)$ pair. The quality of these synthetic labels determines the quality of the recruiter-side model trained on them, making the prompting strategy a critical design choice.
- 
-\subsubsection{Naive Prompting and Its Limitations}
- 
-A naive prompt instructs the model to perform a task in a single step: for example, \emph{``Given this candidate profile and job description, is this a good fit? Answer yes or no.''}. In practice, this approach produces inconsistent outputs for structured evaluation tasks. The model may apply different implicit criteria across examples as each prompt is independently generated when making different calls to the model. This leads to inconsistent labels and noise, which consequently degrades the performance of models trained on the labeled data.
-\subsubsection{Chain-of-Thought Prompting}
+In this thesis, an \gls{LLM} is used as a \textbf{label generator}. Because no ground-truth recruiter feedback exists in the available dataset, an \gls{LLM} is prompted to act as a recruiter and evaluate candidate-job fit using different features and assign a binary label to each $(u,j)$ pair. The quality of these synthetic labels determines the quality of the recruiter model trained on them, making the prompting strategy a critical design choice.
+\subsection{Chain-of-Thought Prompting}
 \label{sec:prelim_cot}
- 
-\gls{CoT} prompting addresses this issue by explicitly instructing the model to reason step by step before arriving at a conclusion \cite{wei2023chainofthoughtpromptingelicitsreasoning}. Rather than asking for a direct answer, the prompt structures the reasoning process which guides the \gls{LLM} to build up its answer from explicit intermediate steps.
+A standard prompt instructs the model to perform a task in a single step: for example, \emph{``Given this candidate profile and job description, is this a good fit? Answer yes or no.''}. This approach produces inconsistent outputs due to the stochastic nature of \glspl{LLM}. \gls{CoT} prompting addresses the issue by explicitly instructing the model to reason step by step before arriving at a conclusion \cite{wei2023chainofthoughtpromptingelicitsreasoning}. Rather than asking for a direct answer, the prompt structures the reasoning process which guides the \gls{LLM} to build up its answer from explicit intermediate steps.
  
 This structured approach has two practical benefits for label generation. First, it forces the model to be explicit about the criteria it is applying, making inconsistencies visible and correctable through prompt refinement, also known as prompt engineering. Second, it anchors the final label to intermediate reasoning steps, reducing the risk of outputs that are superficially plausible but logically unsupported. The design of the \gls{CoT} prompt used in this thesis is discussed in Chapter~\ref{chap:recruiter_recommendation}.
 
@@ -267,7 +179,7 @@ Given a binary prediction $\hat{y} \in \{0,1\}$ and ground truth $y \in \{0,1\}$
     \text{F1} = 2 \cdot \frac{\text{Precision} \cdot \text{Recall}}{\text{Precision} + \text{Recall}}
 \end{equation}
 
-\textbf{AUC-ROC} (Area Under the Receiver Operating Characteristic Curve) measures the probability that a randomly chosen positive example is scored higher than a randomly chosen negative example. Unlike accuracy, it is threshold-independent and therefore more informative when the positive-negative ratio in the evaluation set differs from the deployment setting (further discussed in Chapter~\ref{chap:experiments}). AUC-ROC is the primary metric for evaluating the user-side recommendation model during training.
+\textbf{AUC-ROC} (Area Under the Receiver Operating Characteristic Curve) measures the probability that a randomly chosen positive example is scored higher than a randomly chosen negative example. Unlike accuracy, it is threshold-independent and therefore more informative when the positive-negative ratio in the evaluation set differs from the deployment setting (further discussed in Chapter~\ref{chap:experiments}). \gls{AUC-ROC} is the primary metric for evaluating the user-side recommendation model during training.
 
 \subsection{Ranking Metrics}
 \label{sec:prelim_ranking}
