@@ -174,7 +174,7 @@ distribution ensures the model learns to discriminate at each geographic
 granularity rather than exploiting an artificial balance. The effect of 
 this is confirmed qualitatively in Section~\ref{sec:exp_user_inference}.
 
-\subsection{Hyperparameters and Training Settings}
+\subsection{Training Configuration and Hyperparameters}
 \label{sec:exp_user_hyperparameters}
 
 Each categorical feature is mapped to a 16-dimensional embedding and 
@@ -400,7 +400,7 @@ This user is based in Philadelphia, PA, holds a high school diploma and has only
 
 \section{Recruiter-Side Suitability Model Experiments}
 \label{sec:exp_recruiter}
-% ============================================================
+%============================================================
 
 This section describes the experiments for the recruiter-side suitability model. The goal of these experiments is to train and evaluate a classifier that can predict the suitability of a candidate for a given job. The structure of this section mirrors that of the user-side experiments, covering the experiment goal, setting, dataset creation, training configuration and hyperparameters, experiment results, and a qualitative sanity checks.
 
@@ -412,43 +412,30 @@ The recruiter-side experiments address two design choices that must be made befo
 \subsection{Experiment Setting}
 \label{sec:exp_recruiter_setting}
 
-LLM-labelled pairs are drawn from Windows~1--4, these pairs are split into a training, validation and test set.
-Window~7 is not used for training or model selection; it serves
-exclusively as the deployment window for the qualitative sanity check
-and the congestion balancing simulation of
-Chapter~\ref{chap:congestion_balancing}. 
+LLM-labelled pairs are drawn from Windows~1--4. Unlike the user-side 
+experiments, no window-level validation split is used: the labelled 
+dataset is small (5{,}896 pairs) and a job-level split is sufficient 
+for reliable model selection at this scale. Jobs are randomly 
+partitioned into an 80\% pool for cross-validation and a held-out 
+test set of 20\% used only once after the final model has been 
+chosen. Model selection uses group 5-fold cross-validation with jobs 
+kept intact across folds, and \gls{AUC-ROC} as the primary selection 
+criterion. Window~7 is not used for training or model selection; it 
+serves exclusively as the deployment window for the qualitative 
+sanity check and the congestion balancing simulation of 
+Chapter~\ref{chap:congestion_balancing}.
 
 \subsection{Dataset Creation}
 \label{sec:exp_recruiter_datagen}
-Unlike the \gls{TT} model, which derives its training signal directly
-from observed applications, the recruiter-side model requires an
-additional labeling step before any dataset can be constructed. The
-labeling procedure is described in Section~\ref{sec:recruiter_data_gen};
-this section covers the implementation details.
 
-Labels are generated using the Qwen3.5~(35B) model served locally via
-the Ollama API. For computational feasibility, a sample of jobs is drawn
-from Windows~1--4; for each job, up to 20 applicants are evaluated to ensure a diverse set of examples. The prompt enforces consistency through three
-mechanisms: explicit fit level rules that remove threshold ambiguity, a
-structured JSON output format that requires the model to state
-must-haves, deal-breakers, and a reasoning trace before assigning a
-label, and notes addressing failure modes observed during
-iterative prompt development. An example of a note is the
-treatment of missing values: without explicit instruction, the model
-would sometimes assume absent profile fields indicated average candidates rather
-than missing information, producing optimistic fit levels.
-Responses that fail JSON parsing or contain unexpected fit level values
-are discarded. The full prompt and an example output are provided in
-Appendix~\ref{app:llm_prompt}.
-
-The resulting dataset contains 5,896 labeled pairs across 1,511 unique
-jobs. Table~\ref{tab:recruiter_label_dist} shows the fit level
-distribution. The negative class accounts for 54.1\% of pairs,
-slightly outnumbering positives --- a direct consequence of the strict
-evaluation style: missing profile fields are treated as absent features
-and Poor Fit is the most frequent label at 41.9\%, consistent with
-many applicants lacking one or more stated must-haves. Class weights
-are applied during training inversely proportional to class frequency.
+Labels are generated using the Qwen3.5 (35B) model served locally 
+via the Ollama API, following the procedure described in 
+Section~\ref{sec:recruiter_data_gen}. For each job, up to 20 applicants are evaluated. 
+Responses that fail JSON parsing or contain unexpected fit level 
+values are discarded. The resulting dataset contains 5,896 labeled 
+pairs across 1,511 unique jobs, with the fit level distribution 
+shown in Table~\ref{tab:recruiter_label_dist}. The full prompt 
+and an example output are provided in Appendix~\ref{app:llm_prompt}.
 
 \begin{table}[htbp]
     \centering
@@ -474,23 +461,13 @@ The negative sampling is not described here as in Section~ref{exp:} because this
 
 \subsection{Training Configuration and Hyperparameters}
 \label{sec:exp_recruiter_training_config}
-
-To evaluate generalisation to unseen jobs, all candidate-job pairs
-belonging to a given job are assigned exclusively to one partition.
-Jobs are randomly partitioned into 80\% for cross-validation and final
-model training, and a held-out test set of 20\% used only once after
-the final model has been chosen.
-
-Model selection uses group 5-fold cross-validation, with jobs kept
-intact across folds. Within each fold, the \gls{TF-IDF} vectorizer, \gls{PCA}
-transformer, and feature scaler are fitted exclusively on the fold's
-training portion and applied to the fold's validation portion to
-prevent leakage. Performance is reported using Accuracy, Precision,
-Recall, F1-score, and \gls{AUC-ROC} as defined in
-Section~\ref{sec:prelim_metrics}, with \gls{AUC-ROC} as the primary
-selection criterion. Table~\ref{tab:recruiter_hyperparams} lists the
+Within each fold, the \gls{TF-IDF} vectorizer, \gls{PCA} transformer, 
+and feature scaler are fitted exclusively on the fold's training 
+portion to prevent leakage. The \gls{PCA} transformer reduces the 
+$2d_{\text{text}} = 200$-dimensional interaction vector to 
+$d_{\text{pca}} = 80$ components, retaining 92.9\% of the total 
+variance. Table~\ref{tab:recruiter_hyperparams} lists the 
 hyperparameters used for each candidate classifier.
-
 \begin{table}[H]
     \centering
     \caption{Hyperparameters for each candidate classifier.}

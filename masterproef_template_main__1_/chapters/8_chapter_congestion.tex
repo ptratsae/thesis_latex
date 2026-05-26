@@ -32,9 +32,9 @@ The penalty grows at a constant rate per unit of congestion beyond the safe
 zone:
 \begin{equation}
     \delta_{\text{lin}}(c) = \begin{cases}
-        \min\!\bigl(\gamma_b \cdot (\tau_{\min} - c),\; B\bigr) & c < \tau_{\min}, \\
-        0 & \tau_{\min} \leq c \leq \tau_{\max}, \\
-        \max\!\bigl(-\gamma_p \cdot (c - \tau_{\max}),\; -P\bigr) & c > \tau_{\max},
+        \min\!\bigl(\gamma_b \cdot (\tau_{\min}^{\text{job}} - c),\; B\bigr) & c < \tau_{\min}^{\text{job}}, \\
+        0 & \tau_{\min}^{\text{job}} \leq c \leq \tau_{\max}^{\text{job}}, \\
+        \max\!\bigl(-\gamma_p \cdot (c - \tau_{\max}^{\text{job}}),\; -P\bigr) & c > \tau_{\max}^{\text{job}},
     \end{cases}
 \end{equation}
 where $B$ and $P$ are the maximum boost and penalty magnitudes respectively,
@@ -46,9 +46,9 @@ The penalty grows quadratically, starting slowly for mildly congested jobs and
 accelerating as congestion increases:
 \begin{equation}
     \delta_{\text{quad}}(c) = \begin{cases}
-        \min\!\bigl(\kappa_b \cdot (\tau_{\min} - c)^2,\; B\bigr) & c < \tau_{\min}, \\
-        0 & \tau_{\min} \leq c \leq \tau_{\max}, \\
-        \max\!\bigl(-\kappa_p \cdot (c - \tau_{\max})^2,\; -P\bigr) & c > \tau_{\max},
+        \min\!\bigl(\kappa_b \cdot (\tau_{\min}^{\text{job}} - c)^2,\; B\bigr) & c < \tau_{\min}^{\text{job}}, \\
+        0 & \tau_{\min}^{\text{job}} \leq c \leq \tau_{\max}^{\text{job}}, \\
+        \max\!\bigl(-\kappa_p \cdot (c - \tau_{\max}^{\text{job}})^2,\; -P\bigr) & c > \tau_{\max}^{\text{job}},
     \end{cases}
 \end{equation}
 where $\kappa_b$ and $\kappa_p$ are scaling parameters.
@@ -58,14 +58,14 @@ A smooth S-curve naturally bounds the modification within $[-P, B]$ without
 requiring explicit clamping:
 \begin{equation}
     \delta_{\text{sig}}(c) = \begin{cases}
-        B \cdot \!\left(\dfrac{2}{1 + e^{-k(\tau_{\min} - c)}} - 1\right)
-            & c < \tau_{\min}, \\[6pt]
-        0 & \tau_{\min} \leq c \leq \tau_{\max}, \\[6pt]
-        -P \cdot \!\left(\dfrac{2}{1 + e^{-k(c - \tau_{\max})}} - 1\right)
-            & c > \tau_{\max},
+        B \cdot \!\left(\dfrac{2}{1 + e^{-\kappa_s(\tau_{\min}^{\text{job}} - c)}} - 1\right)
+            & c < \tau_{\min}^{\text{job}}, \\[6pt]
+        0 & \tau_{\min}^{\text{job}} \leq c \leq \tau_{\max}^{\text{job}}, \\[6pt]
+        -P \cdot \!\left(\dfrac{2}{1 + e^{-\kappa_s(c - \tau_{\max}^{\text{job}})}} - 1\right)
+            & c > \tau_{\max}^{\text{job}},
     \end{cases}
 \end{equation}
-where $k$ controls the steepness of the curve.
+where $\kappa_s$ controls the steepness of the curve.
 
 All three functions share the same boundary values ($B$, $P$,
 $H^{\text{job}}$) but differ in how quickly the modification grows
@@ -96,7 +96,7 @@ simulation run. The modified recruiter ranking score is:
 where $r_{uj}$ is the recruiter model's base suitability probability and
 $\delta_{\text{cand}}(\cdot)$ uses the same three functional forms as
 Section~\ref{sec:job_congestion} but parameterised with candidate-side
-thresholds $\tau_{\min}^{\text{cand}}$ and $\tau_{\max}^{\text{cand}}$. The
+thresholds $\tau_{\min}^{\text{cand}}$ and $\tau_{\max}^{\text{cand}}$. The same values for ($B$, $P$) are used and a candidate-side hard cap $H^{\text{cand}}$ is applied. The
 top-$k$ candidates by $\hat{r}_{uj}$ are shortlisted for each job. As more
 job inboxes are processed sequentially, candidates who have been shortlisted
 frequently accumulate negative modifications, naturally redirecting recruiter

@@ -68,8 +68,11 @@ This table serves as a reference index rather than a prerequisite for reading. I
     $\text{exp}_u$                 & Candidate's total years of recorded experience \\
     $\text{exp}_j^{\text{req}}$    & Years of experience required by job $j$ (regex-extracted) \\
     $\delta_{\text{exp}}$          & Experience delta $\text{exp}_u - \text{exp}_j^{\text{req}}$ \\
+    $\mathbf{v}_u^{\text{tfidf}}$ & Candidate TF-IDF vector \\ 
+    $\mathbf{v}_j^{\text{tfidf}}$ & Job TF-IDF vector \\
     $d_{\text{pca}}$               & Output dimensionality of PCA reduction \\
-    $F$                            & Total number of features in the recruiter feature vector \\
+    $\mathbf{p}_{uj}$ & PCA-compressed interaction vector for pair $(u,j)$ \\
+
     $\mathbf{f} \in \mathbb{R}^F$  & Recruiter feature vector for a $(u,j)$ pair \\
     \midrule
     \multicolumn{2}{l}{\textit{Hybrid congestion control
