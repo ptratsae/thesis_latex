@@ -86,7 +86,7 @@ Candidate Profiles: {profiles_text}
 \subsection*{Example Output}
 
 The following shows a model response for a single
-candidate--job pair. The model states the extracted must-haves,
+$(u,j)$ pair. The model states the extracted must-haves,
 nice-to-haves, and deal-breakers before assigning a fit level,
 ensuring the reasoning is traceable and the label is not assigned
 without justification.
@@ -106,7 +106,7 @@ without justification.
   ]
 }
 \end{minted}
-\caption{Example LLM JSON output for a single candidate--job evaluation.}
+\caption{Example LLM JSON output for a single $(u,j)$ pair evaluation.}
 \label{lst:llm_json_output}
 \end{listing}
 
@@ -164,7 +164,7 @@ than re-ranking within fixed inboxes in Phase~2.
     all four universes. Historical Reality is shown for distributional reference
     only and uses organic self-selected applications.
     $\bar{p}_\text{TT}$ and $\bar{p}_\text{rec}^\text{app}$ are the average Two-Tower and
-    recruiter probabilities over all applied (user, job) pairs.}
+    recruiter probabilities over all applied $(u,j)$ pairs.}
     \label{tab:app_hybrid_job}
     \small
     \begin{tabular}{lccccccc}

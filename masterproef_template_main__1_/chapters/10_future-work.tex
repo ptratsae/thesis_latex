@@ -79,8 +79,8 @@ background remain significant even in recent models~\cite{iso2025evaluatingbiasl
 feedback would remove this layer of indirection entirely and allow the model to learn from ground truth rather than a simulation of it.
 
 A second limitation concerns the small size of the labelled dataset. With fewer than 6,000
-candidate--job pairs, the XGBoost classifier is trained on a small subset of the full
-diversity of candidate--job combinations present in the CareerBuilder dataset. Performance on unusual or underrepresented job categories is therefore difficult to
+$(u,j)$ pairs, the XGBoost classifier is trained on a small subset of the full
+diversity of $(u,j)$ combinations present in the CareerBuilder dataset. Performance on unusual or underrepresented job categories is therefore difficult to
 assess, and the model may not generalise well to posting styles or candidate profiles
 not covered by the labelled sample. The bottleneck here is the computational
 cost of LLM-based labelling at scale. Future work could address this through faster
@@ -116,7 +116,7 @@ experience levels, or semantically distant while actually constituting a strong 
 match. The cosine similarity feature therefore measures the wrong thing at a fine-grained
 level, and the model can only compensate for this through the other features in the vector.
 A future direction would be to fine-tune the text encoder on recruiter-labelled
-candidate--job pairs, so that proximity in the embedding space reflects qualification
+$(u,j)$ pairs, so that proximity in the embedding space reflects qualification
 judgments rather than general language similarity.
 
 \section{Congestion Balancing}

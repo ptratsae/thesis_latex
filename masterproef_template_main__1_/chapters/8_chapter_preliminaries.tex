@@ -7,10 +7,8 @@ The chapter is organised as follows. Section~\ref{sec:prelim_notation} establish
 
 \section{Notation}
 \label{sec:prelim_notation}
-Table~\ref{tab:notation} summarises the key symbols used throughout. 
-Symbols specific to later chapters are listed here for completeness 
-and will be reintroduced with full context when first used; this 
-table serves as a reference index rather than a prerequisite for reading.
+Tables \ref{tab:notation_general}, \ref{tab:notation_user}, \ref{tab:notation_recruiter} and \ref{tab:notation_congestion} summarise the key symbols used throughout the chapters. 
+This table serves as a reference index rather than a prerequisite for reading.
 
 \begin{table}[H]
     \centering
@@ -74,11 +72,11 @@ table serves as a reference index rather than a prerequisite for reading.
         \textbf{Symbol} & \textbf{Meaning} \\
         \midrule
         $\text{exp}_u$              & Candidate's total years of recorded experience \\
-        $e_j^{\text{req}}$          & Years of experience required by job $j$ (regex-extracted) \\
-        $\delta_{\text{exp}}$       & Experience delta $\text{exp}_u - e_j^{\text{req}}$ \\
+        $\text{exp}_j^{\text{req}}$          & Years of experience required by job $j$ (regex-extracted) \\
+        $\delta_{\text{exp}}$       & Experience delta $\text{exp}_u - \text{exp}_j^{\text{req}}$ \\
         $d_{\text{pca}}$            & Output dimensionality of PCA reduction \\
         $F$                         & Total number of features in the recruiter feature vector \\
-        $\mathbf{f} \in \mathbb{R}^F$ & Recruiter feature vector for a candidate–job pair \\
+        $\mathbf{f} \in \mathbb{R}^F$ & Recruiter feature vector for a $(u,j)$ pair \\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -119,8 +117,8 @@ table serves as a reference index rather than a prerequisite for reading.
         $p_{\text{TT}}$           & Two-Tower probability $\sigma(\hat{y}_{\text{TT}}) \in [0,1]$ \\
         $p_{\text{rec}}$          & XGBoost recruiter suitability probability $\in [0,1]$ \\
         $\alpha$                  & Bilateral score weight balancing $p_{\text{TT}}$ and $p_{\text{rec}}$ \\
-        $\bar{p}_{\text{rec}}^{\text{app}}$   & Average recruiter suitability over all applied pairs \\
-        $\bar{p}_{\text{rec}}^{\text{short}}$ & Average recruiter suitability over shortlisted pairs \\
+        $\bar{p}_{\text{rec}}^{\text{app}}$   & Average recruiter suitability over all applied $(u,j)$ pairs \\
+        $\bar{p}_{\text{rec}}^{\text{short}}$ & Average recruiter suitability over shortlisted $(u,j)$ pairs \\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -227,7 +225,7 @@ by leveraging the strengths of each.
  
 A \gls{LLM} is a neural network trained on large amounts of text to predict the probability of the next token in a sequence. Through this objective, \gls{LLM} acquire generalised knowledge about language, facts and reasoning patterns. At inference time, an \gls{LLM} takes a natural language \emph{prompt} as input and generates a continuation --- making it usable as a reasoner without any task-specific retraining.
  
-In this thesis, an \gls{LLM} is used not as a recommender system in itself, but as a \textbf{label generator}. Because no ground-truth recruiter feedback exists in the available dataset, an \gls{LLM} is prompted to act as a recruiter and evaluate candidate-job fit using different features and assign a binary label to each pair. The quality of these synthetic labels determines the quality of the recruiter-side model trained on them, making the prompting strategy a critical design choice.
+In this thesis, an \gls{LLM} is used not as a recommender system in itself, but as a \textbf{label generator}. Because no ground-truth recruiter feedback exists in the available dataset, an \gls{LLM} is prompted to act as a recruiter and evaluate candidate-job fit using different features and assign a binary label to each $(u,j)$ pair. The quality of these synthetic labels determines the quality of the recruiter-side model trained on them, making the prompting strategy a critical design choice.
  
 \subsubsection{Naive Prompting and Its Limitations}
  

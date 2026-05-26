@@ -30,7 +30,7 @@ matching datasets: while job-seeker behaviour is recorded at scale, recruiter
 decisions are largely off-platform and invisible. To bridge this gap, a large
 language model (Qwen3.5, 35B parameters) was prompted with structured
 Chain-of-Thought reasoning to generate synthetic candidate-fit labels,
-producing a dataset of 5,896 labelled candidate--job pairs across 1,511 unique
+ producing a dataset of 5,896 labelled $(u,j)$ pairs across 1,511 unique
 jobs. A lightweight XGBoost classifier was then trained on a feature set
 combining heuristic signals (experience delta, TF-IDF keyword overlap, degree
 alignment) with semantic signals (Qwen3 embedding interaction matrix, MiniLM

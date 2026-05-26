@@ -25,7 +25,7 @@ All experiments are conducted on the CareerBuilder Job Recommendation dataset~\c
     \end{tabular}
 \end{table}
 
-The extremely high sparsity --- fewer than one in 200,000 user-job pairs has a recorded interaction --- means that collaborative approaches relying on interaction density are infeasible. The two-tower architecture instead uses interactions as a training signal while generalising through user and job profile features, making it robust to sparse data.
+The extremely high sparsity --- fewer than one in 200,000 $(u,j)$ pairs has a recorded interaction --- means that collaborative approaches relying on interaction density are infeasible. The two-tower architecture instead uses interactions as a training signal while generalising through user and job profile features, making it robust to sparse data.
 
 \subsection{Temporal Window Split}
 \label{sec:custom_split}
@@ -158,7 +158,7 @@ is applied to entirely new users and jobs as it would be in production. This way
 
 \subsection{Dataset Creation}
 \label{sec:exp_user_datagen}
-From the 189,657 users in the training set, a random sample of 25,000 users per window is drawn to create a manageable training set of 100,000 users. With a median of 2 applications per user, this results in approximately 200,000 positive user-job pairs for training. The validation set is not subsampled and contains all 78,428 users having approximately 156,856 positive user-job pairs for validation. For each positive pair $(u, j^+)$, four negatives are sampled according 
+From the 189,657 users in the training set, a random sample of 25,000 users per window is drawn to create a manageable training set of 100,000 users. With a median of 2 applications per user, this results in approximately 200,000 positive $(u,j)$ pairs for training. The validation set is not subsampled and contains all 78,428 users having approximately 156,856 positive $(u,j)$ pairs for validation. For each positive pair $(u,j^+)$, four negatives are sampled according 
 to a \textbf{2:1:1 ratio}:
 \begin{itemize}
     \item \textbf{2 cross-state negatives}: jobs from states other than the user's own state, sampled from the same temporal window. These teach the model that geographic fit is a genuine signal.
@@ -997,7 +997,7 @@ strategy has the highest Gini (0.5994) and the largest starved fraction
     \centering
     \caption{Job-side market-maker results on Window~7. Historical W7 shows
     the raw application distribution for reference. $\bar{p}_{\text{TT}}$ is
-    the average Two-Tower probability of applied (user, job) pairs;
+    the average Two-Tower probability of applied $(u,j)$ pairs;
     $\bar{p}_{\text{rec}}^{\text{app}}$ is the average recruiter suitability probability over all applications.
     Both serve as proxies for match quality.}
     \label{tab:job_mm_results}
@@ -1326,7 +1326,7 @@ achieves the best results across all metrics.
     Historical Reality shows the raw application distribution for reference
     only.
     $\bar{p}_\text{TT}$ and $\bar{p}_{\text{rec}}^{\text{app}}$ are the average Two-Tower
-    and recruiter probabilities over all applied (user, job) pairs.}
+    and recruiter probabilities over all applied $(u,j)$ pairs.}
     \label{tab:hybrid_job}
     \small
     \begin{tabular}{lcccccc}

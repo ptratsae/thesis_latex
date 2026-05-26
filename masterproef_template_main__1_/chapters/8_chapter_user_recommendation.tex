@@ -8,7 +8,7 @@ First, the dataset construction with negative sampling strategy is described in 
 \section{Dataset Construction with Negative Sampling}
 \label{sec:dataset_construction}
 
-Because the interaction log contains only positive examples, negative examples are constructed during dataset creation. For each positive $(u, j)$ pair we sample a mixture of hard and easy negatives: a fraction of negatives are drawn from geographically close jobs while the remainder are sampled from distant jobs. This stratified negative sampling prevents the model from learning trivial separations based only on coarse attributes and ensures it distinguishes true preference from mere co-location. The specific sampling ratio is reported in Section~\ref{sec:exp_user_datagen}.
+Because the interaction log contains only positive examples, negative examples are constructed during dataset creation. For each positive $(u,j)$ pair we sample a mixture of hard and easy negatives: a fraction of negatives are drawn from geographically close jobs while the remainder are sampled from distant jobs. This stratified negative sampling prevents the model from learning trivial separations based only on coarse attributes and ensures it distinguishes true preference from mere co-location. The specific sampling ratio is reported in Section~\ref{sec:exp_user_datagen}.
 
 
 \section{Feature Engineering}

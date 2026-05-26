@@ -17,7 +17,7 @@ is addressed followed by candidate-side congestion. The evidence of both congest
 
 Job congestion arises when the recommendation distribution concentrates applications on a small subset of popular job postings, leaving the majority under-applied. To redistribute traffic more equitably, a market-maker modification is applied to the job ranking score during the recommendation phase. The modification is a function of each job's current application count at the time a user is being processed, so that already-popular jobs are progressively penalised and under-applied jobs receive a visibility boost.
 
-Concretely, at the moment user $u$ is being processed, let $c_j^{(t)}$ denote the number of applications job $j$ has already received from previously processed users in the current simulation run. The modified ranking score for the $(u, j)$ pair is:
+Concretely, at the moment user $u$ is being processed, let $c_j^{(t)}$ denote the number of applications job $j$ has already received from previously processed users in the current simulation run. The modified ranking score for the $(u,j)$ pair is:
 \begin{equation}
     \hat{s}_{uj} = s_{uj} + \delta\!\left(c_j^{(t)}\right),
 \end{equation}
