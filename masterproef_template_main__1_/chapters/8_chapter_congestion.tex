@@ -4,27 +4,29 @@
 Now that both the user-side job recommender system
 (Chapter~\ref{chap:user_recommendation}) and the recruiter-side suitability model (Chapter~\ref{chap:recruiter_recommendation}) have been developed, the
 next step is to mitigate the congestion that emerges as a consequence of
-recommendation at scale. Both forms are first
+recommendation at scale. Throughout this chapter and the congestion experiments (\ref{sec:exp_congestion}), each user is assumed to apply to exactly the top-$k_u$ recommended jobs, where $k_u$ matches their historical application count. Both forms are first
 addressed in isolation using the Gini-based measurement framework and
 market-maker intervention strategies. The two
 strategies are then combined into a two-phased approach where first job congestion
 is addressed followed by candidate-side congestion. The evidence of both congestion forms and the effectiveness of the proposed mitigation strategies are evaluated in a simulated environment using the dataset described in Section~\ref{sec:exp_congestion}.
 
+
+This chapter starts with the job-side market-maker intervention in Section~\ref{sec:job_congestion} and candidate-side market-maker intervention in Section~\ref{sec:user_congestion}. This is followed by the bilateral scoring approach in Section~\ref{sec:bilateral_scoring}, which combines the user and recruiter models into a single score. Finally, the complete two-phase pipeline is described in Section~\ref{sec:hybrid_strategy}, which integrates all three previous components into a unified system.  
 % ============================================================
 \section{Job-Side Market-Maker Intervention}
 \label{sec:job_congestion}
 % ============================================================
 
-Job congestion arises when the recommendation distribution concentrates applications on a small subset of popular job postings, leaving the majority under-applied. To redistribute traffic more equitably, a market-maker modification is applied to the job ranking score during the recommendation phase. The modification is a function of each job's current application count at the time a user is being processed, so that already-popular jobs are progressively penalised and under-applied jobs receive a visibility boost.
+Job congestion arises when the application distribution concentrates applications on a small subset of popular job postings, leaving the majority under-applied. To redistribute traffic more equitably, a market-maker modification is applied to the job ranking score during the recommendation phase. The modification is a function of each job's current application count at the time a user is being processed, so that already-popular jobs are progressively penalised and under-applied jobs receive a visibility boost.
 
 Concretely, at the moment user $u$ is being processed, let $c_j^{(t)}$ denote the number of applications job $j$ has already received from previously processed users in the current simulation run. The modified ranking score for the $(u,j)$ pair is:
 \begin{equation}
-    \hat{s}_{uj} = s_{uj} + \delta\!\left(c_j^{(t)}\right),
+    \hat{s}_{uj} = s_{uj} + \delta_{\text{job}}\!\left(c_j^{(t)}\right),
 \end{equation}
 where $s_{uj}$ is the base relevance score from the \gls{TT} model,
-$\delta(\cdot)$ is a congestion modification function. Jobs within the safe zone $[\tau_{\min}^{\text{job}}, \tau_{\max}^{\text{job}}]$ receive no
-modification ($\delta = 0$). Starved jobs ($c_j^{(t)} < \tau_{\min}^{\text{job}}$) receive a positive boost to increase their visibility. Congested jobs ($c_j^{(t)} > \tau_{\max}^{\text{job}}$) receive a negative penalty to reduce
-further applications. Jobs where $c_j^{(t)} \geq H^{\text{job}}$ for any time step $t$ are penalised heavily to ensure they are at the bottom of the ranking. Three functional forms for $\delta$ are considered,each making a different assumption about how aggressively congestion should be
+$\delta_{\text{job}}(\cdot)$ is a job congestion modification function. Jobs within the safe zone $[\tau_{\min}^{\text{job}}, \tau_{\max}^{\text{job}}]$ receive no
+modification ($\delta_{\text{job}} = 0$). Starved jobs ($c_j^{(t)} < \tau_{\min}^{\text{job}}$) receive a positive boost to increase their visibility. Congested jobs ($c_j^{(t)} > \tau_{\max}^{\text{job}}$) receive a negative penalty to reduce
+further applications. Jobs where $c_j^{(t)} \geq H^{\text{job}}$ for any time step $t$ are penalised heavily to ensure they are at the bottom of the ranking. Three functional forms for $\delta_{\text{job}}$ are considered, each making a different assumption about how aggressively congestion should be
 penalised.
 
 \paragraph{Linear modification.}
@@ -94,14 +96,14 @@ simulation run. The modified recruiter ranking score is:
     \hat{r}_{uj} = r_{uj} + \delta_{\text{cand}}\!\left(v_u^{(t)}\right),
 \end{equation}
 where $r_{uj}$ is the recruiter model's base suitability probability and
-$\delta_{\text{cand}}(\cdot)$ uses the same three functional forms as
+$\delta_{\text{cand}}(\cdot)$ --- the candidate-side congestion modification function --- uses the same three functional forms as
 Section~\ref{sec:job_congestion} but parameterised with candidate-side
-thresholds $\tau_{\min}^{\text{cand}}$ and $\tau_{\max}^{\text{cand}}$. The same values for ($B$, $P$) are used and a candidate-side hard cap $H^{\text{cand}}$ is applied. The
-top-$k$ candidates by $\hat{r}_{uj}$ are shortlisted for each job. As more
+thresholds $\tau_{\min}^{\text{cand}}$ and $\tau_{\max}^{\text{cand}}$. The same values for ($B$, $P$) are used and a candidate-side hard cap $H^{\text{cand}}$ is applied. The top-$k_{\text{short}}$ candidates by $\hat{r}_{uj}$ are shortlisted for each job,
+where $k_{\text{short}}$ is the fixed shortlist size per job. As more
 job inboxes are processed sequentially, candidates who have been shortlisted
 frequently accumulate negative modifications, naturally redirecting recruiter
 attention toward candidates who have not yet been surfaced. The candidate-side
-parameter values used in the experiments are reported in
+parameter values and the behaviour of the modification functions used in the experiments are reported in
 Section~\ref{sec:exp_congestion_setting} and the empirical results are presented in Section~\ref{sec:exp_user_congestion}.
 
 % ============================================================
@@ -132,13 +134,7 @@ score for user $u$ on job $j$ is then:
 where $\alpha \in [0,1]$ controls the balance between user preference 
 and recruiter suitability. Both signals are on the same $[0,1]$ 
 probability scale, making the weighted average well-defined and 
-interpretable.
-
-A notable property of this combined score is that it reduces job 
-congestion as a side effect, even without any explicit penalty: 
-users with low recruiter suitability receive a lower combined score 
-for popular jobs, naturally promoting other jobs in their ranking and 
-diversifying the application pool. The empirical effect of this 
+interpretable. The effect of this 
 implicit redistribution is examined in 
 Section~\ref{sec:exp_bilateral}.
 
@@ -163,12 +159,12 @@ list --- each phase produces a different output for a different audience:
     \item \textbf{Phase~1} answers the question \emph{``which jobs
     should user $u$ apply to?''} and produces a ranked job list per
     user. A simulated application pool is generated by taking the
-    top-$k$ jobs for each user, where $k$ matches their historical
+    top-$k_u$ jobs for each user, where $k_u$ matches their historical
     application count.
     \item \textbf{Phase~2} answers the question \emph{``among all
     applicants to job $j$, who should be shortlisted?''} and produces
-    a candidate shortlist per job, taking the application pool from
-    Phase~1 as its input.
+    a candidate ranking per job, taking the application pool from
+    Phase~1 as its input. The top-$k_{\text{short}}$ candidates by the modified recruiter score are shortlisted for each job.
 \end{itemize}
 
 The two phases use independent scoring formulas and independent running
@@ -195,7 +191,7 @@ The job congestion penalty is applied inside the \gls{TT} component
 only, as applications flow in the user-to-job direction. The recruiter
 probability is left unmodified, since candidate fit should be
 independent of how many other users happen to be applying to the same
-job. Each user applies to their top-$k$ jobs by $s_{uj}$, where $k$
+job. Each user applies to their top-$k_u$ jobs by $s_{uj}$, where $k_u$
 matches their historical application count, preserving realistic
 application volumes.
 
@@ -219,19 +215,5 @@ has already been shortlisted by previously processed job inboxes in
 this Phase~2 run. As the simulation progresses, frequently shortlisted
 candidates accumulate negative modifications, naturally redistributing
 shortlisting opportunities toward candidates who have not yet been
-surfaced. The top-$k$ candidates by $\hat{r}_{uj}$ are shortlisted for
-each job.
-
-Candidate congestion is also reduced implicitly by the application pool
-inherited from Phase~1. Because the combined score filters out
-applications where the candidate has low recruiter suitability, job
-inboxes are smaller and more competitive, producing more diverse
-shortlists in which the recruiter's top-$k$ selection reaches a wider
-range of candidates than it would from a larger, lower-quality
-applicant pool.
-
-The output of Phase~2 is a distribution of shortlisting events per
-candidate, which is evaluated using the Gini coefficient and zone
-classification. 
-
-The experimental results of the complete two-phase pipeline are presented in Section~\ref{sec:exp_hybrid_results}.
+surfaced. The top-$k_{\text{short}}$ candidates by $\hat{r}_{uj}$ are shortlisted for
+each job. The experimental results of the complete two-phase pipeline are presented in Section~\ref{sec:exp_hybrid_results}.
