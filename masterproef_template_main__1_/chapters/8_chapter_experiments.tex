@@ -1,13 +1,21 @@
 \chapter{Experiments and Results}
 \label{chap:experiments}
-This chapter describes the experimental evaluation of the systems developed in previous chapters. First, the shared experiment settings are described in Section~\ref{sec:exp_settings} which includes dataset statistics, how the temporal split is applied, and a summary of the hardware configuration which was used. Then, experiments are presented for the user-side recommender system (Section~\ref{sec:exp_user}), the recruiter-side suitability model (Section~\ref{sec:exp_recruiter}), and the congestion balancing strategies (Section~\ref{sec:exp_congestion}).
+This chapter describes the experimental evaluation of the systems explained in previous chapters. First, the shared experiment settings are described in Section~\ref{sec:exp_settings} which includes dataset statistics, how the temporal split is applied, and a summary of the hardware and software configurations which were used. Then, experiments are presented for the user-side job recommender system (Section~\ref{sec:exp_user}), the recruiter-side suitability model (Section~\ref{sec:exp_recruiter}), and the congestion balancing strategies (Section~\ref{sec:exp_congestion}).
 
 \section{General Experiments Setting}
 \label{sec:exp_settings}
 This section describes the general experimental settings that apply across all experiments in this chapter. This includes a description of the dataset, how the temporal window split is applied, and a summary of the hardware and software configuration used for all experiments. 
-\subsection{Dataset}
+\subsection{CareerBuilder Dataset}
 \label{sec:exp_dataset}
-All experiments are conducted on the CareerBuilder Job Recommendation dataset~\cite{careerbuilderdataset}, consisting of real-world job applications, user profiles and job postings from CareerBuilder.com over a 13-week period. The dataset is organised into seven consecutive 13-day temporal windows where users and jobs are assigned to a single window. Each user applies to jobs which are active in the same window. Table~\ref{tab:dataset_stats} summarises the scale of the full dataset.
+
+All experiments are conducted on the CareerBuilder Job Recommendation 
+dataset~\cite{careerbuilderdataset}, consisting of real-world job 
+applications, user profiles and job postings from CareerBuilder.com. 
+The dataset spans 13 weeks and is organised into seven consecutive 
+13-day temporal windows; each user and each job is assigned to exactly 
+one window, and applications only occur between users and jobs active 
+in the same window. Table~\ref{tab:dataset_stats} summarises the scale 
+of the full dataset.
 
 \begin{table}[htbp]
     \centering
@@ -20,12 +28,25 @@ All experiments are conducted on the CareerBuilder Job Recommendation dataset~\c
         Total unique users       & 389,708 \\
         Total unique jobs        & 1,091,923 \\
         Total applications       & 1,603,111 \\
-        Interaction matrix sparsity & 99.9996\% \\
+        Number of windows        & 7 (13 days each) \\
         \bottomrule
     \end{tabular}
 \end{table}
 
-The extremely high sparsity --- fewer than one in 200,000 $(u,j)$ pairs has a recorded interaction --- means that collaborative approaches relying on interaction density are infeasible. The two-tower architecture instead uses interactions as a training signal while generalising through user and job profile features, making it robust to sparse data.
+Application behaviour is consistent across all seven windows: the 
+median user submits 2 applications per window. The mean (4.5--5.6 depending on the window) substantially exceeds the median in every window, reflecting a 
+heavy-tailed distribution in which a small number of highly active 
+users account for a disproportionate share of total interactions. Because application behaviour is consistent across windows, the temporal split described in the next section is unlikely to introduce distributional shifts between the historical and deployment periods.
+
+In each window, users in the original dataset are labeled as \texttt{Split=Train} or \texttt{Split=Test}. Users marked \texttt{Split=Test} are excluded 
+entirely (22,838 users) including their applications (50,991). These users made five or more applications 
+during the withheld 4-day test period of each window. Of these, 43\% 
+have no recorded interactions in the 9-day training period whatsoever, 
+meaning their only observable activity falls within the withheld 
+portion. Including them would introduce users with incomplete or 
+entirely missing interaction records into the evaluation, so they 
+are excluded entirely.
+
 
 \subsection{Temporal Window Split}
 \label{sec:custom_split}
@@ -35,7 +56,7 @@ The extremely high sparsity --- fewer than one in 200,000 $(u,j)$ pairs has a re
     \begin{tikzpicture}[
         window/.style={
             draw, minimum width=1.2cm, minimum height=0.7cm,
-            font=\footnotesize, fill=blue!20},
+                font=\footnotesize, fill=blue!20},
         deploy/.style={
             draw, minimum width=1.2cm, minimum height=0.7cm,
             font=\footnotesize, fill=orange!15},
@@ -57,7 +78,7 @@ The extremely high sparsity --- fewer than one in 200,000 $(u,j)$ pairs has a re
     \draw [-{Stealth}, thick] (-1, -0.55) -- (11, -0.55) node[right] {Time};
 
     %% Historical bracket (W1--W6)
-    \draw [decorate, decoration={brace, amplitude=6pt}]
+    \draw [decorate, decoration={brace, amplitude=6}]
         (-0.7, 0.55) -- (8.2, 0.55)
         node [midway, yshift=0.45cm, label_node, color=blue!70!black]
         {Historical Data (W1--W6)};
@@ -101,29 +122,20 @@ provide the historical data from which each component learns and is
 developed, though the exact partitioning differs by component and is
 described in the respective experiment sections.
 
-Users marked \texttt{Split=Test} in the original dataset are excluded 
-entirely (22,838 users). These users made five or more applications 
-during the withheld 4-day test period of each window. Of these, 43\% 
-have no recorded interactions in the 9-day training period whatsoever, 
-meaning their only observable activity falls within the withheld 
-portion. Including them would introduce users with incomplete or 
-entirely missing interaction records into the evaluation, so they 
-are excluded entirely.
-
-An important consequence of this temporal split is that all users in Window~7 are cold-start users with no recorded interactions in the training period. This is a realistic reflection of the production setting, where every user at inference time is new to the model. This makes the evaluation more challenging but also more meaningful. Table~\ref{tab:split_stats} summarises the resulting dataset statistics for the historical and deployment periods after applying the temporal window split and removing the users labeled \texttt{Split=Test}. 
+An important consequence of this temporal split is that all users in Window~7 are cold-start users with no recorded interactions in the training period \cite{nadimi2014coldstartproblem}. This is a realistic reflection of the production setting, where every user at inference time is new to the model. This makes the evaluation more challenging but also more meaningful. Table~\ref{tab:split_stats} summarises the resulting dataset statistics for the historical and deployment periods after applying the temporal window split. 
 
 \begin{table}[htbp]
     \centering
     \caption{Dataset split statistics after applying the temporal 
-    window split.}
+window split. Split=Test users and their interactions are excluded.}
     \label{tab:split_stats}
     \begin{tabular}{lrrr}
         \toprule
         \textbf{Split} & \textbf{Users} & \textbf{Jobs} 
                        & \textbf{Applications} \\
         \midrule
-        Historical (W1--W6) & 268,085 & 309,796 & 1,248,287  \\
-        Deployment  (W7)     &  39,948 &  39,946 & 169,227  \\
+        Historical (W1--W6) & 319,146 & 977,369 & 1,248,287  \\
+        Deployment  (W7)     &  47,724 &  114,554 & 303,833  \\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -131,20 +143,15 @@ An important consequence of this temporal split is that all users in Window~7 ar
 \subsection{Hardware and Software Configuration}
 \label{sec:hardware}
 
-All experiments are run on the Artificial Intelligence and Data Analytics Research Group (AIDA) high-performance computing cluster via SSH. Training is performed on a single NVIDIA A40 GPU (46~GB VRAM). The software stack uses Python with PyTorch as the deep learning framework, scikit-learn for the lightweight recruiter-side models, and the Sentence Transformers library for Qwen3 text embeddings.
+All experiments are run on the Artificial Intelligence and Data Analytics Research Group (AIDA) high-performance computing cluster via SSH. Training is performed on a single NVIDIA A40 GPU (46~GB VRAM). The software stack uses Python with PyTorch as the deep learning framework and scikit-learn for the lightweight recruiter-side models. 
 
 % ============================================================
 \section{User-Side Job Recommender System Experiments}
 \label{sec:exp_user}
 % ============================================================
-In this section, the experiments for the user-side job recommender system are described. The goal of these experiments is to train and evaluate a two-tower model that can effectively rank relevant jobs for cold-start users. The experiment setting, dataset creation process, hyperparameters, ablation study, final results and inference evaluation are all detailed in the following subsections.
-\subsection{Experiment Goal}
-\label{sec:exp_user_goal}
 The goal of the user-side experiments is to train and evaluate a 
-two-tower model that can rank relevant jobs highly for cold-start users 
---- users with no interaction history in the training period.  
-Success is measured primarily by \gls{AUC-ROC}, as this metric is least 
-sensitive to the candidate pool size of the validation set. The practical 
+\gls{TT} model that can rank relevant jobs highly for cold-start users 
+--- users with no interaction history in the training period.  An ablation study is conducted to assess the impact of different model architectures and features. The practical 
 utility of the model is additionally assessed qualitatively at inference 
 time by inspecting recommendations for a sample of Window~7 users against 
 the full Window~7 job pool.
@@ -153,13 +160,15 @@ the full Window~7 job pool.
 \label{sec:exp_user_setting}
 
 Windows~1--4 are used for training, Windows~5--6 for validation, and 
-Window~7 serves as the qualitative evaluation window, where the model 
-is applied to entirely new users and jobs as it would be in production. This way we keep the temporal window split described in Section~\ref{sec:custom_split}.
-
+Window~7 serves as the qualitative evaluation window, consistent with 
+the temporal split described in Section~\ref{sec:custom_split}.
 \subsection{Dataset Creation}
 \label{sec:exp_user_datagen}
-From the 189,657 users in the training set, a random sample of 25,000 users per window is drawn to create a manageable training set of 100,000 users. With a median of 2 applications per user, this results in approximately 200,000 positive $(u,j)$ pairs for training. The validation set is not subsampled and contains all 78,428 users having approximately 156,856 positive $(u,j)$ pairs for validation. For each positive pair $(u,j^+)$, four negatives are sampled according 
-to a \textbf{2:1:1 ratio}:
+A random sample of 25,000 users per window is drawn from Windows~1--4, 
+creating a training set of 100,000 users and 461,473 positive pairs. 
+Windows~5--6 are used in full for validation (78,428 users, 367,038 
+positive pairs). For each positive pair $(u,j^+)$, four negatives are sampled according 
+to a 2:1:1 ratio:
 \begin{itemize}
     \item \textbf{2 cross-state negatives}: jobs from states other than the user's own state, sampled from the same temporal window. These teach the model that geographic fit is a genuine signal.
     \item \textbf{1 same-state negative}: a job from the user's state but a different city, active in the same window. This forces the model to look beyond state-level location and discriminate on career content.
@@ -169,24 +178,22 @@ to a \textbf{2:1:1 ratio}:
 The 2:1:1 ratio reflects the geographic structure of the real inference 
 setting: when ranking a user against the full job pool, the vast majority 
 of candidates are in other states, a smaller fraction share the user's 
-state, and only a handful are in the same city. Training with a matching 
-distribution ensures the model learns to discriminate at each geographic 
-granularity rather than exploiting an artificial balance. The effect of 
+state, and only a handful are in the same city. The effect of 
 this is confirmed qualitatively in Section~\ref{sec:exp_user_inference}.
 
 \subsection{Training Configuration and Hyperparameters}
 \label{sec:exp_user_hyperparameters}
 
-Each categorical feature is mapped to a 16-dimensional embedding and 
+Each categorical feature is mapped to an embedding of dimension $d_{\text{cat}}$ = 16 (see Chapter~\ref{chap:user_recommendation}) and 
 the text embedding is truncated to $d_{\text{text}} = 100$. 
 Table~\ref{tab:tower_input_dims} shows the resulting input dimension 
-breakdown: text accounts for approximately 51\% of the user tower 
-input and 76\% of the job tower input — large enough to carry the 
+breakdown: text accounts for approximately 50\% of the user tower 
+input and 76\% of the job tower input, large enough to carry the 
 semantic signal without suppressing the structured features.
 
 Both towers share the same MLP structure: two hidden layers of 512 and 
 256 units, followed by the $d$-dimensional output layer, giving a 
-202→512→256→64 reduction for the user tower and 134→512→256→64 for 
+202→512→256→64 reduction for the user tower and 132→512→256→64 for 
 the job tower. Batch normalisation and ReLU are applied after each 
 hidden layer, with dropout rates of 0.3 and 0.2 for the first and 
 second hidden layer respectively. The output dimension is $d = 64$.
@@ -196,15 +203,15 @@ The model is trained for a maximum of 50 epochs with early stopping
 with a learning rate of $10^{-3}$ and a batch size of 1024.
 \begin{table}[htbp]
     \centering
-    \caption{Input dimension breakdown for each tower after feature encoding.}
+    \caption{Total input dimension breakdown for each tower after feature encoding.}
     \label{tab:tower_input_dims}
     \begin{tabular}{lrrrr}
         \toprule
         \textbf{Tower} & \textbf{Cat. Embeddings} & \textbf{Numerical} 
                        & \textbf{Text ($d_{\text{text}}$)} & \textbf{Total} \\
         \midrule 
-        User & $6 \times 16$ & $6$ & $100$ & $202$ \\
-        Job  & $2 \times 16$ & $2$ & $100$ & $134$ \\
+        User & $6 \times 16$ & $4$ & $100$ & $200$ \\
+        Job  & $2 \times 16$ & $0$ & $100$ & $132$ \\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -213,7 +220,7 @@ with a learning rate of $10^{-3}$ and a batch size of 1024.
  
 To determine the optimal model configuration, a systematic ablation study is conducted comparing two design choices: whether to include location features (city and state) and whether to apply L2 normalisation to the output embeddings. All configurations are trained with the 2:1:1 negative sampling strategy described in Section~\ref{sec:dataset_construction} and use the same training settings described in Section~\ref{sec:exp_user_hyperparameters}. Table~\ref{tab:ablation_user} reports the results at the best validation checkpoint for each configuration.
  
-A note on interpreting the ranking metrics: Hit@K, Recall@K and NDCG@K are computed against the validation set's balanced candidate pool (positive and sampled negative jobs per user) rather than the full job catalogue. For example if a user has applied to 2 jobs, the metrics are computed against a pool of 2 positive jobs and 8 sampled negative jobs using the negative sampling strategy. As discussed in Section~\ref{sec:prelim_metrics}, this makes their absolute values considerably more optimistic than what would be observed at full-scale inference. \gls{AUC-ROC} is therefore used as the primary comparison criterion, as it is less sensitive to this pool-size effect.
+It's important to note that Hit@K, Recall@K and NDCG@K are computed against the validation set's balanced candidate pool (positive and sampled negative jobs per user) rather than the full job catalogue. For example if a user has applied to 2 jobs, the metrics are computed against a pool of 2 positive jobs and 8 sampled negative jobs using the negative sampling strategy. As discussed in Section~\ref{sec:prelim_metrics}, this makes their absolute values more optimistic than what would be observed at full-scale inference. \gls{AUC-ROC} is therefore used as the primary comparison criterion, as it is less sensitive to this pool-size effect. 
  
 \begin{table}[htbp]
     \centering
@@ -231,26 +238,19 @@ A note on interpreting the ranking metrics: Hit@K, Recall@K and NDCG@K are compu
     \end{tabular}
 \end{table}
  
-Two findings emerge from the results. FFirst, \textbf{L2 normalisation consistently hurts performance} regardless 
+Two findings emerge from the results. First, \textbf{L2 normalisation consistently hurts performance} regardless 
 of whether location features are present — AUC drops from 0.9242 to 0.7331 
-with location included, and from 0.8641 to 0.7426 without. This is an interesting finding considering that cosine similarity is a common practice to calculate embedding similarity \cite{you2025semanticsanglecosinesimilarity}. Normalising output embeddings to unit norm removes their magnitude, which prevents the model from encoding match confidence in the scale of the dot product. Without normalisation, the magnitude acts as an additional degree of freedom that the model can use to express certainty, benefiting both the loss and the ranking quality.
+with location included, and from 0.8641 to 0.7426 without. This is an interesting finding considering that cosine similarity is a common practice to calculate embedding similarity \cite{you2025semanticsanglecosinesimilarity}. Normalising output embeddings to unit norm removes their magnitude, which prevents the model from encoding match confidence in the scale of the dot product. In this case, the model benefits from retaining this confidence information.
  
-Second, \textbf{including location features improves performance substantially} — \gls{AUC-ROC} rises from 0.8641 to 0.9242. The 2:1:1 strategy exposes the model to geographically diverse negatives during training. This prevents the model from learning city-density patterns and instead allows it to genuinely learn state-level geographic preference as a meaningful signal. The result is that the location-included model not only scores higher 
-offline but also produces geographically sensible recommendations at 
-inference, as illustrated in Section~\ref{sec:exp_user_inference}.
+Second, \textbf{including location features improves performance substantially} — \gls{AUC-ROC} rises from 0.8641 to 0.9242. Including the location features allows the model to learn that cross-state negatives are less relevant than same-state negatives, and same-state negatives are less relevant than same-city negatives. Without these features, the model struggles to learn geographic preferences using only the job and user content features, which is a much harder signal to extract. In Section~\ref{sec:exp_user_inference} qualitative evidence is provided that the model has indeed learned a meaningful geographic signal, as the top-ranked recommendations for test users are geographically coherent with their location.
  
-Based on the quantitative results, the final model \textbf{includes 
-location features and applies no L2 normalisation}, a choice further 
-supported by the qualitative evaluation in 
-Section~\ref{sec:exp_user_inference}. A complete breakdown of all four 
-configurations across all ranking metrics is provided in 
-Table~\ref{app:tab:full_ablation} in the Appendix.
+A complete table of all metrics for all four ablation configurations at their respective best validation checkpoints is provided in Appendix~\ref{app:ablation_full}.
  
 \subsection{Final Model Results}
 \label{sec:user_results}
  
-The final model is trained \textbf{with location features and without L2 normalisation}, as determined by the ablation study in previous section.  Figure~\ref{fig:trainval} shows the 
-training and validation loss curves across epochs. Table~\ref{tab:final_results_user} reports the validation set results at the best checkpoint.
+The final model is trained \textbf{with location features and without L2 normalisation}, as determined by the ablation study in the previous section.  Figure~\ref{fig:trainval} shows the 
+training and validation loss curves across epochs. Table~\ref{tab:final_results_user} reports the validation set results at the best checkpoint across all metrics.
 
 \begin{figure}[htbp]
     \centering
@@ -261,7 +261,7 @@ The best validation checkpoint is saved at epoch~19. Training continues for
     \label{fig:trainval}
 \end{figure}
  
-\begin{table}[H]
+\begin{table}[htbp]
     \centering
     \caption{Final model results on the validation set (best checkpoint,
     location features included, no L2 norm).}
@@ -293,20 +293,17 @@ The best validation checkpoint is saved at epoch~19. Training continues for
         \end{tabular}
     \end{minipage}
 \end{table}
- 
-All ranking metrics for all four ablation configurations are reported in Appendix~\ref{app:ablation_full}.
+
 \subsection{Qualitative Inference Evaluation}
 \label{sec:exp_user_inference}
  
 To assess real-world recommendation quality, the final model is run 
-at inference time against all jobs from Window~7 (approximately 40,000 
-jobs) for a sample of test users. Two criteria are used to assess the 
+at inference time against all jobs from Window~7 for 2 different test users. Two criteria are used to assess the 
 output: whether recommended jobs are semantically consistent with the 
-user's career history if available, and whether the geographic distribution of 
-recommendations is coherent with the user's location.
+user's career history if available, and whether the locations of the recommended jobs are geographically coherent with the user's location. 
 
-\paragraph{User 668904 — clear career signal, strong geographic coherence.}
-This user is based in Deer Park, Texas, holds a high school diploma and has 18 years of work experience. Their last 3 jobs consists entirely of accounts payable and administrative finance roles: Accounts Payable Analyst, Administrative Assistant, and AP/AR support positions. In Window~7 the user applied to a single job — a Payroll Specialist role in Houston, TX — which the model scores at 3.65. All ten recommended jobs are in Houston and fall squarely within the same financial-administrative cluster: Senior Accounts Payable Specialist, AP/AR Specialist, Accounting Assistant, Accounts Payable Clerk, and similar titles. This is a clean demonstration of the model working as intended: a coherent career signal in the user embedding produces semantically tight, geographically appropriate recommendations with no location post-processing required.
+\paragraph{User 668904 — clear job history.}
+This user is based in Deer Park, Texas, holds a high school diploma and has 18 years of work experience. Their last 3 jobs consists entirely of accounts payable and administrative finance roles: Accounts Payable Analyst, Administrative Assistant, and AP/AR support positions. In Window~7 the user applied to a single job — a Payroll Specialist role in Houston, TX — which the model scores at 3.65. All ten recommended jobs are in Houston and fall within the same financial-administrative cluster: Senior Accounts Payable Specialist, AP/AR Specialist, Accounting Assistant, Accounts Payable Clerk, and similar titles. This is a clean demonstration of the model working as intended: a clear career signal produces semantically consistent recommendations, and the location features ensure all recommendations are in the same geographic area as the user's location. 
 
 \begin{table}[H]
     \centering
@@ -320,7 +317,6 @@ This user is based in Deer Park, Texas, holds a high school diploma and has 18 y
         Location            & Deer Park, TX \\
         Education           & High School \\
         Experience          & 18 years \\
-        Currently Employed  & Yes \\
         Recent Job History  & Accounts Payable Analyst, Administrative Assistant, \\
                             & AP/AR Support\\
         Window 7 Application & Payroll Specialist (Houston, TX) — score 3.65 \\
@@ -351,8 +347,23 @@ This user is based in Deer Park, Texas, holds a high school diploma and has 18 y
     \end{tabular}
 \end{table}
 
-\paragraph{User 831532 — no job history, profile-only recommendations.}
-This user is based in Philadelphia, PA, holds a high school diploma and has only 2 years of recorded experience, with no job history entries in the dataset. The model therefore has no career trajectory to draw on and must rely entirely on demographic and location features. Despite this, the top-10 recommendations are geographically coherent across the PA/NJ/DE tri-state area — the natural labour market for a Philadelphia resident — and semantically consistent with the applied-to jobs, which include residential youth care and community support roles. The geographic spread across all three states mirrors the user's own applications, which also span PA, NJ and DE, suggesting the model has learned a broader regional signal rather than a simple same-state preference. Notably, one of the three jobs the user actually applied to in Window~7 (Residential Youth Care Workers Needed, Conshohocken PA) appears at rank~7 in the recommendation list, despite being ranked against approximately 40,000 jobs. This confirms that even without job history, location, education and basic profile features alone are sufficient to produce geographically and semantically meaningful recommendations.
+\paragraph{User 831532 — no job history.}
+This user is based in Philadelphia, PA, holds a high school diploma 
+and has only 2 years of recorded experience, with no job history 
+entries in the dataset. The model therefore has no information about 
+the user's career and preferences and must rely entirely on demographic 
+and location features. Despite this, the top-10 recommendations are 
+geographically coherent across the neighboring PA/NJ/DE tri-state area 
+and acceptable in terms of semantic consistency with the applied-to 
+jobs, which include residential youth care and community support roles. 
+The geographic spread across all three states mirrors the user's own 
+applications, suggesting the model has learned a broader regional 
+signal rather than a simple same-state preference. Notably, one of the 
+three jobs the user actually applied to in Window~7 (Residential Youth 
+Care Workers Needed, Conshohocken PA) appears at rank~7 in the 
+recommendation list, despite being ranked against approximately 100,000 
+jobs. This confirms that even without job history, location, education 
+and basic profile features alone are sufficient to produce semantically meaningful recommendations.
  
 \begin{table}[H]
     \centering
@@ -366,7 +377,6 @@ This user is based in Philadelphia, PA, holds a high school diploma and has only
         Location            & Philadelphia, PA \\
         Education           & High School \\
         Experience          & 2 years \\
-        Currently Employed  & Yes \\
         Recent Job History  & None recorded \\
         Window 7 Applications & Program Associate (Haddonfield, NJ) — score 2.19 \\
                               & Immediate Openings F/T (Bala Cynwyd, PA) — score 2.81 \\
@@ -401,14 +411,8 @@ This user is based in Philadelphia, PA, holds a high school diploma and has only
 \section{Recruiter-Side Suitability Model Experiments}
 \label{sec:exp_recruiter}
 %============================================================
+The goal of the recruiter-side experiments is to train and evaluate a suitability model that can rank candidates by their fit to a job, using the engineered feature set described in Section~\ref{sec:recruiter_features} and the LLM-generated labels described in Section~\ref{sec:recruiter_data_gen}. A two-stage model selection process is used to first identify the best-performing classifier type among logistic regression, random forest and XGBoost, and then to compare the best classifier across three different negative sampling strategies. Finally, the model is run at inference time to inspect the top-ranked candidates for a sample of Window~7 jobs and confirm that the model has learned meaningful signals of suitability.
 
-This section describes the experiments for the recruiter-side suitability model. The goal of these experiments is to train and evaluate a classifier that can predict the suitability of a candidate for a given job. The structure of this section mirrors that of the user-side experiments, covering the experiment goal, setting, dataset creation, training configuration and hyperparameters, experiment results, and a qualitative sanity checks.
-
-\subsection{Experiment Goal}
-\label{sec:exp_recruiter_goal}
- 
-The recruiter-side experiments address two design choices that must be made before a final model can be deployed. The first is \textbf{classifier selection}: given the engineered feature set described in Section~\ref{sec:recruiter_features}, which model family best exploits it? The second is \textbf{negative strategy selection}: given the chosen classifier, does the choice of negative construction — \gls{LLM}-evaluated hard negatives from the applicant pool, synthetically sampled non-applicants or a combination of both — have a measurable effect on ranking quality, and which strategy yields the more useful model? These two questions are answered sequentially in Sections~\ref{sec:exp_recruiter_model_comparison} and~\ref{sec:exp_recruiter_negatives}. Success is assessed both quantitatively via the metrics introduced in Section~\ref{sec:prelim_classification}, and qualitatively through sanity checks.
- 
 \subsection{Experiment Setting}
 \label{sec:exp_recruiter_setting}
 
@@ -418,23 +422,15 @@ dataset is small (5{,}896 pairs) and a job-level split is sufficient
 for reliable model selection at this scale. Jobs are randomly 
 partitioned into an 80\% pool for cross-validation and a held-out 
 test set of 20\% used only once after the final model has been 
-chosen. Model selection uses group 5-fold cross-validation with jobs 
-kept intact across folds, and \gls{AUC-ROC} as the primary selection 
-criterion. Window~7 is not used for training or model selection; it 
-serves exclusively as the deployment window for the qualitative 
-sanity check and the congestion balancing simulation of 
-Chapter~\ref{chap:congestion_balancing}.
+chosen. \gls{AUC-ROC} is used as the primary selection 
+criterion. Window~7 is reserved for the qualitative inference evaluation.
 
 \subsection{Dataset Creation}
 \label{sec:exp_recruiter_datagen}
 
 Labels are generated using the Qwen3.5 (35B) model served locally 
 via the Ollama API, following the procedure described in 
-Section~\ref{sec:recruiter_data_gen}. For each job, up to 20 applicants are evaluated. 
-Responses that fail JSON parsing or contain unexpected fit level 
-values are discarded. The resulting dataset contains 5,896 labeled 
-pairs across 1,511 unique jobs, with the fit level distribution 
-shown in Table~\ref{tab:recruiter_label_dist}. The full prompt 
+Section~\ref{sec:recruiter_data_gen}. For each job, up to 20 applicants are evaluated, to ensure diverse jobs in the dataset. The resulting dataset contains 5,896 labeled pairs across 1,511 unique jobs, with the fit level distribution shown in Table~\ref{tab:recruiter_label_dist}. The full prompt 
 and an example output are provided in Appendix~\ref{app:llm_prompt}.
 
 \begin{table}[htbp]
@@ -462,7 +458,7 @@ The negative sampling is not described here as in Section~ref{exp:} because this
 \subsection{Training Configuration and Hyperparameters}
 \label{sec:exp_recruiter_training_config}
 Within each fold, the \gls{TF-IDF} vectorizer, \gls{PCA} transformer, 
-and feature scaler are fitted exclusively on the fold's training 
+and feature scaler (See Section~\ref{sec:recruiter_features}) are fitted exclusively on the fold's training 
 portion to prevent leakage. The \gls{PCA} transformer reduces the 
 $2d_{\text{text}} = 200$-dimensional interaction vector to 
 $d_{\text{pca}} = 80$ components, retaining 92.9\% of the total 
@@ -496,8 +492,7 @@ negatives only. This way only the model type is varied. The choice of this
 dataset is motivated by the fact that this is the hardest classification task
 among the three strategies, as all negatives are drawn from the real applicant
 pool rather than from randomly sampled non-applicants.
-Table~\ref{tab:recruiter_results_cv} reports 5-fold cross-validation results;
-Table~\ref{tab:recruiter_results_test} reports the held-out test set
+Table~\ref{tab:recruiter_results_cv} reports 5-fold cross-validation results and Table~\ref{tab:recruiter_results_test} reports the held-out test set
 performance of the selected model.
 
 \begin{table}[htbp]

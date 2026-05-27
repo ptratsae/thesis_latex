@@ -1,17 +1,25 @@
 \chapter{Hybrid Congestion Control}
 \label{chap:congestion_balancing}
+With the user-side job recommender system 
+(Chapter~\ref{chap:user_recommendation}) and the recruiter-side 
+suitability model (Chapter~\ref{chap:recruiter_recommendation}) 
+established, this chapter addresses the congestion introduced in 
+Chapter~\ref{chap:intro} that emerges as a consequence of 
+recommendation at scale. Throughout this chapter and the congestion 
+experiments (Section~\ref{sec:exp_congestion}), each user is assumed 
+to apply to exactly their top-$k_u$ recommended jobs, where $k_u$ 
+matches their historical application count.
 
-Now that both the user-side job recommender system
-(Chapter~\ref{chap:user_recommendation}) and the recruiter-side suitability model (Chapter~\ref{chap:recruiter_recommendation}) have been developed, the
-next step is to mitigate the congestion that emerges as a consequence of
-recommendation at scale. Throughout this chapter and the congestion experiments (\ref{sec:exp_congestion}), each user is assumed to apply to exactly the top-$k_u$ recommended jobs, where $k_u$ matches their historical application count. Both forms are first
-addressed in isolation using the Gini-based measurement framework and
-market-maker intervention strategies. The two
-strategies are then combined into a two-phased approach where first job congestion
-is addressed followed by candidate-side congestion. The evidence of both congestion forms and the effectiveness of the proposed mitigation strategies are evaluated in a simulated environment using the dataset described in Section~\ref{sec:exp_congestion}.
-
-
-This chapter starts with the job-side market-maker intervention in Section~\ref{sec:job_congestion} and candidate-side market-maker intervention in Section~\ref{sec:user_congestion}. This is followed by the bilateral scoring approach in Section~\ref{sec:bilateral_scoring}, which combines the user and recruiter models into a single score. Finally, the complete two-phase pipeline is described in Section~\ref{sec:hybrid_strategy}, which integrates all three previous components into a unified system.  
+This chapter starts with the job-side market-maker interventions in
+Section~\ref{sec:job_congestion} and the candidate-side interventions in
+Section~\ref{sec:user_congestion}. It then introduces the bilateral
+scoring approach in Section~\ref{sec:bilateral_scoring}, which combines
+the user and recruiter models into a single score. Finally, the complete
+two-phase pipeline is described in Section~\ref{sec:hybrid_strategy},
+integrating all three components into a unified system. Evidence of both
+forms of congestion, and the effectiveness of the proposed mitigation
+strategies, is evaluated in a simulated environment using the dataset
+described in Section~\ref{sec:exp_congestion}.
 % ============================================================
 \section{Job-Side Market-Maker Intervention}
 \label{sec:job_congestion}
@@ -170,9 +178,9 @@ list --- each phase produces a different output for a different audience:
 The two phases use independent scoring formulas and independent running
 counters, as they operate in opposite directions on different questions.
 Phase~1 decides who is in each job's inbox; Phase~2 decides who gets
-surfaced from it.
+surfaced from it. 
 
-\subsection{Phase 1: Job Recommendation with Bilateral Scoring and Job-Side Correction}
+\subsection{Phase 1: Job Recommendation with Bilateral Scoring and Job Congestion Correction}
 \label{sec:hybrid_job_congestion}
 
 Phase~1 extends the bilateral score from
@@ -186,22 +194,18 @@ modification from Section~\ref{sec:job_congestion}:
 \end{equation}
 where $\delta_{\text{job}}(\cdot)$ is the job congestion modification,
 $c_j^{(t)}$ is the running application count for job $j$ at the time
-user $u$ is processed, and $\alpha = 0.5$ is used in the experiments.
+user $u$ is processed, $p_{\text{TT}}$ and $p_{\text{rec}}$ are the \gls{TT} and recruiter probabilities, respectively, and $\alpha = 0.5$ is used in the experiments.
 The job congestion penalty is applied inside the \gls{TT} component
 only, as applications flow in the user-to-job direction. The recruiter
 probability is left unmodified, since candidate fit should be
 independent of how many other users happen to be applying to the same
-job. Each user applies to their top-$k_u$ jobs by $s_{uj}$, where $k_u$
-matches their historical application count, preserving realistic
-application volumes.
+job. 
 
-\subsection{Phase 2: Recruiter Shortlisting with Candidate-Side
-Correction}
+\subsection{Phase 2: Recruiter Shortlisting with Candidate Congestion Correction}
 \label{sec:hybrid_user_congestion}
 
-Phase~2 takes the job inboxes produced by Phase~1 and answers a
-different question for a different audience: for each job, which
-candidates should the recruiter shortlist? The recruiter suitability
+Phase~2 takes the job inboxes produced by Phase~1 and determines for each job, which
+candidates should the recruiter shortlist. The recruiter suitability
 score $p_{\text{rec}}$ is reused from Phase~1, but now ranks
 \emph{candidates within a job's inbox} rather than jobs for a user.
 The candidate-side market-maker modification from
@@ -211,9 +215,4 @@ Section~\ref{sec:user_congestion} is applied at this stage:
     \delta_{\text{cand}}\!\left(v_u^{(t)}\right),
 \end{equation}
 where $v_u^{(t)}$ is the running count of how many times candidate $u$
-has already been shortlisted by previously processed job inboxes in
-this Phase~2 run. As the simulation progresses, frequently shortlisted
-candidates accumulate negative modifications, naturally redistributing
-shortlisting opportunities toward candidates who have not yet been
-surfaced. The top-$k_{\text{short}}$ candidates by $\hat{r}_{uj}$ are shortlisted for
-each job. The experimental results of the complete two-phase pipeline are presented in Section~\ref{sec:exp_hybrid_results}.
+has already been shortlisted. The experimental results of the complete two-phase pipeline are presented in Section~\ref{sec:exp_hybrid_results}.
