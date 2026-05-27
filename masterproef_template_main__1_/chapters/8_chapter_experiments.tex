@@ -1144,7 +1144,7 @@ from 0.4976 to 0.8405. This confirms that the bilateral design successfully trad
 The complete two-phase pipeline adds both sigmoid market-maker penalties on top of the
 bilateral scoring from Section~\ref{sec:exp_bilateral}, representing
 the full pipeline described in Section~\ref{sec:hybrid_strategy}. It
-achieves the best results across all metrics.
+achieves the best results across all metrics. In Appendix~\ref{app:hybrid_ablation}, the contribution of each penalty is ablated to show how they work together to produce the final distributional outcomes. The main takeaway from this experiment is that the job-side penalty is the primary driver of both job and candidate congestion improvements, while the candidate-side penalty plays a smaller but still meaningful role in further reducing candidate congestion. 
  
 \begin{table}[H]
     \centering
