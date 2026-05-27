@@ -2,71 +2,57 @@
 \label{chap:conclusion}
 
 This thesis set out to address a structural inefficiency in modern digital
-labour markets. Basic recommender systems concentrate attention on a small subset of popular job postings, creating a feedback loop that leaves the majority of positions under-applied and a large fraction of qualified candidates overlooked. Three contributions were developed and evaluated to tackle this problem from both sides of the market.
+labour markets. Basic recommender systems concentrate attention on a small 
+subset of popular job postings, creating a feedback loop that leaves the 
+majority of positions under-applied and a large fraction of qualified 
+candidates overlooked. Three contributions were developed and evaluated to 
+tackle this problem from both sides of the market.
 
 The first contribution is a user-side job recommender based on a \gls{TT}
 neural architecture. The model learns dense representations of job seekers and
-job postings and measures their compatibility via dot-product similarity. A stratified negative
-sampling strategy, mixing geographically distant, same-state, and same-city
-negatives in a 2:1:1 ratio, was shown to be essential for teaching the
-model to discriminate on career content rather than on coarse geographic
-proximity alone. An ablation study established that including location features
-and omitting L2 normalisation on the output embeddings yields the strongest
-performance, with an \gls{AUC}of 0.9242 on the validation set. Qualitative
-inspection at inference time confirmed that the model produces geographically
-coherent and semantically tight recommendations for users with clear career
-signals, and falls back to location and profile features for
-recommendations for users with no recorded interaction history.
+job postings and measures their compatibility via dot-product similarity. A 
+stratified negative sampling strategy, mixing geographically distant, 
+same-state, and same-city negatives in a 2:1:1 ratio, was shown to be 
+essential for teaching the model to discriminate on career content rather than 
+coarse geographic proximity. An ablation study established that including 
+location features and omitting L2 normalisation yields the strongest 
+performance, with an \gls{AUC} of 0.9242 on the validation set.
 
-The second contribution is a recruiter-side suitability model. Because no ground-truth labels are available for recruiter decisions, a large
-language model was prompted with structured
-\gls{CoT} reasoning to generate synthetic candidate-fit labels. A lightweight XGBoost classifier was then trained on a feature set
-combining heuristic signals with semantic signals which imitated the LLM's reasoning. A two-stage model selection process was performed to choose
-the classifier which was best fit for the congestion-aware two-sided job-matching pipeline. The final classifier was a
-XGBoost trained on combined negatives (equal parts LLM-hard and synthetic
-random) achieving AUC 0.755. This model performed slightly worse than the model trained on random negatives, but was more robust to the 2 purposes it had to serve in the final pipeline.
+The second contribution is a recruiter-side suitability model. Because no 
+ground-truth labels are available for recruiter decisions, a large language 
+model was prompted with structured \gls{CoT} reasoning to generate synthetic 
+candidate-fit labels. A lightweight XGBoost classifier was then trained on a 
+feature set combining heuristic and semantic signals. A two-stage model 
+selection process identified XGBoost trained on combined negatives (equal 
+parts LLM-hard and synthetic random) as the most robust choice for the dual 
+purpose it serves in the pipeline, achieving an AUC of 0.755.
 
-The third contribution is a congestion-aware two-sided job matching framework. 
-It integrates both models into a sequential two-phase pipeline. Phase~1
-generates job recommendations for users using a bilateral combined score that
-weights the \gls{TT} relevance signal and the recruiter suitability score
-equally, augmented by a job-side market-maker penalty that
-progressively suppresses over-applied jobs and boosts under-applied ones.
-Phase~2 re-ranks each job's applicant inbox using the recruiter model, augmented by a candidate-side market-maker penalty that
-redistributes shortlisting attention away from candidates who have already been
-surfaced frequently. Three functional forms for the penalty (linear,
-quadratic, and sigmoid) were evaluated. The sigmoid form performed best on
-the job side due to its early steep slope at the start of the congestion range, while all three forms converged on nearly identical outcomes on the
-candidate side, a structural consequence of the narrower congestion range on
-that side of the market.
+The third contribution is a congestion-aware two-sided job matching framework
+that integrates both models into a sequential two-phase pipeline. Phase~1 
+generates job recommendations using a bilateral score combining \gls{TT} 
+relevance and recruiter suitability, augmented by a job-side market-maker 
+penalty that progressively suppresses over-applied jobs and boosts 
+under-applied ones. Phase~2 re-ranks each job's applicant inbox using the 
+recruiter model, augmented by a candidate-side penalty that redistributes 
+shortlisting attention toward overlooked candidates. Among the three penalty 
+forms evaluated, the sigmoid performed best on the job side, while all three 
+converged on the candidate side due to the narrower congestion range.
 
-The experimental evaluation was conducted on the CareerBuilder dataset using a
-rigorous temporal window split, with all model selection performed on
-Windows~1--6 and the final evaluation on the held-out Window~7. The results
-demonstrate the effectiveness of the proposed framework at multiple levels. An
-uncorrected \gls{TT} recommender was shown to worsen congestion relative to
-organic user behaviour, with the job-side Gini rising from 0.8575 to 0.9625
-and the starved job fraction increasing from 80.9\% to 90.8\%. This confirms
-that uncorrected systems are not neutral. The bilateral scoring component alone, which combines
-both model outputs without any explicit penalty, already
-produces a meaningful improvement, reducing the job-side Gini to 0.9182 while
-simultaneously raising the average recruiter suitability probability from
-0.4976 to 0.8405, indicating that users are being steered toward jobs where
-they are genuinely competitive candidates rather than merely interested ones.
-The complete hybrid strategy (bilateral scoring plus sigmoid penalties
-on both sides) achieves the strongest results across all metrics: the job-side
-Gini coefficient falls from 0.9182 to 0.7130 and the fraction of starved jobs
-drops from 85.6\% to 63.3\%, while the candidate-side Gini falls from 0.6326
-to 0.4967 and the fraction of starved candidates drops from 32.1\% to just
-3.4\%. These improvements come with a small reduction of 3 percentage points
-in Two-Tower probability relative to the bilateral baseline. This is a modest reductionfor
-a substantially more equitable market-level distribution and keeping the average recruiter shortlisting suitability probability high at 0.8106. 
+The experimental evaluation on the CareerBuilder dataset shows that an 
+uncorrected \gls{TT} recommender actively worsens congestion relative to 
+organic behaviour which confirms that unmodified systems are not neutral. The 
+complete hybrid pipeline reverses this: the job-side Gini falls by 26\% and 
+the fraction of starved jobs drops by 27 percentage points, while the 
+candidate-side Gini falls by 37\% and starved candidates drop from 32.1\% to 
+just 3.4\%. These gains come at a modest cost of 3 percentage points in 
+\gls{TT} probability, while the average recruiter suitability remains high 
+at 0.8106. 
 
-Taken together, these results demonstrate that coordinating user-side
-recommendation and recruiter-side ranking is an effective lever for congestion
-mitigation in large-scale labour platforms. By
-treating both job seekers and recruiters as active participants with their own
-preferences, and by explicitly balancing the distribution of attention across
-both sides, it is possible to move the market toward an equilibrium that is
-fairer for candidates, more manageable for recruiters, and more efficient
-overall.
+These results demonstrate that the congestion problem in job markets is not 
+simply a side effect of popularity bias, but is actively reinforced by 
+relevance-optimised recommenders. Addressing it requires coordinating both 
+sides of the market: steering users toward jobs where they are genuinely 
+competitive, and ensuring recruiters surface candidates who have not already 
+been claimed by competing inboxes. The framework developed in this thesis 
+shows that this coordination is achievable without sacrificing match quality, 
+and points toward a more equitable model of algorithmic hiring assistance.
