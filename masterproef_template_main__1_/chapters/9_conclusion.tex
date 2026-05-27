@@ -6,7 +6,7 @@ labour markets. Basic recommender systems concentrate attention on a small
 subset of popular job postings, creating a feedback loop that leaves the 
 majority of positions under-applied and a large fraction of qualified 
 candidates overlooked. Three contributions were developed and evaluated to 
-tackle this problem from both sides of the market.
+tackle this problem from both sides of the market while improving match quality from the recruiter's perspective.
 
 The first contribution is a user-side job recommender based on a \gls{TT}
 neural architecture. The model learns dense representations of job seekers and
@@ -44,15 +44,8 @@ organic behaviour which confirms that unmodified systems are not neutral. The
 complete hybrid pipeline reverses this: the job-side Gini falls by 26\% and 
 the fraction of starved jobs drops by 27 percentage points, while the 
 candidate-side Gini falls by 37\% and starved candidates drop from 32.1\% to 
-just 3.4\%. These gains come at a modest cost of 3 percentage points in 
+just 3.4\%. These gains come at a modest cost of 9 percentage points in 
 \gls{TT} probability, while the average recruiter suitability remains high 
-at 0.8106. 
+at 0.8106 compared to 0.6287 for the uncorrected \gls{TT} universe. The average suitability of shortlisted candidates increases by 19 percentage points, demonstrating that the framework successfully steers users toward less popular jobs while improving the quality of matches from the recruiter's perspective.
 
-These results demonstrate that the congestion problem in job markets is not 
-simply a side effect of popularity bias, but is actively reinforced by 
-relevance-optimised recommenders. Addressing it requires coordinating both 
-sides of the market: steering users toward jobs where they are genuinely 
-competitive, and ensuring recruiters surface candidates who have not already 
-been claimed by competing inboxes. The framework developed in this thesis 
-shows that this coordination is achievable without sacrificing match quality, 
-and points toward a more equitable model of algorithmic hiring assistance.
+The framework developed in this thesis shows that this coordination is achievable at a modest cost to user-side relevance, while substantially improving recruiter-side match quality and reducing congestion on both sides of the market. This demonstrates that recommender systems can be designed to balance relevance with fairness and efficiency objectives, benefiting all participants in the labour market ecosystem.
