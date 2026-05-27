@@ -411,7 +411,7 @@ and basic profile features alone are sufficient to produce semantically meaningf
 \section{Recruiter-Side Suitability Model Experiments}
 \label{sec:exp_recruiter}
 %============================================================
-The goal of the recruiter-side experiments is to train and evaluate a suitability model that can rank candidates by their fit to a job, using the engineered feature set described in Section~\ref{sec:recruiter_features} and the LLM-generated labels described in Section~\ref{sec:recruiter_data_gen}. A two-stage model selection process is used to first identify the best-performing classifier type among logistic regression, random forest and XGBoost, and then to compare the best classifier across three different negative sampling strategies. Finally, the model is run at inference time to inspect the top-ranked candidates for a sample of Window~7 jobs and confirm that the model has learned meaningful signals of suitability.
+The goal of the recruiter-side experiments is to train and evaluate a suitability model that can rank candidates by their fit to a job, using the engineered feature set described in Section~\ref{sec:recruiter_features} and the \gls{LLM}-generated labels described in Section~\ref{sec:recruiter_data_gen}. A two-stage model selection process is used to first identify the best-performing classifier type among logistic regression, random forest, XGBoost and a soft-voting ensemble of the three. The second stage involves selecting the best classifier across three different negative sampling strategies discussed in Section~\ref{sec:recruiter_balanced}. Finally, the model is run at inference time to inspect the top-ranked candidates for a Window~7 job.
 
 \subsection{Experiment Setting}
 \label{sec:exp_recruiter_setting}
@@ -422,15 +422,14 @@ dataset is small (5{,}896 pairs) and a job-level split is sufficient
 for reliable model selection at this scale. Jobs are randomly 
 partitioned into an 80\% pool for cross-validation and a held-out 
 test set of 20\% used only once after the final model has been 
-chosen. \gls{AUC-ROC} is used as the primary selection 
-criterion. Window~7 is reserved for the qualitative inference evaluation.
+chosen. Window~7 is reserved for the qualitative inference evaluation.
 
 \subsection{Dataset Creation}
 \label{sec:exp_recruiter_datagen}
 
 Labels are generated using the Qwen3.5 (35B) model served locally 
 via the Ollama API, following the procedure described in 
-Section~\ref{sec:recruiter_data_gen}. For each job, up to 20 applicants are evaluated, to ensure diverse jobs in the dataset. The resulting dataset contains 5,896 labeled pairs across 1,511 unique jobs, with the fit level distribution shown in Table~\ref{tab:recruiter_label_dist}. The full prompt 
+Section~\ref{sec:recruiter_data_gen}. For each job, up to 20 applicants are evaluated, to ensure a broader coverage of jobs in the dataset. The resulting dataset contains 5,896 labeled pairs across 1,511 unique jobs, with the fit level distribution shown in Table~\ref{tab:recruiter_label_dist}. The full prompt 
 and an example output are provided in Appendix~\ref{app:llm_prompt}.
 
 \begin{table}[htbp]
@@ -453,12 +452,10 @@ and an example output are provided in Appendix~\ref{app:llm_prompt}.
     \end{tabular}
 \end{table}
 
-The negative sampling is not described here as in Section~ref{exp:} because this is an experiment which has been done (see Section~ref{}).
-
 \subsection{Training Configuration and Hyperparameters}
 \label{sec:exp_recruiter_training_config}
 Within each fold, the \gls{TF-IDF} vectorizer, \gls{PCA} transformer, 
-and feature scaler (See Section~\ref{sec:recruiter_features}) are fitted exclusively on the fold's training 
+and feature scaler (see Section~\ref{sec:recruiter_features}) are fitted exclusively on the fold's training 
 portion to prevent leakage. The \gls{PCA} transformer reduces the 
 $2d_{\text{text}} = 200$-dimensional interaction vector to 
 $d_{\text{pca}} = 80$ components, retaining 92.9\% of the total 
@@ -484,7 +481,10 @@ hyperparameters used for each candidate classifier.
     \end{tabular}
 \end{table}
 
-\subsection{Stage 1: Classifier Selection}
+\subsection{Model Selection}
+This section describes the two-stage model selection process. Throughout the second stage, models are referred to by their negative type (e.g. LLM-negative model, synthetic-negative model or combined model) to reflect the dataset they were trained on. 
+
+\subsubsection{Stage 1: Classifier Selection}
 \label{sec:exp_recruiter_model_comparison}
 
 All four candidate classifiers are compared on the dataset with \gls{LLM}
@@ -492,16 +492,14 @@ negatives only. This way only the model type is varied. The choice of this
 dataset is motivated by the fact that this is the hardest classification task
 among the three strategies, as all negatives are drawn from the real applicant
 pool rather than from randomly sampled non-applicants.
-Table~\ref{tab:recruiter_results_cv} reports 5-fold cross-validation results and Table~\ref{tab:recruiter_results_test} reports the held-out test set
-performance of the selected model.
+Table~\ref{tab:recruiter_results_cv} reports 5-fold cross-validation results and Table~\ref{tab:recruiter_results_test} reports the held-out test set performance of the selected model.
 
 \begin{table}[htbp]
     \centering
     \small
     \caption{5-fold cross-validation results for all candidate classifiers
     on the \gls{LLM}-negative dataset, grouped by job. Values are mean
-    $\pm$ standard deviation across folds. \gls{AUC-ROC} is the primary
-    selection criterion.}
+    $\pm$ standard deviation across folds.}
     \label{tab:recruiter_results_cv}
     \begin{tabular}{lrrrrr}
         \toprule
@@ -536,20 +534,16 @@ performance of the selected model.
     \end{tabular}
 \end{table}
 
-XGBoost achieves the highest F1 (0.597) and outperforms Logistic Regression
+XGBoost outperforms Logistic Regression
 across all metrics except Recall, where both models are nearly identical
 (0.588 vs.\ 0.589). Compared to Random Forest, XGBoost has substantially
-higher Recall (0.588 vs.\ 0.528) --- an important difference in a recruitment
+higher F1 (0.597 vs.\ 0.567) and Recall (0.588 vs.\ 0.528) --- an important difference in a recruitment
 context where missing genuinely qualified candidates is costly. The Ensemble
-achieves a marginally higher AUC (0.696 vs.\ 0.690), but the gap is well
-within the standard deviation of both models and does not represent a
-meaningful difference. XGBoost is therefore selected as the final classifier:
-it achieves the best F1, matches the Ensemble on AUC within noise, and avoids
+achieves similar performance to XGBoost. XGBoost is therefore selected as the final classifier:
+it achieves the best F1, matches the Ensemble, and avoids
 the added complexity of combining three models. The final XGBoost model
 achieves an AUC of 0.724 on the held-out test set, confirming that
-cross-validation performance generalises to unseen jobs. A feature importance
-analysis across all three classifiers is provided in
-Appendix~\ref{app:exp_recruiter_feature_importance}.
+cross-validation performance generalises to unseen jobs. A feature importance table for all three classifiers (XGBoost, Random Forest, Logistic Regression) is provided in Appendix~\ref{app:exp_recruiter_feature_importance}.
 
 \begin{table}[htbp]
     \centering
@@ -570,21 +564,21 @@ Appendix~\ref{app:exp_recruiter_feature_importance}.
 
 
 
-\subsection{Stage 2: Negative Strategy Selection}
+\subsubsection{Stage 2: Negative Strategy Selection}
 \label{sec:exp_recruiter_negatives}
  
-Having established XGBoost as the strongest classifier, the model type is now held fixed and the negative construction strategy is varied. Table~\ref{tab:recruiter_neg_comparison} reports XGBoost test set performance for each strategy, where each model is evaluated on a test set constructed with the same negative type as its training data.
+Having established XGBoost as the strongest classifier, the model type is now held fixed and the negative construction strategy is varied, as discussed in Section~\ref{sec:recruiter_balanced}. Table~\ref{tab:recruiter_neg_comparison} reports XGBoost test set performance for each strategy, where each model is evaluated on a test set constructed with the same negative type as its training data. 
  
-\subsubsection{Synthetic vs.\ LLM negatives}
-The first interesting but expected result is the gap between the synthetic and LLM models: \gls{AUC} 0.852 vs.\ 0.724, a difference of 0.128. This gap is a task-difficulty effect. The synthetic model is tested on random non-applicants, who by construction are unlikely to match the job on any meaningful feature; almost any signal separates them from strong applicants. The LLM model is tested on poor-fit applicants from the real pool --- candidates who self-selected to apply despite a mismatch. These share the same self-selection signal as positives, forcing the model to rely on deeper feature differences. The lower \gls{AUC} correctly reflects the genuine difficulty of that discrimination task.
+\paragraph{Synthetic vs.\ LLM negatives.}
+The first interesting but expected result is the gap in performance between the synthetic and \gls{LLM}-based negatives: \gls{AUC} 0.852 vs.\ 0.724 due to a difference in task difficulty, as discussed in Section~\ref{sec:recruiter_balanced}. The synthetic-negative model is tested on random non-applicants who are easy to separate from strong candidates, while the LLM-negative model faces the harder within-pool discrimination task. The problem with training on synthetic negatives is that it may not generalise well to the within-applicant-pool ranking scenario and the model trained on \gls{LLM} negatives may not generalise well to the broader candidate-scoring context in congestion balancing. This motivates the combined strategy, which is evaluated next.
  
-\subsubsection{Combined as the Best Choice}
-The combined model achieves \gls{AUC} 0.755 on a mixed test set with equal proportions of LLM and synthetic negatives, outperforming the LLM-only model (0.724) but underperforming the synthetic-only model (0.852). Crucially, in the congestion balancing context of Chapter~\ref{chap:congestion_balancing}, the model must score candidates who may not have applied to the job at all --- which is precisely the synthetic scenario. A model trained exclusively on LLM negatives has never seen that setting and may not generalise well to it. The combined model handles both regimes and achieves the best verified performance across them.
+\paragraph{Combined model as the best choice.}
+The combined model achieves an \gls{AUC} of 0.755 on a mixed test set with equal proportions of \gls{LLM} and synthetic negatives, outperforming the LLM-negative model (0.724) but underperforming the synthetic-negative model (0.852). All other metrics are also in between the two extremes. Crucially, in the congestion balancing context of Chapter~\ref{chap:congestion_balancing}, the model must score all $(u,j)$ pairs during the application phase and rank all applicants for a given job during the recruitment phase. The combined model is the only one of the three that has been trained on data resembling both scenarios, and therefore is expected to generalise best across the board. XGBoost trained on combined negatives is therefore selected as the final recruiter-side model and serialised for use in Chapter~\ref{chap:congestion_balancing}
 
  
 \begin{table}[H]
     \centering
-    \caption{Effect of negative sampling strategy on XGBoost test set performance. Each model is evaluated on a test set matching its training negatives; AUC values reflect both model quality and task difficulty and are not directly comparable across rows (see text).}
+    \caption{Effect of negative sampling strategy on XGBoost test set performance. Each model is evaluated on a test set matching its training negatives; AUC values reflect both model quality and task difficulty.}
     \label{tab:recruiter_neg_comparison}
     \begin{tabular}{lrrrrr}
         \toprule
@@ -597,105 +591,11 @@ The combined model achieves \gls{AUC} 0.755 on a mixed test set with equal propo
     \end{tabular}
 \end{table}
  
-The two-stage selection process yields a clear conclusion: \textbf{XGBoost trained on combined negatives} is the final recruiter-side model. It achieves the best balance between the two extremes, generalises to both the within-applicant-pool ranking scenario and the broader candidate-scoring context in congestion balancing, and outperforms the LLM-only model on a verified test set. This model is serialised and used as a recruiter-side suitability scorer
-and candidate ranker in Chapter~\ref{chap:congestion_balancing}.
- 
 \subsection{Qualitative Inference Evaluation}
 \label{sec:exp_recruiter_sanity}
 
-To validate that the final combined model behaves sensibly in practice,
-three jobs are sampled from Windows~5--6 --- jobs the model has never
-seen during training or model selection. The three cases probe different
-aspects of model behaviour: generalisation to non-applicants (Job~1),
-within-pool differentiation among actual applicants (Job~2), and mixed
-ranking across both groups (Job~3). All scores are produced by the
-final XGBoost model trained on combined negatives.
+To validate that the final combined model behaves sensibly in practice, a qualitative sanity check is performed on a Window~7 job with a mix of applicants and non-applicants. The assessment is based on the expectation that the model should rank applicants generally higher than non-applicants, and that within the applicant group, candidates with more relevant experience and education should be ranked higher than those with less relevant profiles. The same should hold for non-applicants, where candidates with finance-adjacent backgrounds should be ranked higher than those with unrelated experience.
 
-A note on absolute scores: the model scores fit quality rather than
-application likelihood, so scores are intentionally moderate even for
-genuine applicants who lack key requirements. The meaningful signal lies
-in the relative ranking rather than the absolute value.
-
-\paragraph{Job 814441 — Office associate: non-applicant generalisation.}
-This role requires administrative and customer service skills, basic PC
-knowledge, and experience with office equipment, with accounting or
-finance experience listed as a plus. Five random non-applicants are
-scored to test whether the model generalises to candidates it was not
-explicitly trained on. Table~\ref{tab:sanity_office_assoc} shows the
-results.
-
-The model correctly places the customer service and clerical profile
-(41.0\%) at the top --- a direct match for the role's core requirements
---- while IT and banking profiles rank lower. One notable anomaly is
-user 1442371, who reports 112 years of experience, almost certainly a
-data entry error. Despite this outlier value, the model does not
-over-reward the candidate, suggesting the feature scaler handles
-extreme values robustly. The accounting assistant profile (12.3\%)
-ranks fourth despite being finance-adjacent, likely because the history
-keywords align less strongly with the administrative and customer-facing
-language of the job description than the cashier and file clerk
-terminology of the top-ranked candidate --- a known characteristic of
-TF-IDF-based features.
-
-\begin{table}[H]
-    \centering
-    \caption{Sanity check --- Job 814441 (Office associate).
-    Five random non-applicants scored by the final combined model.}
-    \label{tab:sanity_office_assoc}
-    \small
-    \begin{tabular}{r r l r p{6.5cm}}
-        \toprule
-        \textbf{Rank} & \textbf{Score} & \textbf{Degree} &
-        \textbf{Exp} & \textbf{Recent history} \\
-        \midrule
-        1 & 41.0\% & High School &  10y & Customer Service, File Clerk, Cashier \\
-        2 & 33.1\% & Bachelor's  & 112y & Contract Site Supervisor, Head Tennis Coach, Operations Manager \\
-        3 & 20.0\% & Bachelor's  &   4y & IT Specialist, IT Support Technician, Help Desk \\
-        4 & 12.3\% & ---         &   9y & Accounting Assistant, AP Specialist, Teller \\
-        5 &  7.1\% & Bachelor's  &   7y & Licensed Personal Banker, Assistant Manager \\
-        \bottomrule
-    \end{tabular}
-\end{table}
-
-\paragraph{Job 446397 — Client liaison / project coordinator:
-within-pool differentiation.}
-This role requires at least two years of experience in healthcare or
-insurance project management, strong communication skills, and the
-ability to manage client relationships. Five actual applicants are
-scored to test whether the model creates meaningful differentiation
-within the harder within-pool regime. Table~\ref{tab:sanity_client_liaison}
-shows the results.
-
-The model produces a spread from 15.3\% to 52.7\%, with the top
-candidate being an assistant manager and customer service representative
-with six years of experience. Absolute scores are moderate across the
-board, which is expected: none of the applicants have an explicit
-healthcare or insurance project management background, so the model
-correctly reflects that no candidate is a strong fit. The bottom two
-candidates --- a master cashier and housekeeper, and a candidate with
-sparse unstructured history --- score lowest, consistent with their
-profiles being furthest from the role's requirements.
-
-\begin{table}[H]
-    \centering
-    \caption{Sanity check --- Job 446397 (Client liaison / project
-    coordinator). Five actual applicants scored by the final combined
-    model.}
-    \label{tab:sanity_client_liaison}
-    \small
-    \begin{tabular}{r r l r p{6.5cm}}
-        \toprule
-        \textbf{Rank} & \textbf{Score} & \textbf{Degree} &
-        \textbf{Exp} & \textbf{Recent history} \\
-        \midrule
-        1 & 52.7\% & ---         &  6y & Assistant Manager, Customer Service Rep, Senior Customer Service \\
-        2 & 41.1\% & Bachelor's  & 10y & Office and Operations Manager, Production Manager, Technical \\
-        3 & 36.0\% & Master's    &  6y & Sales Representative, Enrollment Advisor, Account Manager \\
-        4 & 17.1\% & ---         &  3y & Tennessean Paper Co., Volunteer Work \\
-        5 & 15.3\% & High School &  8y & Master Cashier, Housekeeper, Sales Associate \\
-        \bottomrule
-    \end{tabular}
-\end{table}
 
 \paragraph{Job 1053516 — VP assistant treasurer: mixed ranking.}
 This senior role requires 15 or more years of experience in banking,
@@ -706,11 +606,11 @@ the model ranks the two groups sensibly in a mixed setting.
 Table~\ref{tab:sanity_vp_treasurer} shows the full combined ranking.
 
 The top three positions are all held by applicants with finance
-backgrounds: a CPA assistant and bank teller (62.9\%), a fund
+backgrounds, all holding a Bachelor's degree: a CPA assistant and bank teller (62.9\%), a fund
 accountant with 16 years of experience (60.4\%), and an assistant
 controller with 28 years (48.3\%). The best-scoring non-applicant
 (42.9\%) is an accounting analyst with teller experience --- a
-finance-adjacent profile that plausibly overlaps with treasury work,
+finance-adjacent profile that overlaps with treasury work,
 so its placement at rank~4 is reasonable rather than a model error.
 Non-applicants with unrelated backgrounds such as lab management,
 retail, and customer service correctly cluster at the bottom.
@@ -719,7 +619,7 @@ Applicants score 32.5\% on average versus 22.7\% for non-applicants,
 confirming that the model assigns systematically higher suitability to
 the self-selected group. The two lowest-scoring applicants (16.2\% and
 6.9\%) have histories in cashiering, internships, and night auditing
---- profiles that share little with the senior treasury role despite
+--- profiles that share little with the job requirements despite
 the applicants having chosen to apply, which the model correctly
 penalises.
 
