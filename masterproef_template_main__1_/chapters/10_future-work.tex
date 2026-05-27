@@ -1,177 +1,68 @@
-%This chapter explains what the next steps are to continue the research and innovation of your master's thesis. Are there any additional features of research directions that are interesting? Are there ways in which your solution can be improved?
 \chapter*{Future Work}
 \chaptermark{Future Work}
 \addcontentsline{toc}{chapter}{Future Work}  
 \label{ch:future-work}
 
-While the proposed framework produces strong quantitative results and qualitatively sensible behaviour,
-several structural limitations constrain the current design. These are discussed per component below,
-together with the most natural directions for future work.
+While the proposed framework produces strong quantitative results and qualitatively 
+sensible behaviour, several structural limitations constrain the current design. These 
+are discussed per component below, together with the most natural directions for 
+future work.
 
 \section{User-Side Recommender}
 
-The Two-Tower model operates on implicit feedback: application events are treated as binary
-positive signals, equating \emph{applied to} with \emph{good fit}. This assumption is a known
-limitation of interaction-log-based training~\cite{yin2026correctweightsimpleeffective}. A
-user may apply speculatively to positions for which they are underqualified, or conversely
-fail to apply to a highly relevant job due to limited visibility. This label noise is
-structural rather than incidental, and any model trained on application logs inherits it. A
-natural direction for future work would be to incorporate downstream hiring signals ---
-interview invitations, shortlisting decisions, or hiring outcomes --- to replace the current
-binary scheme with graded relevance labels, aligning the training objective more closely with
-the platform's actual goal of facilitating successful matches.
+The \gls{TT} model operates on implicit feedback: application events are treated as 
+binary positive signals, meaning \emph{applied to} is assumed to be a \emph{good fit} 
+and \emph{not applied to} a \emph{poor fit}. A user may apply speculatively to 
+positions for which they are underqualified, or conversely fail to apply to a highly 
+relevant job due to limited visibility, introducing label noise. Two complementary 
+improvements to the training objective address this. First, the loss function could be 
+adapted to correct for false negatives: ~\cite{yin2026correctweightsimpleeffective} 
+proposes a Corrected and Weighted (CW) loss that re-calibrates the assumed negative 
+distribution using Positive-Unlabeled learning and dynamically down-weights uncertain 
+negatives that are likely mislabelled. Second, even with corrected labels, Binary 
+Cross-Entropy treats each example independently while the actual task is a ranking 
+problem. Replacing it with a ranking-aware objective such as Bayesian Personalised 
+Ranking~\cite{rendle2012bprbayesianpersonalizedranking} would align training more 
+directly with the evaluation metrics without any architectural change.
 
-A second direction concerns the training objective itself. The model is optimised with
-Binary Cross-Entropy loss, which treats each example independently and does not directly
-optimise for ranking quality. The deployment task, however, is a ranking problem: what
-matters is whether the most relevant jobs appear at the top of the list, not whether each
-pair is classified correctly in isolation. Replacing BCE with a ranking-aware objective such
-as Bayesian Personalised Ranking~\cite{rendle2012bprbayesianpersonalizedranking} would
-align training more directly with the evaluation metrics and could improve top-$K$
-performance without any architectural change.
-
-The negative sampling strategy offers a third avenue for improvement. Negatives are
-constructed once at dataset creation time using a fixed mixture of geographically proximal
-and distant jobs, and this set remains unchanged throughout training. Early in training, when
-the model is still a poor discriminator, these negatives are genuinely challenging. As the
-model improves, however, the same examples become trivially easy to reject, providing
-diminishing learning signal. A dynamic strategy --- where negatives are refreshed during
-training by selecting jobs the model currently scores as nearly relevant but that are
-in fact incorrect --- would maintain a consistent level of difficulty throughout and force the
-model to refine its representations beyond what a fixed negative set allows \cite{10.1145/2484028.2484126}.
-
-At the architectural level, the two towers process their respective inputs in complete
-isolation: the user tower reads the user profile and produces a single vector; the job tower
-does the same for the job. The only moment the two representations interact is the final dot
-product, which reduces compatibility to a single geometric similarity score. This means the
-model cannot capture conditional relationships between features --- for instance, that
-geographic proximity matters more for junior roles than for senior ones, or that a specific
-skill in the user profile is only relevant given a particular job category. A recruiter
-reading a CV alongside a job description naturally reasons across both simultaneously; the
-two-tower design structurally prevents this. Introducing cross-interactions between the two
-sides during encoding, as proposed by~\cite{su2023twotowermatchinglearningsparse}, could capture these
-dependencies and improve matching precision, though at the cost of the caching efficiency
-that makes the current design practical at scale.
-
-Finally, the popularity bias present in the historical application log is reflected in the
-training data: jobs that attracted many applications are well-represented in positive pairs
-and tend to produce large, well-separated embeddings, while rarely-applied-to jobs are
-underrepresented. The congestion correction described in
-Chapter~\ref{chap:congestion_balancing} addresses this post-hoc via score adjustments at
-inference time, but the underlying embedding space remains skewed toward popular jobs. A
-more principled direction for future work would be to incorporate the congestion objective
-directly into the training procedure, so that the model learns to produce fairer
-representations from the start rather than correcting for bias downstream. The work of
-\cite{mashayekhi2023reconreducingcongestionjob} demonstrates this in-processing paradigm by combining an optimal transport component with a
-job recommendation model in a joint optimisation problem, showing that congestion can be
-reduced without sacrificing recommendation quality.
+Finally, the model optimises purely for user preference with no explicit notion of 
+fairness or congestion, leaving the market-maker framework as a post-processing 
+correction. A more principled direction would be to incorporate the congestion 
+objective directly into training, so that the model learns fairer representations from 
+the start. The work of~\cite{mashayekhi2023reconreducingcongestionjob} demonstrates 
+this by combining an optimal transport component with a job recommendation model in a 
+joint optimisation problem, showing that congestion can be reduced without sacrificing 
+recommendation quality.
 
 \section{Recruiter-Side Recommender}
 
-The most fundamental limitation of the recruiter-side component is that the model learns to
-replicate the judgments of a \gls{LLM}, not the decisions of actual human
-recruiters. LLM-generated labels are a proxy for ground truth: the labeler may carry biases
-inherited from its pretraining data, and despite the structured \gls{CoT} prompt, the model
-may apply inconsistent implicit thresholds across independent calls. This is a documented
-concern in LLM-as-judge settings more broadly, with research
-specifically in recruitment contexts showing that implicit biases around educational
-background remain significant even in recent models~\cite{iso2025evaluatingbiasllmsjobresume}. Access to real recruiter
-feedback would remove this layer of indirection entirely and allow the model to learn from ground truth rather than a simulation of it.
+The biggest limitation is that it learns to replicate the judgments of an \gls{LLM} rather than actual human recruiters, using 
+features that only partially capture what the LLM itself reasons over. On the label 
+side, \glspl{LLM} may carry biases inherited from pretraining 
+data~\cite{iso2025evaluatingbiasllmsjobresume}, and access to real recruiter feedback 
+would remove this layer of indirection entirely. On the feature side, the current 
+heuristic and semantic signals do not fully capture the nuances of job descriptions 
+and candidate profiles. More expressive feature engineering or even a more complex model architecture could improve the model's ability to predict recruiter judgments, though this would require more data. 
 
-A second limitation concerns the small size of the labelled dataset. With fewer than 6,000
-$(u,j)$ pairs, the XGBoost classifier is trained on a small subset of the full
-diversity of $(u,j)$ combinations present in the CareerBuilder dataset. Performance on unusual or underrepresented job categories is therefore difficult to
-assess, and the model may not generalise well to posting styles or candidate profiles
-not covered by the labelled sample. The bottleneck here is the computational
-cost of LLM-based labelling at scale. Future work could address this through faster
-inference, batched prompt optimisation, or by distilling the LLM's judgments into a smaller,
-faster labelling model that can be run over a substantially larger sample.
-
-A third limitation is that several heuristic features rely on regex extraction. Both
-the experience delta and the degree match feature are derived by
-parsing free-text job postings with hand-crafted patterns. When a posting does not follow a
-standard format, the regex fails silently: the experience delta defaults to zero and degree
-requirements go undetected. This means the features are informative only when the posting is
-well-structured, and they carry no signal otherwise. A future direction would be to replace regex extraction with a structured
-information extraction model --- either a fine-tuned transformer or a zero-shot
-LLM prompting approach --- which would be more robust to formatting variation and
-would recover requirements from a broader range of posting styles.
-
-Fourth, the four-level LLM fit judgments --- \textit{Very Good Fit}, \textit{Good Fit},
-\textit{Poor Fit}, \textit{Very Poor Fit} --- are collapsed to binary labels before
-training. This discards a meaningful distinction: a borderline \textit{Good Fit} and a
-\textit{Very Good Fit} are treated identically as positives, and the model has no signal to
-distinguish between them. Training directly on the ordinal fit levels using a ranking or
-ordinal regression objective would preserve this gradient and give the model a richer
-supervisory signal \cite{wang2025surveyordinalregressionapplications}, potentially producing better-calibrated suitability scores at inference
-time.
-
-Finally, the semantic similarity features rely on cosine similarity between general-purpose
-Qwen3 text embeddings of job titles. These embeddings capture broad semantic proximity ---
-they know that \textit{software engineer} and \textit{backend developer} are conceptually
-close --- but they have no notion of recruitment-specific compatibility. A recruiter
-assessing suitability reasons about seniority gaps, domain transitions, and
-overqualification: two titles can be semantically similar while representing incompatible
-experience levels, or semantically distant while actually constituting a strong recruiter
-match. The cosine similarity feature therefore measures the wrong thing at a fine-grained
-level, and the model can only compensate for this through the other features in the vector.
-A future direction would be to fine-tune the text encoder on recruiter-labelled
-$(u,j)$ pairs, so that proximity in the embedding space reflects qualification
-judgments rather than general language similarity.
+A separate limitation is the binary classification approach. The four-level \gls{LLM} 
+fit judgments (\textit{Very Good Fit}, \textit{Good Fit}, \textit{Poor Fit}, 
+\textit{Very Poor Fit}) are mapped to binary labels before training, removing a 
+meaningful distinction. Training directly on the ordinal fit levels using ordinal 
+regression~\cite{wang2025surveyordinalregressionapplications} would preserve this 
+ordinal structure and give the model a better signal, potentially producing 
+better-calibrated suitability scores at inference time.
 
 \section{Congestion Balancing}
 
-The most immediate limitation of the market-maker framework is that all
-threshold and shape parameters --- $\tau_{\min}$, $\tau_{\max}$, $H$, $B$,
-$P$, and the market makers --- are set manually rather than
-optimised. The chapter is explicit that these are design choices, not tuned
-hyperparameters. In a real deployment, the optimal values depend on the scale
-of the job market, the application volume, and the platform's balance between
-relevance and distributional equity. A natural direction for future work would
-be to frame parameter selection as an optimisation problem with explicit
-objectives on both quality and fairness metrics, either via grid search,
-Bayesian optimisation, or a learned controller that adapts thresholds
-dynamically as market conditions change.
+The first limitation is the manual setting of all threshold and 
+shape parameters ($\tau_{\min}$, $\tau_{\max}$, $H$, $B$, $P$, and the market maker 
+scale parameters), which are pure design choices.
+Second, the penalty functions themselves are static, applying the same shape 
+regardless of whether a job is a popular or not. Framing 
+parameter selection as an optimisation problem, and allowing penalty shapes to 
+adapt to entity-level characteristics, would address both limitations simultaneously.
 
-A second limitation is the order dependence of the sequential simulation.
-Users and job inboxes are processed one by one, and the running counters
-$c_j^{(t)}$ and $v_u^{(t)}$ accumulate as the simulation progresses. This
-means early-processed users shape the penalty landscape seen by later-processed
-ones: a job that fills its safe zone early is penalised for all subsequent
-users, regardless of their fit. No principled ordering is used, so the results
-are implicitly a function of processing order. In a live system, this temporal
-dependence is unavoidable, but its effect on the final distribution --- and
-whether it systematically disadvantages certain user segments --- is not
-analysed. Future work could examine order-robust variants, for instance by
-processing users in randomised batches or by running the simulation multiple
-times with different orderings and reporting average behaviour.
-
-Third, Phase~1 of the hybrid strategy simulates the application pool by taking
-each user's top-$k$ jobs by combined score, where $k$ matches their historical
-application count. This conflates \emph{recommended} with \emph{applied to}: in
-practice, users apply selectively based on information beyond what the model
-captures, and not every high-scoring recommendation translates into an
-application. The simulated inboxes entering Phase~2 are therefore cleaner and
-more model-aligned than real inboxes would be, which likely leads to an
-optimistic estimate of the candidate-side congestion reduction achievable in
-production.
-
-Fourth, the weighting parameter $\alpha = 0.5$ in the bilateral scoring
-formula (Equation~\ref{eq:combined_score}) is fixed for simplicity, giving
-equal weight to the user-side and recruiter-side signals. This is an arbitrary
-choice. The optimal choice for $\alpha$ depends on which model would be considered most important. If the user preference is considered more important the weight for the Two-Tower model would be greater than 0.5 and vice versa for the suitability. Also in settings where one model is substantially more reliable than
-the other, equal weighting would be suboptimal. A learned or cross-validated
-$\alpha$ would be a straightforward improvement, and examining the sensitivity
-of congestion and quality metrics to its value would clarify how robust the
-current results are to this design choice.
-
-Finally, the hard cap $H$ removes any entity from consideration entirely once
-it exceeds a fixed count. For jobs, this means a posting that has received
-$H^{\text{job}}$ applications will not appear in any subsequent user's
-recommendations, even for users for whom it is the best available match and
-for whom no comparable alternative exists. The issue is that it 
-prioritises an equal distribution unconditionally over individual relevance.
-A softer alternative --- such as capping the penalty at a large but finite
-value, or conditioning the hard cap on whether a suitable substitute exists
-in the user's ranking --- would allow the framework to respect equity without
-entirely eliminating relevant options for users in sparse job markets.
+The final limitation is structural which is the order dependence of the sequential simulation. Users 
+and job inboxes are processed one by one, and the running counters $c_j^{(t)}$ and 
+$v_u^{(t)}$ accumulate as the simulation progresses, meaning early-processed users 
+shape the penalty landscape seen by later ones. This means for example that a user at the beginning gets better recommended jobs than a user towards the end, which is unfair. Future work could examine the impact of processing order an solution this by for example randomising the order at each iteration or processing users in parallel.
